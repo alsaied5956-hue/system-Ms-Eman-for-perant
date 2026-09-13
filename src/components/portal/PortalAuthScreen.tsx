@@ -39,12 +39,17 @@ export const PortalAuthScreen: React.FC<PortalAuthScreenProps> = ({
   revocationNotice,
   onClearRevocationNotice,
 }) => {
-  const [activeTab, setActiveTab] = useState<"login" | "register">("login");
+  const [activeTab, setActiveTab] = useState<"login" | "register" | "supervisor">("login");
 
   // Login form state
   const [loginBarcode, setLoginBarcode] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [showLoginPassword, setShowLoginPassword] = useState(false);
+
+  // Dedicated Supervisor form state
+  const [supervisorId, setSupervisorId] = useState("");
+  const [supervisorPin, setSupervisorPin] = useState("");
+  const [showSupervisorPin, setShowSupervisorPin] = useState(false);
 
   // Register form state
   const [regBarcode, setRegBarcode] = useState("");
@@ -108,6 +113,56 @@ export const PortalAuthScreen: React.FC<PortalAuthScreenProps> = ({
       }
     } catch (err) {
       setErrorMsg("حدث خطأ غير متوقع أثناء تسجيل الدخول. يرجى المحاولة ثانية.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Submit Dedicated Supervisor Login (Bypasses parent accounts activation)
+  const handleSupervisorSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setIsAlreadyActiveNotice(false);
+    setIsLoading(true);
+
+    try {
+      const cleanId = supervisorId.trim();
+      const cleanPin = supervisorPin.trim();
+
+      if (!cleanId || !cleanPin) {
+        setErrorMsg("يرجى إدخال رقم هاتف المشرف أو المعرف والرمز السري.");
+        setIsLoading(false);
+        return;
+      }
+
+      // 1. Direct bypassed supervisor credentials check
+      const cleanPhone = cleanId.replace(/\D/g, "");
+      const isSupervisor =
+        (cleanId === "01000000000" ||
+          cleanPhone === "01000000000" ||
+          cleanPhone === "1000000000" ||
+          cleanId === "1" ||
+          cleanId.toLowerCase() === "admin" ||
+          cleanId.toLowerCase() === "supervisor") &&
+        (cleanPin === "2468" || cleanPin === "admin");
+
+      if (isSupervisor) {
+        setSuccessMsg("تم تسجيل دخول المشرف العام بنجاح!");
+        onLoginSuccess("admin", undefined, cleanId);
+        return;
+      }
+
+      // 2. Delegate to authentication service
+      const res = await authenticatePortalLogin(cleanId, cleanPin, students);
+      if (res.success && res.role === "admin") {
+        setSuccessMsg(res.message);
+        onLoginSuccess("admin", res.account, cleanId);
+      } else {
+        setErrorMsg("بيانات دخول المشرف غير صحيحة. يرجى التأكد من رقم الهاتف والرمز السري (PIN).");
+      }
+    } catch {
+      setErrorMsg("حدث خطأ أثناء التحقق من صلاحيات المشرف.");
     } finally {
       setIsLoading(false);
     }
@@ -195,43 +250,64 @@ export const PortalAuthScreen: React.FC<PortalAuthScreenProps> = ({
           </div>
 
           {/* Mode Switcher Tabs */}
-          <div className="grid grid-cols-2 p-1.5 rounded-2xl bg-slate-950/80 border border-slate-800">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("login");
-                setErrorMsg(null);
-                setSuccessMsg(null);
-                setIsAlreadyActiveNotice(false);
-              }}
-              className={`py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                activeTab === "login"
-                  ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md font-extrabold"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <KeyRound className="w-4 h-4" />
-              <span>تسجيل الدخول</span>
-            </button>
+          {activeTab === "supervisor" ? (
+            <div className="flex items-center justify-between p-2 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold animate-fadeIn">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-amber-400" />
+                <span>دخول المشرف العام والإدارة</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("login");
+                  setErrorMsg(null);
+                  setSuccessMsg(null);
+                  setIsAlreadyActiveNotice(false);
+                }}
+                className="text-xs text-slate-300 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 transition cursor-pointer"
+              >
+                العودة لدخول أولياء الأمور ↵
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 p-1.5 rounded-2xl bg-slate-950/80 border border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("login");
+                  setErrorMsg(null);
+                  setSuccessMsg(null);
+                  setIsAlreadyActiveNotice(false);
+                }}
+                className={`py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  activeTab === "login"
+                    ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md font-extrabold"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <KeyRound className="w-4 h-4" />
+                <span>تسجيل الدخول</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("register");
-                setErrorMsg(null);
-                setSuccessMsg(null);
-                setIsAlreadyActiveNotice(false);
-              }}
-              className={`py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                activeTab === "register"
-                  ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md font-extrabold"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <UserCheck className="w-4 h-4" />
-              <span>تفعيل حساب جديد (أول مرة)</span>
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("register");
+                  setErrorMsg(null);
+                  setSuccessMsg(null);
+                  setIsAlreadyActiveNotice(false);
+                }}
+                className={`py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  activeTab === "register"
+                    ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md font-extrabold"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <UserCheck className="w-4 h-4" />
+                <span>تفعيل حساب جديد (أول مرة)</span>
+              </button>
+            </div>
+          )}
 
           {/* Remote Logout Revocation Notice */}
           {revocationNotice && (
@@ -358,6 +434,89 @@ export const PortalAuthScreen: React.FC<PortalAuthScreenProps> = ({
                   <>
                     <KeyRound className="w-4 h-4" />
                     <span>دخول البوابة</span>
+                  </>
+                )}
+              </button>
+
+              {/* Discrete Supervisor Login Toggle Button */}
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("supervisor");
+                    setErrorMsg(null);
+                    setSuccessMsg(null);
+                    setIsAlreadyActiveNotice(false);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold text-slate-400 hover:text-amber-400 hover:bg-slate-800/50 border border-slate-800 hover:border-amber-500/30 transition cursor-pointer"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+                  <span>تسجيل دخول المشرفين</span>
+                </button>
+              </div>
+            </form>
+          ) : activeTab === "supervisor" ? (
+            /* TAB 3: DEDICATED SUPERVISOR LOGIN */
+            <form onSubmit={handleSupervisorSubmit} className="space-y-4 animate-fadeIn">
+              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-[11px] text-amber-300 leading-relaxed flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 shrink-0 text-amber-400" />
+                <span>لوحة تسجيل الدخول المخصصة للمشرف العام وإدارة المنظومة.</span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                  <Phone className="w-4 h-4 text-amber-400" />
+                  <span>رقم هاتف المشرف أو الكود التعريفي</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    dir="ltr"
+                    value={supervisorId}
+                    onChange={(e) => setSupervisorId(e.target.value)}
+                    placeholder="رقم الهاتف أو المعرف"
+                    className="w-full px-4 py-3 rounded-2xl bg-slate-950/70 border border-slate-700/80 focus:border-amber-400 focus:outline-none text-white text-sm font-mono tracking-wider text-center"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                  <Lock className="w-4 h-4 text-amber-400" />
+                  <span>الرمز السري (PIN)</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showSupervisorPin ? "text" : "password"}
+                    required
+                    dir="ltr"
+                    value={supervisorPin}
+                    onChange={(e) => setSupervisorPin(e.target.value)}
+                    placeholder="••••"
+                    className="w-full px-4 py-3 rounded-2xl bg-slate-950/70 border border-slate-700/80 focus:border-amber-400 focus:outline-none text-white text-sm font-mono tracking-widest text-center"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSupervisorPin(!showSupervisorPin)}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1"
+                  >
+                    {showSupervisorPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-extrabold text-sm transition-all shadow-xl shadow-amber-500/20 active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+              >
+                {isLoading ? (
+                  <span>جاري التحقق من صلاحيات المشرف...</span>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>دخول لوحة تحكم المشرف</span>
                   </>
                 )}
               </button>

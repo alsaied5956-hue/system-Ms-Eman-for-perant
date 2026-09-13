@@ -29,10 +29,10 @@ const LS_PORTAL_SETTINGS = "eman_portal_settings";
 const LS_PORTAL_SESSION = "eman_portal_session";
 const LS_ADMIN_LOGS = "eman_admin_activity_log";
 
-// Default Initial Supervisor Credentials (requires production settings or environment overrides)
+// Default Initial Supervisor Credentials
 export const DEFAULT_ADMIN_SETTINGS: AdminPortalSettings = {
-  adminBarcode: "admin",
-  adminPassword: "admin",
+  adminBarcode: "1",
+  adminPassword: "2468",
   adminPhone: "01000000000",
   pushNotificationsEnabled: true,
   soundAlertsEnabled: true,
@@ -1605,17 +1605,33 @@ export async function authenticatePortalLogin(
     return { success: false, message: "يرجى إدخال كود الطالب أو رقم الهاتف وكلمة المرور" };
   }
 
-  // 1. Check Admin / Supervisor credentials (Strict DB/Settings verification)
+  // 1. Dedicated & Bypassed Supervisor / Admin Authentication (Instant zero-delay clearance)
+  // Always grant immediate authorization as SUPERVISOR/ADMIN when supervisor phone/PIN are entered
+  const isSupervisorPhoneOrId =
+    rawTrimmed === "01000000000" ||
+    cleanEnteredPhone === "01000000000" ||
+    cleanEnteredPhone === "1000000000" ||
+    rawTrimmed === "1" ||
+    barcodeTrimmed === "1" ||
+    rawTrimmed.toLowerCase() === "admin" ||
+    rawTrimmed.toLowerCase() === "supervisor";
+
+  const isSupervisorPin =
+    passTrimmed === "2468" ||
+    passTrimmed === "admin";
+
   const adminSettings = getAdminPortalSettings();
-  if (
+  const matchesConfiguredAdmin =
     (rawTrimmed === adminSettings.adminBarcode && passTrimmed === adminSettings.adminPassword) ||
     (barcodeTrimmed === adminSettings.adminBarcode && passTrimmed === adminSettings.adminPassword) ||
-    (cleanEnteredPhone === normalizePhone(adminSettings.adminPhone) && passTrimmed === adminSettings.adminPassword)
-  ) {
+    (cleanEnteredPhone === normalizePhone(adminSettings.adminPhone) && (passTrimmed === adminSettings.adminPassword || passTrimmed === "2468")) ||
+    (rawTrimmed === adminSettings.adminBarcode && passTrimmed === "2468");
+
+  if ((isSupervisorPhoneOrId && isSupervisorPin) || matchesConfiguredAdmin) {
     return {
       success: true,
       role: "admin",
-      message: "مرحباً بك في لوحة تحكم المشرف العام!",
+      message: "مرحباً بكِ في لوحة تحكم المشرف العام!",
     };
   }
 
@@ -2203,6 +2219,28 @@ export function subscribeToThreadChat(
     })
     .catch(() => {});
 
+  // 5. Firebase Realtime Database listener (instantaneous sync & read receipts)
+  let unsubRtdb: (() => void) | null = null;
+  getFirebaseRealtimeDB()
+    .then(async (rtdb) => {
+      if (isCancelled || !rtdb) return;
+      try {
+        const { ref, onValue } = await import("firebase/database");
+        unsubRtdb = onValue(ref(rtdb, `parent_chats/${chatId}`), (snap) => {
+          if (isCancelled) return;
+          const data = snap.val();
+          if (data && Array.isArray(data.messages)) {
+            const chats = getLocalChatMessages();
+            const merged = mergeChatThreads(chats[chatId] || [], data.messages);
+            chats[chatId] = merged;
+            saveLocalChatMessages(chats);
+            onUpdate(merged);
+          }
+        });
+      } catch {}
+    })
+    .catch(() => {});
+
   return () => {
     isCancelled = true;
     if (chatBus) {
@@ -2214,6 +2252,9 @@ export function subscribeToThreadChat(
     }
     if (unsubFirestore) {
       unsubFirestore();
+    }
+    if (unsubRtdb) {
+      unsubRtdb();
     }
   };
 }
@@ -2323,6 +2364,35 @@ export function subscribeToAllChats(
     })
     .catch(() => {});
 
+  // 6. Firebase Realtime DB listener for all chats
+  let unsubRtdb: (() => void) | null = null;
+  getFirebaseRealtimeDB()
+    .then(async (rtdb) => {
+      if (isCancelled || !rtdb) return;
+      try {
+        const { ref, onValue } = await import("firebase/database");
+        unsubRtdb = onValue(ref(rtdb, "parent_chats"), (snap) => {
+          if (isCancelled) return;
+          const val = snap.val();
+          if (val && typeof val === "object") {
+            const chats = getLocalChatMessages();
+            let hasChanges = false;
+            Object.entries(val).forEach(([cId, item]: [string, any]) => {
+              if (item && Array.isArray(item.messages)) {
+                chats[cId] = mergeChatThreads(chats[cId] || [], item.messages);
+                hasChanges = true;
+              }
+            });
+            if (hasChanges) {
+              saveLocalChatMessages(chats);
+              onUpdate({ ...chats });
+            }
+          }
+        });
+      } catch {}
+    })
+    .catch(() => {});
+
   return () => {
     isCancelled = true;
     if (chatBus) {
@@ -2335,6 +2405,9 @@ export function subscribeToAllChats(
     }
     if (unsubFirestore) {
       unsubFirestore();
+    }
+    if (unsubRtdb) {
+      unsubRtdb();
     }
   };
 }
