@@ -1,0 +1,31 @@
+{
+  "test_123": [
+    {
+      "id": "msg-1789121968549-zj8m",
+      "conversationId": "test_123",
+      "senderId": "admin",
+      "senderRole": "supervisor",
+      "text": "مرحبا بكم في منظومة الأستاذة إيمان الدمشيتي",
+      "status": "READ",
+      "timestamp": 1789121968549,
+      "timeFormatted": "١٠:١٩ ص",
+      "isRead": true
+    }
+  ],
+  "test_realtime": [
+    {
+      "id": "msg-1789139233359-3j9e",
+      "conversationId": "test_realtime",
+      "chatId": "test_realtime",
+      "senderId": "parent_1001",
+      "sender": "parent",
+      "senderRole": "parent",
+      "senderName": "ولي أمر أحمد",
+      "text": "السلام عليكم ورحمة الله",
+      "status": "SENT",
+      "isRead": false,
+      "timestamp": 1789139233359,
+      "timeFormatted": "٣:٠٧ م"
+    }
+  ]
+}
