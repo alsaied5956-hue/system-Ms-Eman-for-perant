@@ -1,6 +1,26 @@
 import fs from "fs";
 import path from "path";
 import type { Response } from "express";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+
+const SUPABASE_URL =
+  process.env.VITE_SUPABASE_URL ||
+  process.env.SUPABASE_URL ||
+  "https://lzdvmzumwuqycwdecaan.supabase.co";
+const SUPABASE_KEY =
+  process.env.SUPABASE_SERVICE_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
+  "sb_publishable_B2ATdO71x3VxvOL18ATZtA_bupiDf3l";
+
+let supabaseServer: SupabaseClient | null = null;
+try {
+  supabaseServer = createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: { persistSession: false },
+  });
+} catch (e) {
+  console.warn("[portalStore] Supabase client init notice:", e);
+}
 
 export interface StudentRecord {
   barcode: string;
@@ -75,13 +95,32 @@ const STORE_PATH = path.join(process.cwd(), ".system_data_store.json");
 const ACCOUNTS_PATH = path.join(process.cwd(), ".parent_accounts_store.json");
 const DELETED_ACCOUNTS_PATH = path.join(process.cwd(), ".deleted_accounts_store.json");
 
-function normalizePhone(val?: string | null): string {
+export function normalizeBarcode(raw?: string | number | null): string {
+  if (raw === undefined || raw === null) return "";
+  let val = String(raw).trim();
+  val = val.replace(/[٠-٩۰-۹]/g, (d) => {
+    const code = d.charCodeAt(0);
+    if (code >= 1632 && code <= 1641) return String(code - 1632);
+    if (code >= 1776 && code <= 1785) return String(code - 1776);
+    return d;
+  });
+  return val.replace(/[\u200B-\u200D\uFEFF\s]/g, "");
+}
+
+export function normalizePhone(val?: string | null): string {
   if (!val) return "";
-  const cleaned = String(val).replace(/\D/g, "");
-  if (cleaned.startsWith("20") && cleaned.length > 10) {
-    return "0" + cleaned.slice(2);
-  }
-  return cleaned;
+  let raw = String(val).trim();
+  raw = raw.replace(/[٠-٩۰-۹]/g, (d) => {
+    const code = d.charCodeAt(0);
+    if (code >= 1632 && code <= 1641) return String(code - 1632);
+    if (code >= 1776 && code <= 1785) return String(code - 1776);
+    return d;
+  });
+  let digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("0020")) digits = digits.slice(4);
+  else if (digits.startsWith("20") && digits.length > 10) digits = digits.slice(2);
+  if (digits.startsWith("0")) digits = digits.slice(1);
+  return digits;
 }
 
 export function getTodayKey(): string {
@@ -357,7 +396,7 @@ export function recordLiveScan(data: {
   };
 }
 
-export function getStudentPortalData(query: string): {
+export async function getStudentPortalData(query: string): Promise<{
   success: boolean;
   student?: StudentRecord;
   todayAttendance?: string | null;
@@ -370,16 +409,174 @@ export function getStudentPortalData(query: string): {
   account?: ParentAccountRecord | null;
   message?: string;
   systemTime: string;
-} {
-  const clean = query.trim();
-  const cleanPhone = normalizePhone(clean);
+}> {
+  const cleanBarcode = normalizeBarcode(query);
+  const cleanPhone = normalizePhone(query);
   const todayKey = getTodayKey();
 
-  // Search by exact barcode first, then numeric barcode, then parent phone or student phone
+  // 1. Primary Source of Truth: Direct Supabase Authoritative Query
+  if (supabaseServer) {
+    try {
+      let studentRow: any = null;
+      if (cleanBarcode) {
+        const numBarcode = !isNaN(Number(cleanBarcode)) ? Number(cleanBarcode) : null;
+        let q = supabaseServer.from("students").select("*");
+        if (numBarcode !== null) {
+          q = q.or(`barcode.eq.${cleanBarcode},barcode.eq.${numBarcode}`);
+        } else {
+          q = q.eq("barcode", cleanBarcode);
+        }
+        const { data: stData } = await q.limit(1);
+        if (stData && stData.length > 0) {
+          studentRow = stData[0];
+        }
+      }
+
+      if (!studentRow && cleanPhone) {
+        const { data: stPhoneData } = await supabaseServer
+          .from("students")
+          .select("*")
+          .or(`parent_phone.ilike.%${cleanPhone}%,phone.ilike.%${cleanPhone}%`)
+          .limit(1);
+        if (stPhoneData && stPhoneData.length > 0) {
+          studentRow = stPhoneData[0];
+        }
+      }
+
+      if (studentRow) {
+        const sId = studentRow.id;
+        const bCode = String(studentRow.barcode).trim();
+
+        // Concurrently fetch attendance_logs, payments, homework, and parent_accounts
+        const [attRes, payRes, accRes] = await Promise.allSettled([
+          supabaseServer
+            .from("attendance_logs")
+            .select("*")
+            .or(`student_id.eq.${sId},barcode.eq.${bCode}`)
+            .order("date_key", { ascending: false })
+            .limit(500),
+          supabaseServer
+            .from("payments")
+            .select("*")
+            .or(`student_id.eq.${sId},barcode.eq.${bCode}`)
+            .order("month_key", { ascending: false })
+            .limit(100),
+          supabaseServer
+            .from("parent_accounts")
+            .select("*")
+            .or(`id.eq.${bCode},parent_phone.eq.${studentRow.parent_phone}`)
+            .maybeSingle(),
+        ]);
+
+        const studentHistory: Record<string, string> = {};
+        if (attRes.status === "fulfilled" && attRes.value.data) {
+          attRes.value.data.forEach((att: any) => {
+            if (att.date_key) {
+              studentHistory[att.date_key] = att.status || "حضور";
+            }
+          });
+        }
+
+        const studentPayments: Record<string, any> = {};
+        if (payRes.status === "fulfilled" && payRes.value.data) {
+          payRes.value.data.forEach((p: any) => {
+            const mKey = p.month_key;
+            if (mKey) {
+              studentPayments[mKey] = {
+                monthKey: mKey,
+                amount: Number(p.amount_paid || 0),
+                paidAmount: Number(p.amount_paid || 0),
+                requiredAmount: Number(p.required_amount || 0),
+                date: p.payment_date ? p.payment_date.slice(0, 10) : "",
+                time: p.payment_date ? p.payment_date.slice(11, 16) : "",
+                note: p.notes || "",
+                notes: p.notes || "",
+                recordedBy: p.received_by || "الإشراف",
+                timestamp: p.created_at ? new Date(p.created_at).getTime() : Date.now(),
+              };
+            }
+          });
+        }
+
+        // Merge live today status from memory cache if scanned recently
+        const todayAttendance =
+          systemDataCache.attendanceToday[bCode] ||
+          studentHistory[todayKey] ||
+          systemDataCache.attendanceHistory[todayKey]?.[bCode] ||
+          null;
+
+        const todayScanTime = systemDataCache.scanLogTimes[bCode] || null;
+
+        // Parse exam scores
+        let parsedScores: number[] = [];
+        if (Array.isArray(studentRow.total_exam_scores)) {
+          parsedScores = studentRow.total_exam_scores;
+        } else if (typeof studentRow.total_exam_scores === "string") {
+          try {
+            parsedScores = JSON.parse(studentRow.total_exam_scores);
+          } catch {}
+        }
+
+        const student: StudentRecord = {
+          id: studentRow.id,
+          barcode: bCode,
+          name: studentRow.name,
+          phone: studentRow.phone || "",
+          parentPhone: studentRow.parent_phone || "",
+          groupGrade: studentRow.grade || "الصف الرابع الابتدائي",
+          groupDays: studentRow.group_days || "سبت - إثنين - أربعاء",
+          points: studentRow.points || 0,
+          totalAttendanceDays:
+            studentRow.total_attendance_days !== undefined
+              ? Number(studentRow.total_attendance_days)
+              : Object.values(studentHistory).filter((s) => s === "حضور").length,
+          totalAbsentDays:
+            studentRow.total_absent_days !== undefined
+              ? Number(studentRow.total_absent_days)
+              : Object.values(studentHistory).filter((s) => s === "غائب").length,
+          totalExamScores: parsedScores,
+          lastExamTitle: studentRow.last_exam_title || "",
+          lastExamScore: studentRow.last_exam_score || "",
+          createdAt: studentRow.created_at,
+          notes: studentRow.notes || "",
+        };
+
+        const unreadNotices = (systemDataCache.platformMessages || []).filter((msg) => {
+          if (!msg) return false;
+          if (msg.studentBarcode && String(msg.studentBarcode).trim() === bCode) return true;
+          if (msg.grade && student.groupGrade && msg.grade === student.groupGrade) return true;
+          if (msg.target === "all" || msg.target === "all_parents") return true;
+          return false;
+        });
+
+        const account =
+          (accRes.status === "fulfilled" && accRes.value.data ? accRes.value.data : null) ||
+          parentAccountsCache[bCode] ||
+          null;
+
+        return {
+          success: true,
+          student,
+          todayAttendance,
+          todayScanTime,
+          attendanceHistory: studentHistory,
+          payments: studentPayments,
+          groupPrices: systemDataCache.groupPrices,
+          examScores: student.totalExamScores || [],
+          unreadNotices,
+          account,
+          systemTime: new Date().toISOString(),
+        };
+      }
+    } catch (err) {
+      console.warn("[portalStore] Supabase query notice, falling back to cache:", err);
+    }
+  }
+
+  // 2. Resilient Fallback to systemDataCache
   const student = systemDataCache.students.find((s) => {
-    const b = String(s.barcode).trim();
-    if (b === clean) return true;
-    if (!isNaN(Number(clean)) && Number(b) === Number(clean)) return true;
+    const b = normalizeBarcode(s.barcode);
+    if (b === cleanBarcode) return true;
     if (cleanPhone) {
       if (normalizePhone(s.parentPhone) === cleanPhone) return true;
       if (normalizePhone(s.phone) === cleanPhone) return true;

@@ -56,20 +56,37 @@ export const activityBus =
     : null;
 
 /**
+ * Strict Barcode Normalizer
+ * Converts Arabic-Indic numerals, trims spaces and invisible control characters
+ */
+export function normalizeBarcode(raw?: string | number | null): string {
+  if (raw === undefined || raw === null) return "";
+  let val = String(raw).trim();
+  val = val.replace(/[٠-٩۰-۹]/g, (d) => {
+    const code = d.charCodeAt(0);
+    if (code >= 1632 && code <= 1641) return String(code - 1632);
+    if (code >= 1776 && code <= 1785) return String(code - 1776);
+    return d;
+  });
+  return val.replace(/[\u200B-\u200D\uFEFF\s]/g, "");
+}
+
+/**
  * Clean & normalize phone numbers for consistent Arabic Egyptian mobile matching
  */
-export function normalizePhone(raw?: string): string {
-  if (!raw) return "";
-  // Keep only digits
-  let digits = raw.replace(/\D/g, "");
-  // Strip Egyptian international code prefix (20) if present
-  if (digits.startsWith("20") && digits.length > 10) {
-    digits = digits.slice(2);
-  }
-  // Strip leading 0
-  if (digits.startsWith("0")) {
-    digits = digits.slice(1);
-  }
+export function normalizePhone(raw?: string | number | null): string {
+  if (raw === undefined || raw === null) return "";
+  let val = String(raw).trim();
+  val = val.replace(/[٠-٩۰-۹]/g, (d) => {
+    const code = d.charCodeAt(0);
+    if (code >= 1632 && code <= 1641) return String(code - 1632);
+    if (code >= 1776 && code <= 1785) return String(code - 1776);
+    return d;
+  });
+  let digits = val.replace(/\D/g, "");
+  if (digits.startsWith("0020")) digits = digits.slice(4);
+  else if (digits.startsWith("20") && digits.length > 10) digits = digits.slice(2);
+  if (digits.startsWith("0")) digits = digits.slice(1);
   return digits;
 }
 
@@ -1581,18 +1598,21 @@ export async function authenticatePortalLogin(
   password: string,
   students: Student[]
 ): Promise<{ success: boolean; role?: "parent" | "admin"; account?: ParentAccount; message: string }> {
-  const barcodeTrimmed = barcode.trim();
+  const barcodeTrimmed = normalizeBarcode(barcode);
+  const cleanEnteredPhone = normalizePhone(barcode);
+  const rawTrimmed = barcode.trim();
   const passTrimmed = password.trim();
 
-  if (!barcodeTrimmed || !passTrimmed) {
+  if (!rawTrimmed || !passTrimmed) {
     return { success: false, message: "يرجى إدخال كود الطالب أو رقم الهاتف وكلمة المرور" };
   }
 
   // 1. Check Admin / Supervisor credentials (Instant 0ms)
   const adminSettings = getAdminPortalSettings();
   if (
+    (rawTrimmed === adminSettings.adminBarcode && passTrimmed === adminSettings.adminPassword) ||
     (barcodeTrimmed === adminSettings.adminBarcode && passTrimmed === adminSettings.adminPassword) ||
-    ((barcodeTrimmed === "admin" || barcodeTrimmed === "1") && passTrimmed === "2468")
+    ((rawTrimmed === "admin" || rawTrimmed === "1" || barcodeTrimmed === "1") && passTrimmed === "2468")
   ) {
     return {
       success: true,
@@ -1603,21 +1623,48 @@ export async function authenticatePortalLogin(
 
   // 2. Check Parent credentials from LocalStorage first (Instant 0ms)
   let accounts = getLocalParentAccounts();
-  let account = accounts[barcodeTrimmed];
+  let account = accounts[barcodeTrimmed] || accounts[rawTrimmed];
 
   // If not found by direct barcode, check numeric matching or phone number
   if (!account) {
-    const cleanEntered = normalizePhone(barcodeTrimmed);
     account = Object.values(accounts).find(
       (a) =>
-        String(a.studentBarcode).trim() === barcodeTrimmed ||
-        (cleanEntered && normalizePhone(a.parentPhone) === cleanEntered) ||
-        (a.linkedBarcodes && a.linkedBarcodes.includes(barcodeTrimmed))
+        normalizeBarcode(a.studentBarcode) === barcodeTrimmed ||
+        String(a.studentBarcode).trim() === rawTrimmed ||
+        (cleanEnteredPhone && normalizePhone(a.parentPhone) === cleanEnteredPhone) ||
+        (a.linkedBarcodes && (a.linkedBarcodes.includes(barcodeTrimmed) || a.linkedBarcodes.includes(rawTrimmed)))
     );
   }
 
-  // 3. Fast cloud fallback if account is missing on a freshly opened device or if local password doesn't match
-  // (In case supervisor set/updated password or activated account on another device)
+  // 3. Fast Supabase Authoritative Fallback
+  if (!account || account.password !== passTrimmed) {
+    try {
+      let query = supabase.from("parent_accounts").select("*");
+      if (cleanEnteredPhone) {
+        query = query.or(`id.eq.${barcodeTrimmed},parent_phone.ilike.%${cleanEnteredPhone}%`);
+      } else {
+        query = query.eq("id", barcodeTrimmed);
+      }
+      const { data: supaAcc } = await query.maybeSingle();
+      if (supaAcc) {
+        account = {
+          studentBarcode: String(supaAcc.id),
+          studentName: supaAcc.student_name,
+          linkedBarcodes: Array.isArray(supaAcc.linked_barcodes) ? supaAcc.linked_barcodes : [String(supaAcc.id)],
+          parentPhone: supaAcc.parent_phone,
+          password: supaAcc.password,
+          status: supaAcc.status || "active",
+          createdAt: supaAcc.created_at,
+          activatedAt: supaAcc.activated_at,
+          updatedAt: supaAcc.updated_at,
+        };
+        accounts[account.studentBarcode] = account;
+        saveLocalParentAccounts(accounts);
+      }
+    } catch {}
+  }
+
+  // 4. Fast Firestore Fallback
   if (!account || account.password !== passTrimmed) {
     try {
       await ensureFirebaseAuth();
@@ -1640,8 +1687,8 @@ export async function authenticatePortalLogin(
   if (!account) {
     try {
       const synced = await syncParentAccountsFromCloud();
-      if (synced && synced[barcodeTrimmed]) {
-        account = synced[barcodeTrimmed];
+      if (synced && (synced[barcodeTrimmed] || synced[rawTrimmed])) {
+        account = synced[barcodeTrimmed] || synced[rawTrimmed];
       }
     } catch {}
   }

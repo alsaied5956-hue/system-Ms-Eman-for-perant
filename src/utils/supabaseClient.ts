@@ -27,6 +27,42 @@ export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON
   },
 });
 
+/**
+ * Strict Barcode Normalizer
+ * Converts Arabic-Indic numerals, trims invisible spaces, and normalizes barcodes
+ */
+export function normalizeBarcode(raw?: string | number | null): string {
+  if (raw === undefined || raw === null) return "";
+  let val = String(raw).trim();
+  val = val.replace(/[٠-٩۰-۹]/g, (d) => {
+    const code = d.charCodeAt(0);
+    if (code >= 1632 && code <= 1641) return String(code - 1632);
+    if (code >= 1776 && code <= 1785) return String(code - 1776);
+    return d;
+  });
+  return val.replace(/[\u200B-\u200D\uFEFF\s]/g, "");
+}
+
+/**
+ * Strict Phone Normalizer
+ * Handles Egyptian phone formats, country codes (+20, 0020, 20), Arabic numerals, and spaces
+ */
+export function normalizePhone(raw?: string | number | null): string {
+  if (raw === undefined || raw === null) return "";
+  let val = String(raw).trim();
+  val = val.replace(/[٠-٩۰-۹]/g, (d) => {
+    const code = d.charCodeAt(0);
+    if (code >= 1632 && code <= 1641) return String(code - 1632);
+    if (code >= 1776 && code <= 1785) return String(code - 1776);
+    return d;
+  });
+  let digits = val.replace(/\D/g, "");
+  if (digits.startsWith("0020")) digits = digits.slice(4);
+  else if (digits.startsWith("20") && digits.length > 10) digits = digits.slice(2);
+  if (digits.startsWith("0")) digits = digits.slice(1);
+  return digits;
+}
+
 export interface LiveScanPayload {
   barcode: string;
   name: string;
@@ -1322,5 +1358,215 @@ export function subscribeToParentAccountSupabase(
     supabase.removeChannel(channel);
   };
 }
+
+export interface UnifiedStudentPortalData {
+  success: boolean;
+  student: any | null;
+  attendanceHistory: Record<string, string>;
+  attendanceLogs: any[];
+  payments: Record<string, any>;
+  paymentsList: any[];
+  homeworkList: any[];
+  examScores: number[];
+  lastExamTitle?: string;
+  lastExamScore?: string;
+  account?: any | null;
+  message?: string;
+}
+
+/**
+ * High-Speed Authoritative Data Aggregator for Parent Student Portal
+ * Fetches real-time student data, attendance logs, payment records, exams, and homework
+ * directly from primary Supabase tables (students, attendance_logs, payments, homework, parent_accounts).
+ */
+export async function fetchUnifiedStudentPortalDataFromSupabase(
+  barcodeOrPhone: string
+): Promise<UnifiedStudentPortalData> {
+  const cleanBarcode = normalizeBarcode(barcodeOrPhone);
+  const cleanPhone = normalizePhone(barcodeOrPhone);
+
+  if (!cleanBarcode && !cleanPhone) {
+    return {
+      success: false,
+      student: null,
+      attendanceHistory: {},
+      attendanceLogs: [],
+      payments: {},
+      paymentsList: [],
+      homeworkList: [],
+      examScores: [],
+      message: "كود الطالب أو رقم الهاتف مطلوب",
+    };
+  }
+
+  try {
+    // 1. Query students table
+    let studentRow: any = null;
+    if (cleanBarcode) {
+      const numBarcode = !isNaN(Number(cleanBarcode)) ? Number(cleanBarcode) : null;
+      let query = supabase.from("students").select("*");
+      if (numBarcode !== null) {
+        query = query.or(`barcode.eq.${cleanBarcode},barcode.eq.${numBarcode}`);
+      } else {
+        query = query.eq("barcode", cleanBarcode);
+      }
+      const { data: stData } = await query.limit(1);
+      if (stData && stData.length > 0) {
+        studentRow = stData[0];
+      }
+    }
+
+    if (!studentRow && cleanPhone) {
+      const { data: stPhoneData } = await supabase
+        .from("students")
+        .select("*")
+        .or(`parent_phone.ilike.%${cleanPhone}%,phone.ilike.%${cleanPhone}%`)
+        .limit(1);
+      if (stPhoneData && stPhoneData.length > 0) {
+        studentRow = stPhoneData[0];
+      }
+    }
+
+    if (!studentRow) {
+      return {
+        success: false,
+        student: null,
+        attendanceHistory: {},
+        attendanceLogs: [],
+        payments: {},
+        paymentsList: [],
+        homeworkList: [],
+        examScores: [],
+        message: "لم يتم العثور على طالب بهذا الكود أو رقم الهاتف في قاعدة البيانات الموحدة",
+      };
+    }
+
+    const sId = studentRow.id;
+    const bCode = String(studentRow.barcode).trim();
+
+    // 2. Concurrently fetch attendance_logs, payments, homework, and parent_accounts
+    const [attRes, payRes, hwRes, accRes] = await Promise.allSettled([
+      supabase
+        .from("attendance_logs")
+        .select("*")
+        .or(`student_id.eq.${sId},barcode.eq.${bCode}`)
+        .order("date_key", { ascending: false })
+        .limit(500),
+      supabase
+        .from("payments")
+        .select("*")
+        .or(`student_id.eq.${sId},barcode.eq.${bCode}`)
+        .order("month_key", { ascending: false })
+        .limit(100),
+      supabase
+        .from("homework")
+        .select("*")
+        .or(`student_id.eq.${sId},barcode.eq.${bCode}`)
+        .order("date_key", { ascending: false })
+        .limit(100),
+      supabase
+        .from("parent_accounts")
+        .select("*")
+        .or(`id.eq.${bCode},parent_phone.eq.${studentRow.parent_phone}`)
+        .maybeSingle(),
+    ]);
+
+    // Format Attendance
+    const attendanceLogs = attRes.status === "fulfilled" && attRes.value.data ? attRes.value.data : [];
+    const attendanceHistory: Record<string, string> = {};
+    attendanceLogs.forEach((att: any) => {
+      if (att.date_key) {
+        attendanceHistory[att.date_key] = att.status || "حضور";
+      }
+    });
+
+    // Format Payments
+    const paymentsList = payRes.status === "fulfilled" && payRes.value.data ? payRes.value.data : [];
+    const paymentsMap: Record<string, any> = {};
+    paymentsList.forEach((p: any) => {
+      const mKey = p.month_key;
+      if (mKey) {
+        paymentsMap[mKey] = {
+          monthKey: mKey,
+          amount: Number(p.amount_paid || 0),
+          paidAmount: Number(p.amount_paid || 0),
+          requiredAmount: Number(p.required_amount || 0),
+          date: p.payment_date ? p.payment_date.slice(0, 10) : "",
+          time: p.payment_date ? p.payment_date.slice(11, 16) : "",
+          note: p.notes || "",
+          notes: p.notes || "",
+          recordedBy: p.received_by || "الإشراف",
+          timestamp: p.created_at ? new Date(p.created_at).getTime() : Date.now(),
+        };
+      }
+    });
+
+    // Format Homework
+    const homeworkList = hwRes.status === "fulfilled" && hwRes.value.data ? hwRes.value.data : [];
+
+    // Format Account
+    const account = accRes.status === "fulfilled" && accRes.value.data ? accRes.value.data : null;
+
+    // Parse exam scores if stored in student row
+    let parsedScores: number[] = [];
+    if (Array.isArray(studentRow.total_exam_scores)) {
+      parsedScores = studentRow.total_exam_scores;
+    } else if (typeof studentRow.total_exam_scores === "string") {
+      try {
+        parsedScores = JSON.parse(studentRow.total_exam_scores);
+      } catch {}
+    }
+
+    const student = {
+      id: studentRow.id,
+      barcode: bCode,
+      name: studentRow.name,
+      phone: studentRow.phone || "",
+      parentPhone: studentRow.parent_phone || "",
+      groupGrade: studentRow.grade || "الصف الرابع الابتدائي",
+      groupDays: studentRow.group_days || "سبت - إثنين - أربعاء",
+      groupTime: studentRow.group_time || "04:00 م",
+      customMonthlyFee: studentRow.monthly_fee !== undefined && studentRow.monthly_fee !== null ? Number(studentRow.monthly_fee) : undefined,
+      discountReason: studentRow.notes || "",
+      notes: studentRow.notes || "",
+      points: studentRow.points || 0,
+      totalAttendanceDays: studentRow.total_attendance_days !== undefined ? Number(studentRow.total_attendance_days) : attendanceLogs.filter((a: any) => a.status === "حضور").length,
+      totalAbsentDays: studentRow.total_absent_days !== undefined ? Number(studentRow.total_absent_days) : attendanceLogs.filter((a: any) => a.status === "غائب").length,
+      totalExamScores: parsedScores,
+      lastExamTitle: studentRow.last_exam_title || "",
+      lastExamScore: studentRow.last_exam_score || "",
+      createdAt: studentRow.created_at,
+      updatedAt: studentRow.updated_at,
+    };
+
+    return {
+      success: true,
+      student,
+      attendanceHistory,
+      attendanceLogs,
+      payments: paymentsMap,
+      paymentsList,
+      homeworkList,
+      examScores: student.totalExamScores,
+      lastExamTitle: student.lastExamTitle,
+      lastExamScore: student.lastExamScore,
+      account,
+    };
+  } catch (err: any) {
+    console.error("[fetchUnifiedStudentPortalDataFromSupabase] Error:", err);
+    return {
+      success: false,
+      student: null,
+      attendanceHistory: {},
+      attendanceLogs: [],
+      payments: {},
+      paymentsList: [],
+      homeworkList: [],
+      examScores: [],
+      message: err.message || "حدث خطأ أثناء جلب البيانات من الخادم الموحد",
+    };
+  }
+}
+
 
 

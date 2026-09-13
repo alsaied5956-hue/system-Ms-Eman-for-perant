@@ -16,7 +16,15 @@ import {
   markChatThreadRead,
   subscribeToThreadChat,
   getAdminPortalSettings,
+  normalizeBarcode,
 } from "../../utils/portalStorage";
+import {
+  fetchUnifiedStudentPortalDataFromSupabase,
+  UnifiedStudentPortalData,
+  subscribeToStudentChanges,
+  subscribeToAttendanceStatusChanges,
+  subscribeToPaymentChanges,
+} from "../../utils/supabaseClient";
 import {
   sendPortalNotification,
   playPortalAudioChime,

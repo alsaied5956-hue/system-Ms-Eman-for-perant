@@ -438,14 +438,14 @@ function applyZeroCacheHeaders(res: express.Response) {
   res.setHeader("Surrogate-Control", "no-store");
 }
 
-// Ultra-fast Student Portal Data (serves parents in <5ms from memory, zero-cache)
-app.get("/api/portal/student-data", (req, res) => {
+// Ultra-fast Student Portal Data (serves parents from unified Supabase + memory, zero-cache)
+app.get("/api/portal/student-data", async (req, res) => {
   try {
     const barcode = req.query.barcode ? String(req.query.barcode).trim() : "";
     if (!barcode) {
       return res.status(400).json({ success: false, message: "كود الطالب أو رقم الهاتف مطلوب" });
     }
-    const data = getStudentPortalData(barcode);
+    const data = await getStudentPortalData(barcode);
     applyZeroCacheHeaders(res);
     return res.json(data);
   } catch (err: any) {
@@ -2045,7 +2045,7 @@ app.post("/api/portal/chat/read", (req, res) => {
         (readerRole === "admin" && (m.senderRole === "parent" || (m as any).sender === "parent")) ||
         (readerRole === "parent" && (m.senderRole === "supervisor" || (m as any).sender === "admin"));
 
-      if (matchesId || isBatchAll || matchesRole) {
+      if ((matchesId || isBatchAll) && matchesRole) {
         if (!m.isRead || m.status !== "READ") {
           m.isRead = true;
           m.status = "READ";
