@@ -126,15 +126,6 @@ export const AuthOverlay: React.FC<AuthOverlayProps> = ({
             <ArrowLeft className="w-4 h-4" />
           </button>
         </form>
-
-        <div className="text-center pt-3 border-t border-slate-800/80 space-y-3">
-          <div className="inline-flex items-center gap-2 text-xs text-slate-400 bg-slate-900/90 px-3.5 py-1.5 rounded-full border border-slate-800">
-            <span>حساب المسؤول:</span>
-            <span className="text-amber-400 font-mono font-black">admin</span>
-            <span>/</span>
-            <span className="text-amber-400 font-mono font-black">2468</span>
-          </div>
-        </div>
       </div>
     </div>
   );

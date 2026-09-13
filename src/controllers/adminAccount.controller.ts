@@ -25,7 +25,7 @@ export class AdminAccountController {
     this.pgPool = pgPool;
     this.redis = redisClient;
     this.outboxService = outboxService;
-    this.supervisorPin = supervisorPin || process.env.SUPERVISOR_PIN || "2468";
+    this.supervisorPin = supervisorPin || process.env.SUPERVISOR_PIN || "";
     this.cdnPurgeUrl = process.env.CDN_PURGE_URL;
   }
 

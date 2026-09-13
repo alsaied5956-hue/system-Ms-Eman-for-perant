@@ -22,6 +22,25 @@ try {
   console.warn("[portalStore] Supabase client init notice:", e);
 }
 
+export function barcodeToUUID(barcode: string): string {
+  const raw = String(barcode || "").trim();
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
+    return raw.toLowerCase();
+  }
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57, h3 = 0x62a9d36f, h4 = 0x9e3779b9;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+    h3 = Math.imul(h3 ^ ch, 3812041933);
+    h4 = Math.imul(h4 ^ ch, 2869860233);
+  }
+  const hex1 = ((h1 >>> 0).toString(16).padStart(8, "0") + (h2 >>> 0).toString(16).padStart(8, "0"));
+  const hex2 = ((h3 >>> 0).toString(16).padStart(8, "0") + (h4 >>> 0).toString(16).padStart(8, "0"));
+  const fullHex = (hex1 + hex2).slice(0, 32);
+  return `${fullHex.slice(0, 8)}-${fullHex.slice(8, 12)}-4${fullHex.slice(13, 16)}-a${fullHex.slice(17, 20)}-${fullHex.slice(20, 32)}`;
+}
+
 export interface StudentRecord {
   barcode: string;
   name: string;
@@ -172,6 +191,52 @@ export function initPortalStore(): void {
           console.log(`[PortalStore] Loaded ${deletedAccountsCache.size} deleted accounts tombstones.`);
         }
       } catch {}
+    }
+
+    // 5. Hydrate authoritative parent accounts from production Supabase table
+    if (supabaseServer) {
+      Promise.resolve(
+        supabaseServer
+          .from("parent_accounts")
+          .select("*")
+      )
+        .then(({ data, error }) => {
+          if (!error && Array.isArray(data)) {
+            let loadedCount = 0;
+            for (const row of data) {
+              const barcodes: string[] = Array.isArray(row.linked_student_barcodes) && row.linked_student_barcodes.length > 0
+                ? row.linked_student_barcodes
+                : [];
+              const primaryBarcode = barcodes[0] || "";
+              if (!primaryBarcode) continue;
+              const status = (row.status || "active").toLowerCase() as "active" | "disabled" | "deleted";
+              if (status === "deleted") {
+                deletedAccountsCache.add(primaryBarcode);
+                delete parentAccountsCache[primaryBarcode];
+                continue;
+              }
+              const acc: ParentAccountRecord = {
+                studentBarcode: primaryBarcode,
+                linkedBarcodes: barcodes,
+                parentPhone: row.parent_phone || "",
+                password: row.password_hash || "",
+                status,
+                createdAt: row.created_at,
+                updatedAt: row.updated_at,
+                activatedAt: row.created_at,
+              };
+              parentAccountsCache[primaryBarcode] = acc;
+              barcodes.forEach((b: string) => {
+                if (b && !parentAccountsCache[b]) {
+                  parentAccountsCache[b] = acc;
+                }
+              });
+              loadedCount++;
+            }
+            console.log(`[PortalStore] Synced ${loadedCount} accounts from Supabase production table.`);
+          }
+        })
+        .catch((e: any) => console.warn("[PortalStore] Initial Supabase accounts hydration notice:", e));
     }
   } catch (err) {
     console.error("[PortalStore] Init error:", err);
@@ -842,6 +907,30 @@ export function saveParentAccountRecord(account: ParentAccountRecord): ParentAcc
   parentAccountsCache[bCode] = updated;
   persistAccountsDebounced();
 
+  // Sync to production Supabase table public.parent_accounts
+  if (supabaseServer) {
+    const uuid = barcodeToUUID(bCode);
+    const barcodes = updated.linkedBarcodes && updated.linkedBarcodes.length > 0
+      ? updated.linkedBarcodes
+      : [bCode];
+    Promise.resolve(
+      supabaseServer
+        .from("parent_accounts")
+        .upsert({
+          id: uuid,
+          parent_phone: updated.parentPhone || "",
+          password_hash: updated.password || "",
+          linked_student_barcodes: barcodes,
+          status: updated.status || "active",
+          updated_at: nowIso,
+        }, { onConflict: "id" })
+    )
+      .then(({ error }: any) => {
+        if (error) console.warn("[portalStore] Supabase upsert notice:", error.message);
+      })
+      .catch((e: any) => console.warn("[portalStore] Supabase upsert exception:", e));
+  }
+
   // Broadcast account state change over SSE stream to ALL clients (supervisors & parents)
   broadcastPortalSSE({
     type: "ACCOUNT_SAVED",
@@ -867,6 +956,25 @@ export function deleteParentAccountRecord(barcode: string): boolean {
     delete parentAccountsCache[bCode];
     persistAccountsDebounced();
     existed = true;
+  }
+
+  // HARD DELETE directly on production Supabase table public.parent_accounts
+  if (supabaseServer) {
+    const uuid = barcodeToUUID(bCode);
+    Promise.resolve(
+      supabaseServer
+        .from("parent_accounts")
+        .delete()
+        .or(`id.eq.${uuid},linked_student_barcodes.cs.{${bCode}}`)
+    )
+      .then(({ error }: any) => {
+        if (error) {
+          console.warn("[portalStore] Supabase delete notice:", error.message);
+        } else {
+          console.log(`[portalStore] Hard deleted account for barcode ${bCode} from Supabase.`);
+        }
+      })
+      .catch((e: any) => console.warn("[portalStore] Supabase delete exception:", e));
   }
 
   // Instant broadcast to ALL connected mobile and desktop devices (<30ms, 0 quota)

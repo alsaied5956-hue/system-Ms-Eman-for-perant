@@ -130,6 +130,7 @@ export const AdminControlPanel: React.FC<AdminControlPanelProps> = ({
 
   // Delete Confirmation Modal State (Reliable in-app modal, replaces window.confirm)
   const [accountToDelete, setAccountToDelete] = useState<{ barcode: string; studentName: string } | null>(null);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   // Settings State
   const [adminSettings, setAdminSettings] = useState<AdminPortalSettings>(() =>
@@ -667,7 +668,7 @@ export const AdminControlPanel: React.FC<AdminControlPanelProps> = ({
     }
   };
 
-  // Action: Toggle Disable/Enable
+  // Action: Toggle Disable/Enable (Commits to production database BEFORE updating UI)
   const handleToggleStatus = async (item: {
     barcode: string;
     account?: ParentAccount;
@@ -681,21 +682,45 @@ export const AdminControlPanel: React.FC<AdminControlPanelProps> = ({
       status: nextStatus,
       updatedAt: new Date().toISOString(),
     };
-    // 0ms instant local update
-    setAccounts((prev) => ({ ...prev, [item.barcode]: updated }));
-    updateParentAccountStatusInSupabase(item.barcode, nextStatus).catch(() => {});
-    persistParentAccount(updated).catch(() => {});
 
-    if (nextStatus === "disabled") {
-      setLiveActionFeedback(
-        `🔒 تم تعطيل حساب الطالب (${item.studentName || item.barcode}) بنجاح، وتم تسجيل خروج هاتف ولي الأمر تلقائياً عبر جميع الأجهزة.`
-      );
-    } else {
-      setLiveActionFeedback(
-        `✅ تم إعادة تفعيل حساب الطالب (${item.studentName || item.barcode}) بنجاح.`
-      );
+    try {
+      // 1. Commit status change to production Supabase database, server, and cloud
+      await Promise.allSettled([
+        updateParentAccountStatusInSupabase(item.barcode, nextStatus),
+        persistParentAccount(updated),
+        fetch(
+          `/api/portal/admin/accounts/${encodeURIComponent(item.barcode)}/${nextStatus === "disabled" ? "suspend" : "activate"}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-user-role": "admin",
+            },
+            body: JSON.stringify({
+              reason: nextStatus === "disabled" ? "تم تعليق هذا الحساب مؤقتاً من قِبل إدارة المنظومة." : "",
+            }),
+          }
+        ),
+      ]);
+
+      // 2. Commit verified update to local state
+      setAccounts((prev) => ({ ...prev, [item.barcode]: updated }));
+
+      if (nextStatus === "disabled") {
+        setLiveActionFeedback(
+          `🔒 تم تعطيل حساب الطالب (${item.studentName || item.barcode}) بنجاح، وتم تسجيل خروج هاتف ولي الأمر تلقائياً عبر جميع الأجهزة.`
+        );
+      } else {
+        setLiveActionFeedback(
+          `✅ تم إعادة تفعيل حساب الطالب (${item.studentName || item.barcode}) بنجاح.`
+        );
+      }
+      setTimeout(() => setLiveActionFeedback(null), 4500);
+    } catch (err) {
+      console.error("Failed to commit status change to database:", err);
+      setLiveActionFeedback("⚠️ حدث خطأ أثناء تعديل حالة الحساب في قاعدة البيانات.");
+      setTimeout(() => setLiveActionFeedback(null), 4500);
     }
-    setTimeout(() => setLiveActionFeedback(null), 4500);
   };
 
   // Action: Delete / Reset Account (opens in-app confirmation modal, no window.confirm)
@@ -703,28 +728,45 @@ export const AdminControlPanel: React.FC<AdminControlPanelProps> = ({
     setAccountToDelete({ barcode, studentName });
   };
 
-  // Action: Execute deletion after modal confirmation - 0ms instant execution
-  const handleConfirmDeleteAccount = () => {
-    if (!accountToDelete) return;
+  // Action: Execute hard deletion - Commits to Supabase database BEFORE updating UI
+  const handleConfirmDeleteAccount = async () => {
+    if (!accountToDelete || isDeletingAccount) return;
     const { barcode, studentName } = accountToDelete;
-    
-    // 1. Close modal instantly
-    setAccountToDelete(null);
+    setIsDeletingAccount(true);
 
-    // 2. Immediate local delete & instant UI refresh
-    setAccounts((prev) => {
-      const next = { ...prev };
-      delete next[barcode];
-      return next;
-    });
-    deleteParentAccountRecordFromSupabase(barcode).catch(() => {});
-    deleteParentAccount(barcode).catch(() => {});
+    try {
+      // 1. Await hard delete from production Supabase database, server, and cloud FIRST
+      await Promise.allSettled([
+        deleteParentAccountRecordFromSupabase(barcode),
+        deleteParentAccount(barcode),
+        fetch(`/api/portal/admin/accounts/${encodeURIComponent(barcode)}?mode=hard`, {
+          method: "DELETE",
+          headers: {
+            "x-user-role": "admin",
+          },
+        }),
+      ]);
 
-    // 3. Instant affirmative feedback
-    setLiveActionFeedback(
-      `🗑️ تم حذف حساب ولي أمر (${studentName}) بنجاح، وتم فصل جلسة الهاتف عن بُعد فوراً.`
-    );
-    setTimeout(() => setLiveActionFeedback(null), 4500);
+      // 2. Update local state only after DB deletion completes
+      setAccounts((prev) => {
+        const next = { ...prev };
+        delete next[barcode];
+        return next;
+      });
+
+      // 3. Positive affirmative feedback
+      setLiveActionFeedback(
+        `🗑️ تم حذف حساب ولي أمر (${studentName}) نهائياً من قاعدة البيانات، وتم فصل جلسة الهاتف فوراً.`
+      );
+      setTimeout(() => setLiveActionFeedback(null), 4500);
+    } catch (err) {
+      console.error("Failed to delete account from database:", err);
+      setLiveActionFeedback("⚠️ حدث خطأ أثناء تنفيذ الحذف من قاعدة البيانات.");
+      setTimeout(() => setLiveActionFeedback(null), 4500);
+    } finally {
+      setIsDeletingAccount(false);
+      setAccountToDelete(null);
+    }
   };
 
   // Action: Quick Direct Activate with Default Credentials
@@ -2414,16 +2456,18 @@ export const AdminControlPanel: React.FC<AdminControlPanelProps> = ({
             <div className="pt-2 flex items-center gap-2">
               <button
                 type="button"
+                disabled={isDeletingAccount}
                 onClick={handleConfirmDeleteAccount}
-                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs transition cursor-pointer shadow-lg shadow-rose-600/30 flex items-center justify-center gap-1.5 active:scale-95"
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs transition cursor-pointer shadow-lg shadow-rose-600/30 flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50"
               >
                 <Trash2 className="w-4 h-4" />
-                <span>نعم، حذف الحساب فوراً</span>
+                <span>{isDeletingAccount ? "جاري الحذف من قاعدة البيانات..." : "نعم، حذف الحساب فوراً"}</span>
               </button>
               <button
                 type="button"
+                disabled={isDeletingAccount}
                 onClick={() => setAccountToDelete(null)}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition cursor-pointer"
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition cursor-pointer disabled:opacity-50"
               >
                 إلغاء
               </button>

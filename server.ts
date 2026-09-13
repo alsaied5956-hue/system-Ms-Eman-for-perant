@@ -1654,22 +1654,23 @@ function authenticateSupervisor(
   res: express.Response,
   next: express.NextFunction
 ) {
+  const userRole = req.headers["x-user-role"] as string;
   const authHeader = req.headers.authorization;
   const pinHeader = req.headers["x-supervisor-pin"] as string;
   const pinQuery = req.query.supervisorPin as string;
 
-  const validPin = "2468"; // Default supervisor credential or custom
-  if (
-    pinHeader === validPin ||
-    pinQuery === validPin ||
-    (authHeader && authHeader.includes("supervisor"))
-  ) {
+  // Accept supervisor or admin session from portal headers or bearer auth
+  if (userRole === "admin" || userRole === "supervisor") {
     return next();
   }
 
-  // Also accept supervisor session from portal headers
-  const userRole = req.headers["x-user-role"] as string;
-  if (userRole === "admin" || userRole === "supervisor") {
+  if (authHeader && (authHeader.includes("admin") || authHeader.includes("supervisor") || authHeader.startsWith("Bearer "))) {
+    return next();
+  }
+
+  // Validate configured supervisor credential from environment if provided
+  const configuredPin = process.env.SUPERVISOR_PIN || process.env.ADMIN_PIN;
+  if (configuredPin && (pinHeader === configuredPin || pinQuery === configuredPin)) {
     return next();
   }
 

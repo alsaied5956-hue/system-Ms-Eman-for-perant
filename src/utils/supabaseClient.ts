@@ -1128,38 +1128,111 @@ export function subscribeToDatabaseChanges(onStateChange: () => void): () => voi
 }
 
 /**
- * Save parent accounts registry to Supabase
+ * Deterministic UUID generator for student barcodes (converts any barcode to valid Postgres UUID)
+ */
+export function barcodeToUUID(barcode: string): string {
+  const raw = String(barcode || "").trim();
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
+    return raw.toLowerCase();
+  }
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57, h3 = 0x62a9d36f, h4 = 0x9e3779b9;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+    h3 = Math.imul(h3 ^ ch, 3812041933);
+    h4 = Math.imul(h4 ^ ch, 2869860233);
+  }
+  const hex1 = ((h1 >>> 0).toString(16).padStart(8, "0") + (h2 >>> 0).toString(16).padStart(8, "0"));
+  const hex2 = ((h3 >>> 0).toString(16).padStart(8, "0") + (h4 >>> 0).toString(16).padStart(8, "0"));
+  const fullHex = (hex1 + hex2).slice(0, 32);
+  return `${fullHex.slice(0, 8)}-${fullHex.slice(8, 12)}-4${fullHex.slice(13, 16)}-a${fullHex.slice(17, 20)}-${fullHex.slice(20, 32)}`;
+}
+
+/**
+ * Save parent accounts registry to production Supabase table public.parent_accounts
  */
 export async function savePortalAccountsToSupabase(accounts: Record<string, ParentAccount>): Promise<boolean> {
   try {
-    const { error } = await supabase.from("chat_messages").insert({
-      sender_role: "admin",
-      sender_name: "portal_accounts_registry",
-      message: JSON.stringify(accounts),
-      is_read: true,
+    const accountList = Object.values(accounts).filter((a) => a && a.studentBarcode && a.status !== "deleted");
+    if (accountList.length === 0) return true;
+
+    const records = accountList.map((acc) => {
+      const bCode = String(acc.studentBarcode).trim();
+      const barcodes = acc.linkedBarcodes && acc.linkedBarcodes.length > 0
+        ? acc.linkedBarcodes
+        : [bCode];
+      return {
+        id: barcodeToUUID(bCode),
+        parent_phone: acc.parentPhone || "",
+        password_hash: acc.password || "",
+        linked_student_barcodes: barcodes,
+        fcm_token: acc.fcmToken || "",
+        status: acc.status || "active",
+        updated_at: new Date().toISOString(),
+      };
     });
-    return !error;
-  } catch {
+
+    const { error } = await supabase
+      .from("parent_accounts")
+      .upsert(records, { onConflict: "id" });
+
+    if (error) {
+      console.warn("[Supabase parent_accounts] Upsert multiple notice:", error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn("[Supabase parent_accounts] Error saving registry:", err);
     return false;
   }
 }
 
 /**
- * Fetch parent accounts registry from Supabase
+ * Fetch all parent accounts from production Supabase table public.parent_accounts
  */
 export async function fetchPortalAccountsFromSupabase(): Promise<Record<string, ParentAccount> | null> {
   try {
-    const { data } = await supabase
-      .from("chat_messages")
-      .select("message")
-      .eq("sender_name", "portal_accounts_registry")
-      .order("created_at", { ascending: false })
-      .limit(1);
+    const { data, error } = await supabase
+      .from("parent_accounts")
+      .select("*");
 
-    if (data && data.length > 0 && data[0].message) {
-      return JSON.parse(data[0].message);
+    if (!error && Array.isArray(data)) {
+      const result: Record<string, ParentAccount> = {};
+      for (const row of data) {
+        const barcodes: string[] = Array.isArray(row.linked_student_barcodes) && row.linked_student_barcodes.length > 0
+          ? row.linked_student_barcodes
+          : [];
+        const primaryBarcode = barcodes[0] || "";
+        if (!primaryBarcode) continue;
+
+        const normalizedStatus = (row.status || "active").toLowerCase() as "active" | "disabled" | "deleted";
+        if (normalizedStatus === "deleted") continue;
+
+        const account: ParentAccount = {
+          studentBarcode: primaryBarcode,
+          linkedBarcodes: barcodes,
+          parentPhone: row.parent_phone || "",
+          password: row.password_hash || "",
+          fcmToken: row.fcm_token || "",
+          status: normalizedStatus,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          activatedAt: row.created_at,
+        };
+
+        result[primaryBarcode] = account;
+        barcodes.forEach((b: string) => {
+          if (b && !result[b]) {
+            result[b] = account;
+          }
+        });
+      }
+      return result;
     }
-  } catch {}
+  } catch (err) {
+    console.warn("[Supabase parent_accounts] Fetch error:", err);
+  }
   return null;
 }
 
@@ -1172,15 +1245,18 @@ export async function fetchPortalAccountsFromSupabase(): Promise<Record<string, 
  */
 export async function saveParentAccountRecordToSupabase(account: ParentAccount): Promise<boolean> {
   try {
+    const bCode = String(account.studentBarcode).trim();
+    if (!bCode) return false;
+    const uuid = barcodeToUUID(bCode);
     const barcodes = account.linkedBarcodes && account.linkedBarcodes.length > 0
       ? account.linkedBarcodes
-      : [account.studentBarcode];
+      : [bCode];
 
     const { error } = await supabase.from("parent_accounts").upsert(
       {
-        id: account.studentBarcode,
-        parent_phone: account.parentPhone,
-        password_hash: account.password,
+        id: uuid,
+        parent_phone: account.parentPhone || "",
+        password_hash: account.password || "",
         linked_student_barcodes: barcodes,
         fcm_token: account.fcmToken || "",
         status: account.status || "active",
@@ -1210,35 +1286,21 @@ export async function checkBarcodeAlreadyLinkedSupabase(
   try {
     const cleanBarcode = String(barcode).trim();
     if (!cleanBarcode) return { isLinked: false };
+    const uuid = barcodeToUUID(cleanBarcode);
 
-    // 1. Direct ID match
-    const { data: directAccount } = await supabase
+    // 1. Direct ID match or Array contains match
+    const { data: matches, error } = await supabase
       .from("parent_accounts")
       .select("id, parent_phone, status, linked_student_barcodes")
-      .eq("id", cleanBarcode)
-      .maybeSingle();
-
-    if (directAccount && directAccount.status === "active") {
-      return {
-        isLinked: true,
-        parentPhone: directAccount.parent_phone,
-        accountId: directAccount.id,
-      };
-    }
-
-    // 2. Array contains match
-    const { data: arrayMatches } = await supabase
-      .from("parent_accounts")
-      .select("id, parent_phone, status, linked_student_barcodes")
-      .contains("linked_student_barcodes", [cleanBarcode])
+      .or(`id.eq.${uuid},linked_student_barcodes.cs.{${cleanBarcode}}`)
       .eq("status", "active")
       .limit(1);
 
-    if (arrayMatches && arrayMatches.length > 0) {
+    if (!error && matches && matches.length > 0) {
       return {
         isLinked: true,
-        parentPhone: arrayMatches[0].parent_phone,
-        accountId: arrayMatches[0].id,
+        parentPhone: matches[0].parent_phone,
+        accountId: matches[0].id,
       };
     }
   } catch (err) {
@@ -1256,33 +1318,49 @@ export async function updateParentAccountStatusInSupabase(
 ): Promise<boolean> {
   try {
     const cleanBarcode = String(barcode).trim();
+    if (!cleanBarcode) return false;
+    const uuid = barcodeToUUID(cleanBarcode);
+
     const { error } = await supabase
       .from("parent_accounts")
       .update({
         status,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", cleanBarcode);
+      .or(`id.eq.${uuid},linked_student_barcodes.cs.{${cleanBarcode}}`);
 
-    return !error;
-  } catch {
+    if (error) {
+      console.warn("[Supabase parent_accounts] Update status error:", error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn("[Supabase parent_accounts] Update status exception:", err);
     return false;
   }
 }
 
 /**
- * Delete parent account from Supabase
+ * Hard delete parent account record permanently from Supabase production table
  */
 export async function deleteParentAccountRecordFromSupabase(barcode: string): Promise<boolean> {
   try {
     const cleanBarcode = String(barcode).trim();
+    if (!cleanBarcode) return false;
+    const uuid = barcodeToUUID(cleanBarcode);
+
     const { error } = await supabase
       .from("parent_accounts")
       .delete()
-      .eq("id", cleanBarcode);
+      .or(`id.eq.${uuid},linked_student_barcodes.cs.{${cleanBarcode}}`);
 
-    return !error;
-  } catch {
+    if (error) {
+      console.warn("[Supabase parent_accounts] Delete error:", error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn("[Supabase parent_accounts] Delete exception:", err);
     return false;
   }
 }
@@ -1295,13 +1373,15 @@ export async function updateParentAccountFCMTokenInSupabase(
   fcmToken: string
 ): Promise<boolean> {
   try {
+    const cleanBarcode = String(barcode).trim();
+    const uuid = barcodeToUUID(cleanBarcode);
     const { error } = await supabase
       .from("parent_accounts")
       .update({
         fcm_token: fcmToken,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", barcode.trim());
+      .or(`id.eq.${uuid},linked_student_barcodes.cs.{${cleanBarcode}}`);
     return !error;
   } catch {
     return false;

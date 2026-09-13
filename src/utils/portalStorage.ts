@@ -19,6 +19,7 @@ import {
   updateParentAccountStatusInSupabase,
   deleteParentAccountRecordFromSupabase,
   subscribeToParentAccountSupabase,
+  barcodeToUUID,
 } from "./supabaseClient";
 
 // Storage Keys
@@ -28,10 +29,10 @@ const LS_PORTAL_SETTINGS = "eman_portal_settings";
 const LS_PORTAL_SESSION = "eman_portal_session";
 const LS_ADMIN_LOGS = "eman_admin_activity_log";
 
-// Default Initial Supervisor Credentials
+// Default Initial Supervisor Credentials (requires production settings or environment overrides)
 export const DEFAULT_ADMIN_SETTINGS: AdminPortalSettings = {
-  adminBarcode: "1",
-  adminPassword: "2468",
+  adminBarcode: "admin",
+  adminPassword: "admin",
   adminPhone: "01000000000",
   pushNotificationsEnabled: true,
   soundAlertsEnabled: true,
@@ -476,7 +477,6 @@ export async function persistParentAccount(account: ParentAccount): Promise<void
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-supervisor-pin": "2468",
           "x-user-role": "admin",
         },
         body: JSON.stringify({ reason: reasonText }),
@@ -488,7 +488,6 @@ export async function persistParentAccount(account: ParentAccount): Promise<void
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-supervisor-pin": "2468",
           "x-user-role": "admin",
         },
       }).catch(() => {});
@@ -621,7 +620,6 @@ export async function deleteParentAccount(studentBarcode: string): Promise<void>
       fetch(`/api/portal/admin/accounts/${encodeURIComponent(b)}?mode=hard`, {
         method: "DELETE",
         headers: {
-          "x-supervisor-pin": "2468",
           "x-user-role": "admin",
         },
       }).catch(() => {});
@@ -1607,12 +1605,12 @@ export async function authenticatePortalLogin(
     return { success: false, message: "يرجى إدخال كود الطالب أو رقم الهاتف وكلمة المرور" };
   }
 
-  // 1. Check Admin / Supervisor credentials (Instant 0ms)
+  // 1. Check Admin / Supervisor credentials (Strict DB/Settings verification)
   const adminSettings = getAdminPortalSettings();
   if (
     (rawTrimmed === adminSettings.adminBarcode && passTrimmed === adminSettings.adminPassword) ||
     (barcodeTrimmed === adminSettings.adminBarcode && passTrimmed === adminSettings.adminPassword) ||
-    ((rawTrimmed === "admin" || rawTrimmed === "1" || barcodeTrimmed === "1") && passTrimmed === "2468")
+    (cleanEnteredPhone === normalizePhone(adminSettings.adminPhone) && passTrimmed === adminSettings.adminPassword)
   ) {
     return {
       success: true,
@@ -1639,23 +1637,28 @@ export async function authenticatePortalLogin(
   // 3. Fast Supabase Authoritative Fallback
   if (!account || account.password !== passTrimmed) {
     try {
+      const uuid = barcodeToUUID(barcodeTrimmed);
       let query = supabase.from("parent_accounts").select("*");
       if (cleanEnteredPhone) {
-        query = query.or(`id.eq.${barcodeTrimmed},parent_phone.ilike.%${cleanEnteredPhone}%`);
+        query = query.or(`id.eq.${uuid},linked_student_barcodes.cs.{${barcodeTrimmed}},parent_phone.eq.${cleanEnteredPhone}`);
       } else {
-        query = query.eq("id", barcodeTrimmed);
+        query = query.or(`id.eq.${uuid},linked_student_barcodes.cs.{${barcodeTrimmed}}`);
       }
       const { data: supaAcc } = await query.maybeSingle();
       if (supaAcc) {
+        const barcodes: string[] = Array.isArray(supaAcc.linked_student_barcodes) && supaAcc.linked_student_barcodes.length > 0
+          ? supaAcc.linked_student_barcodes
+          : [barcodeTrimmed];
+        const primaryBarcode = barcodes[0] || barcodeTrimmed;
         account = {
-          studentBarcode: String(supaAcc.id),
-          studentName: supaAcc.student_name,
-          linkedBarcodes: Array.isArray(supaAcc.linked_barcodes) ? supaAcc.linked_barcodes : [String(supaAcc.id)],
-          parentPhone: supaAcc.parent_phone,
-          password: supaAcc.password,
-          status: supaAcc.status || "active",
+          studentBarcode: primaryBarcode,
+          studentName: supaAcc.student_name || "",
+          linkedBarcodes: barcodes,
+          parentPhone: supaAcc.parent_phone || "",
+          password: supaAcc.password_hash || supaAcc.password || "",
+          status: (supaAcc.status || "active").toLowerCase() as "active" | "disabled" | "deleted",
           createdAt: supaAcc.created_at,
-          activatedAt: supaAcc.activated_at,
+          activatedAt: supaAcc.created_at,
           updatedAt: supaAcc.updated_at,
         };
         accounts[account.studentBarcode] = account;

@@ -142,7 +142,7 @@ export const DEFAULT_USERS: UserAccount[] = [
   },
   {
     username: "eman",
-    pass: "2468",
+    pass: "eman2026",
     role: "admin",
     permissions: [
       "add_student",

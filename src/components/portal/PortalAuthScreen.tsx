@@ -307,7 +307,7 @@ export const PortalAuthScreen: React.FC<PortalAuthScreenProps> = ({
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
                   <Barcode className="w-4 h-4 text-amber-400" />
-                  <span>كود الطالب أو رقم الهاتف المسجل (أو 1 للمشرف)</span>
+                  <span>كود الطالب أو رقم الهاتف المسجل</span>
                 </label>
                 <div className="relative">
                   <input
@@ -316,7 +316,7 @@ export const PortalAuthScreen: React.FC<PortalAuthScreenProps> = ({
                     dir="ltr"
                     value={loginBarcode}
                     onChange={(e) => setLoginBarcode(e.target.value)}
-                    placeholder="كود الطالب أو رقم الهاتف (أو 1 للمشرف)"
+                    placeholder="كود الطالب أو رقم الهاتف المسجل"
                     className="w-full px-4 py-3 rounded-2xl bg-slate-950/70 border border-slate-700/80 focus:border-amber-400 focus:outline-none text-white text-sm font-mono tracking-wider text-center"
                   />
                 </div>
@@ -325,7 +325,7 @@ export const PortalAuthScreen: React.FC<PortalAuthScreenProps> = ({
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
                   <Lock className="w-4 h-4 text-amber-400" />
-                  <span>كلمة المرور (2468 للمشرف الافتراضي)</span>
+                  <span>كلمة المرور</span>
                 </label>
                 <div className="relative">
                   <input
@@ -345,10 +345,6 @@ export const PortalAuthScreen: React.FC<PortalAuthScreenProps> = ({
                     {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
-                <span>👑 دخول المشرف: هاتف <strong className="text-amber-300 font-mono">1</strong> وكلمة المرور <strong className="text-amber-300 font-mono">2468</strong></span>
               </div>
 
               <button
