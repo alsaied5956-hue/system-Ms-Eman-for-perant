@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import { Student, GradeName, GroupDays, GRADE_ORDER } from "../types";
 import { getTodayKey, openWhatsApp } from "../utils/helpers";
 import { enqueuePlatformMessagesBatch } from "../utils/storage";
+import { dispatchPushNotification } from "../services/pushNotificationService";
 import {
   broadcastHomeworkChange,
   saveHomeworkToSupabase,
@@ -321,6 +322,20 @@ export const HomeworkTrackerTab: React.FC<HomeworkTrackerTabProps> = ({
     ];
 
     enqueuePlatformMessagesBatch(batchPayload);
+
+    // 🔔 Loud Native System Web Push & FCM Notification to Parents
+    batchPayload.forEach((item) => {
+      dispatchPushNotification({
+        targetUserIds: [item.studentBarcode, item.phone].filter(Boolean),
+        title: item.title,
+        body: item.message,
+        type: "homework",
+        tag: `hw-${item.studentBarcode}-${todayKey}`,
+        eventId: `hw-${item.studentBarcode}-${todayKey}`,
+        url: "/?tab=homework",
+        sound: "/notification.wav",
+      }).catch(() => {});
+    });
 
     // ⚡ Supabase Realtime: Broadcast homework changes across all assistant screens in <20ms
     broadcastHomeworkChange({

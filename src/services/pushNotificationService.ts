@@ -215,6 +215,7 @@ export async function dispatchPushNotification(payload: {
   tag?: string;
   eventId?: string;
   type?: string;
+  sound?: string;
 }): Promise<boolean> {
   const eventId = payload.eventId || `ev-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
   

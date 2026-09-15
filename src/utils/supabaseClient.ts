@@ -1423,6 +1423,67 @@ export async function updateParentAccountFCMTokenInSupabase(
 }
 
 /**
+ * Verify Parent Account Status in Supabase for silent background check on app launch
+ */
+export async function verifyParentAccountStatusInSupabase(
+  barcode: string,
+  parentPhone?: string
+): Promise<{ exists: boolean; status: "active" | "disabled" | "deleted" | "unknown"; account?: ParentAccount }> {
+  try {
+    const cleanBarcode = String(barcode).trim();
+    if (!cleanBarcode) return { exists: false, status: "unknown" };
+    const uuid = barcodeToUUID(cleanBarcode);
+
+    let query = supabase.from("parent_accounts").select("*");
+    if (parentPhone) {
+      query = query.or(`id.eq.${uuid},linked_student_barcodes.cs.{${cleanBarcode}},parent_phone.eq.${parentPhone}`);
+    } else {
+      query = query.or(`id.eq.${uuid},linked_student_barcodes.cs.{${cleanBarcode}}`);
+    }
+
+    const { data, error } = await query.limit(1);
+
+    if (error) {
+      console.warn("[verifyParentAccountStatusInSupabase] query notice:", error.message);
+      return { exists: true, status: "unknown" };
+    }
+
+    if (!data || data.length === 0) {
+      // Record was deleted by the supervisor from Supabase
+      return { exists: false, status: "deleted" };
+    }
+
+    const row = data[0];
+    const statusVal = String(row.status || "active").toLowerCase();
+
+    if (statusVal === "disabled" || statusVal === "suspended") {
+      return { exists: true, status: "disabled" };
+    }
+
+    if (statusVal === "deleted") {
+      return { exists: false, status: "deleted" };
+    }
+
+    const account: ParentAccount = {
+      studentBarcode: row.student_barcode || cleanBarcode,
+      studentName: row.student_name || "",
+      parentPhone: row.parent_phone || "",
+      parentName: row.parent_name || "",
+      role: "parent",
+      status: "active",
+      activatedAt: row.activated_at || row.created_at,
+      linkedBarcodes: Array.isArray(row.linked_student_barcodes) ? row.linked_student_barcodes : [],
+    };
+
+    return { exists: true, status: "active", account };
+  } catch (err) {
+    console.warn("[verifyParentAccountStatusInSupabase] error:", err);
+    return { exists: true, status: "unknown" };
+  }
+}
+
+
+/**
  * Subscribe to realtime status changes of parent_accounts table in Supabase
  * Triggers 0ms instant remote logout when supervisor deactivates, suspends, or deletes.
  */

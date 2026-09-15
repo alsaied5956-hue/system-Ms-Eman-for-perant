@@ -1,12 +1,11 @@
 /**
- * Robust IndexedDB Storage Engine for Zero-Latency Local Operations
- * Provides safe, asynchronous, persistent storage in the browser.
+ * IndexedDB Purge & Deactivation Module
+ * In compliance with cloud-first architecture, all offline snapshot caching and
+ * IndexedDB state fallbacks are strictly disabled and purged to guarantee zero
+ * data divergence between installed PWA apps and live browser views.
  */
 
 const DB_NAME = "AimanCenterDB_v1";
-const DB_VERSION = 1;
-const STORE_OPERATIONS = "pending_operations";
-const STORE_SNAPSHOT = "system_snapshot";
 
 interface OperationRecord {
   id: string;
@@ -15,143 +14,63 @@ interface OperationRecord {
   timestamp: number;
 }
 
-let dbInstance: IDBDatabase | null = null;
-let dbInitPromise: Promise<IDBDatabase | null> | null = null;
+// Purge all legacy IndexedDB stores on initialization
+export async function purgeAllOfflineDatabases(): Promise<void> {
+  if (typeof window === "undefined" || !("indexedDB" in window)) return;
+  try {
+    const dbsToPurge = ["AimanCenterDB_v1", "TeacherEmanOfflineDB", "eman_offline_store"];
+    dbsToPurge.forEach((name) => {
+      try {
+        indexedDB.deleteDatabase(name);
+      } catch {}
+    });
+  } catch (err) {
+    console.info("IndexedDB purge notice:", err);
+  }
+}
+
+// Automatically trigger purge in browser
+if (typeof window !== "undefined") {
+  purgeAllOfflineDatabases().catch(() => {});
+}
 
 export async function openIndexedDB(): Promise<IDBDatabase | null> {
-  if (typeof window === "undefined" || !("indexedDB" in window)) {
-    return null;
-  }
-
-  if (dbInstance) return dbInstance;
-  if (dbInitPromise) return dbInitPromise;
-
-  dbInitPromise = new Promise<IDBDatabase | null>((resolve) => {
-    try {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-      request.onupgradeneeded = (e: IDBVersionChangeEvent) => {
-        const db = (e.target as IDBOpenDBRequest).result;
-        if (!db.objectStoreNames.contains(STORE_OPERATIONS)) {
-          db.createObjectStore(STORE_OPERATIONS, { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains(STORE_SNAPSHOT)) {
-          db.createObjectStore(STORE_SNAPSHOT, { keyPath: "key" });
-        }
-      };
-
-      request.onsuccess = (e) => {
-        dbInstance = (e.target as IDBOpenDBRequest).result;
-        resolve(dbInstance);
-      };
-
-      request.onerror = (e) => {
-        console.warn("IndexedDB open error (falling back to LocalStorage):", e);
-        resolve(null);
-      };
-    } catch (err) {
-      console.warn("IndexedDB not supported or blocked, using LocalStorage:", err);
-      resolve(null);
-    }
-  });
-
-  return dbInitPromise;
+  // Offline IndexedDB is disabled in favor of live Supabase Cloud state
+  return null;
 }
 
 /**
- * Save an operation to IndexedDB pending queue
+ * Save an operation to IndexedDB pending queue (disabled in cloud-only mode)
  */
-export async function saveOperationToIndexedDB(op: OperationRecord): Promise<void> {
-  try {
-    const db = await openIndexedDB();
-    if (!db) return;
-
-    const tx = db.transaction(STORE_OPERATIONS, "readwrite");
-    const store = tx.objectStore(STORE_OPERATIONS);
-    store.put(op);
-  } catch (err) {
-    // Non-fatal, LocalStorage handles synchronous fallback
-  }
+export async function saveOperationToIndexedDB(_op: OperationRecord): Promise<void> {
+  // No-op: Supabase is source of truth
 }
 
 /**
- * Get all pending operations from IndexedDB
+ * Get all pending operations from IndexedDB (always returns empty array)
  */
 export async function getPendingOperationsFromIndexedDB(): Promise<OperationRecord[]> {
-  try {
-    const db = await openIndexedDB();
-    if (!db) return [];
-
-    return new Promise<OperationRecord[]>((resolve) => {
-      const tx = db.transaction(STORE_OPERATIONS, "readonly");
-      const store = tx.objectStore(STORE_OPERATIONS);
-      const req = store.getAll();
-
-      req.onsuccess = () => {
-        resolve(req.result || []);
-      };
-      req.onerror = () => {
-        resolve([]);
-      };
-    });
-  } catch {
-    return [];
-  }
+  return [];
 }
 
 /**
  * Delete specific operations from IndexedDB once committed to Firestore
  */
-export async function removeOperationsFromIndexedDB(ids: string[]): Promise<void> {
-  try {
-    const db = await openIndexedDB();
-    if (!db || ids.length === 0) return;
-
-    const tx = db.transaction(STORE_OPERATIONS, "readwrite");
-    const store = tx.objectStore(STORE_OPERATIONS);
-    ids.forEach((id) => store.delete(id));
-  } catch {
-    // Non-fatal
-  }
+export async function removeOperationsFromIndexedDB(_ids: string[]): Promise<void> {
+  // No-op
 }
 
 /**
- * Save system state snapshot to IndexedDB for large offline persistence
+ * Save system state snapshot to IndexedDB (disabled to prevent stale data divergence)
  */
-export async function saveSnapshotToIndexedDB(key: string, data: any): Promise<void> {
-  try {
-    const db = await openIndexedDB();
-    if (!db) return;
-
-    const tx = db.transaction(STORE_SNAPSHOT, "readwrite");
-    const store = tx.objectStore(STORE_SNAPSHOT);
-    store.put({ key, data, updatedAt: Date.now() });
-  } catch {
-    // Non-fatal
-  }
+export async function saveSnapshotToIndexedDB(_key: string, _data: any): Promise<void> {
+  // No-op: Offline snapshots disabled
 }
 
 /**
- * Load system state snapshot from IndexedDB
+ * Load system state snapshot from IndexedDB (strictly returns null to force live Supabase fetch)
  */
-export async function loadSnapshotFromIndexedDB(key: string): Promise<any | null> {
-  try {
-    const db = await openIndexedDB();
-    if (!db) return null;
-
-    return new Promise<any>((resolve) => {
-      const tx = db.transaction(STORE_SNAPSHOT, "readonly");
-      const store = tx.objectStore(STORE_SNAPSHOT);
-      const req = store.get(key);
-
-      req.onsuccess = () => {
-        resolve(req.result ? req.result.data : null);
-      };
-      req.onerror = () => {
-        resolve(null);
-      };
-    });
-  } catch {
-    return null;
-  }
+export async function loadSnapshotFromIndexedDB(_key: string): Promise<any | null> {
+  return null;
 }
+

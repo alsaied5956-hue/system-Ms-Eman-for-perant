@@ -3,11 +3,13 @@ import { Student, PaymentRecord, GroupDays, GradeName } from "../types";
 export interface ParentAccount {
   studentBarcode: string;
   studentName?: string;
+  parentName?: string;
   linkedBarcodes: string[];
   parentPhone: string;
-  password: string;
+  password?: string;
+  role?: "parent" | "admin";
   status: "active" | "disabled" | "deleted";
-  createdAt: string;
+  createdAt?: string;
   updatedAt?: string;
   activatedAt?: string;
   deletedAt?: string;

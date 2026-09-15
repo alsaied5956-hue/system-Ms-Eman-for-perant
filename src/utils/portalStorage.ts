@@ -2402,23 +2402,53 @@ export function subscribeToAllChats(
 }
 
 /**
- * Session Persistence
- * Enforces sessionStorage so closing the browser forces a fresh login, while supporting seamless tab refreshes
+ * Session Persistence: Parent Persistent Session vs. Supervisor Ephemeral Session
+ * - Parent: Long-lived persistence in localStorage ('parent_session_token') surviving app restarts, reboots, and browser closure.
+ * - Supervisor: Strictly ephemeral in sessionStorage, immediately resetting upon window/tab closure.
  */
+export const LS_PARENT_SESSION_TOKEN = "parent_session_token";
+
 export function getSavedPortalSession(): PortalSession | null {
   try {
     if (typeof window !== "undefined") {
-      const raw = sessionStorage.getItem(LS_PORTAL_SESSION) || localStorage.getItem(LS_PORTAL_SESSION);
-      if (raw) {
-        const parsed: PortalSession = JSON.parse(raw);
+      // 1. Check active sessionStorage first (supervisor session or current tab parent session)
+      const sessionRaw = sessionStorage.getItem(LS_PORTAL_SESSION);
+      if (sessionRaw) {
+        const parsed: PortalSession = JSON.parse(sessionRaw);
         if (parsed && (parsed.role === "admin" || parsed.isSupervisor)) {
           parsed.role = "admin";
           parsed.isSupervisor = true;
+          return parsed;
         }
-        return parsed;
+        if (parsed && parsed.role === "parent") {
+          return parsed;
+        }
+      }
+
+      // 2. Check long-lived persistent parent session in localStorage ('parent_session_token')
+      const parentTokenRaw =
+        localStorage.getItem(LS_PARENT_SESSION_TOKEN) ||
+        localStorage.getItem(LS_PORTAL_SESSION);
+
+      if (parentTokenRaw) {
+        const parsed: PortalSession = JSON.parse(parentTokenRaw);
+        // Security check: Supervisor sessions MUST NEVER persist via localStorage
+        if (parsed && (parsed.role === "admin" || parsed.isSupervisor)) {
+          localStorage.removeItem(LS_PORTAL_SESSION);
+          localStorage.removeItem(LS_PARENT_SESSION_TOKEN);
+          return null;
+        }
+
+        if (parsed && parsed.role === "parent") {
+          // Re-populate sessionStorage for current tab session synchronization
+          sessionStorage.setItem(LS_PORTAL_SESSION, JSON.stringify(parsed));
+          return parsed;
+        }
       }
     }
-  } catch {}
+  } catch (err) {
+    console.warn("getSavedPortalSession error:", err);
+  }
   return null;
 }
 
@@ -2429,14 +2459,39 @@ export function savePortalSession(session: PortalSession | null): void {
         if (session.role === "admin" || session.isSupervisor) {
           session.role = "admin";
           session.isSupervisor = true;
+          // Ephemeral Supervisor session: Strictly in sessionStorage ONLY
+          sessionStorage.setItem(LS_PORTAL_SESSION, JSON.stringify(session));
+          localStorage.removeItem(LS_PORTAL_SESSION);
+          localStorage.removeItem(LS_PARENT_SESSION_TOKEN);
+        } else {
+          // Long-lived Parent session: Persists across restarts, reboots, and browser closures
+          session.role = "parent";
+          const serialized = JSON.stringify(session);
+          localStorage.setItem(LS_PARENT_SESSION_TOKEN, serialized);
+          localStorage.setItem(LS_PORTAL_SESSION, serialized);
+          sessionStorage.setItem(LS_PORTAL_SESSION, serialized);
         }
-        sessionStorage.setItem(LS_PORTAL_SESSION, JSON.stringify(session));
-        // Remove from localStorage so closing the browser window forces fresh login
-        localStorage.removeItem(LS_PORTAL_SESSION);
       } else {
+        // Explicit logout: Purge all session keys completely
         sessionStorage.removeItem(LS_PORTAL_SESSION);
         localStorage.removeItem(LS_PORTAL_SESSION);
+        localStorage.removeItem(LS_PARENT_SESSION_TOKEN);
       }
+    }
+  } catch (err) {
+    console.warn("savePortalSession error:", err);
+  }
+}
+
+export function clearPortalSession(role?: "parent" | "admin"): void {
+  try {
+    if (typeof window === "undefined") return;
+    if (role === "admin") {
+      sessionStorage.removeItem(LS_PORTAL_SESSION);
+    } else {
+      sessionStorage.removeItem(LS_PORTAL_SESSION);
+      localStorage.removeItem(LS_PORTAL_SESSION);
+      localStorage.removeItem(LS_PARENT_SESSION_TOKEN);
     }
   } catch {}
 }

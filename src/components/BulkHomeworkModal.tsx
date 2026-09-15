@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { Student, GradeName, GroupDays, GRADE_ORDER } from "../types";
 import { getTodayKey } from "../utils/helpers";
 import { enqueuePlatformMessage } from "../utils/storage";
+import { dispatchPushNotification } from "../services/pushNotificationService";
 import {
   BookOpen,
   X,
@@ -159,6 +160,18 @@ export const BulkHomeworkModal: React.FC<BulkHomeworkModalProps> = ({
         message,
         channel: "in_app",
       });
+
+      // 🔔 Loud Native Push Notification to Parent
+      dispatchPushNotification({
+        targetUserIds: [student.barcode, student.parentPhone || "", student.phone || ""].filter(Boolean),
+        title: `⚠️ تنبيه واجب: عدم تسليم - ${student.name}`,
+        body: message,
+        type: "homework",
+        tag: `hw-warn-${student.barcode}-${Date.now()}`,
+        eventId: `hw-warn-${student.barcode}-${Date.now()}`,
+        url: "/?tab=homework",
+        sound: "/notification.wav",
+      }).catch(() => {});
     });
 
     // Enqueue 2: Deficient
@@ -173,6 +186,18 @@ export const BulkHomeworkModal: React.FC<BulkHomeworkModalProps> = ({
         message,
         channel: "in_app",
       });
+
+      // 🔔 Loud Native Push Notification to Parent
+      dispatchPushNotification({
+        targetUserIds: [student.barcode, student.parentPhone || "", student.phone || ""].filter(Boolean),
+        title: `⚠️ تنبيه واجب: تقصير في الحل - ${student.name}`,
+        body: message,
+        type: "homework",
+        tag: `hw-warn-${student.barcode}-${Date.now()}`,
+        eventId: `hw-warn-${student.barcode}-${Date.now()}`,
+        url: "/?tab=homework",
+        sound: "/notification.wav",
+      }).catch(() => {});
     });
 
     // Enqueue 3: Completed
@@ -187,6 +212,18 @@ export const BulkHomeworkModal: React.FC<BulkHomeworkModalProps> = ({
         message,
         channel: "in_app",
       });
+
+      // 🔔 Loud Native Push Notification to Parent
+      dispatchPushNotification({
+        targetUserIds: [student.barcode, student.parentPhone || "", student.phone || ""].filter(Boolean),
+        title: `🌟 إشعار واجب: تسليم ممتاز - ${student.name}`,
+        body: message,
+        type: "homework",
+        tag: `hw-done-${student.barcode}-${Date.now()}`,
+        eventId: `hw-done-${student.barcode}-${Date.now()}`,
+        url: "/?tab=homework",
+        sound: "/notification.wav",
+      }).catch(() => {});
     });
 
     setIsSending(false);

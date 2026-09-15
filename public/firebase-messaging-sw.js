@@ -20,6 +20,46 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// Helper: Contextual interactive action buttons for notifications
+function getNotificationActions(type, tag) {
+  const normType = String(type || "").toLowerCase();
+  const normTag = String(tag || "").toLowerCase();
+
+  if (normType === "chat" || normTag.includes("chat")) {
+    return [
+      { action: "open_chat", title: "💬 فتح المحادثة" },
+      { action: "open_portal", title: "عرض المنظومة" },
+    ];
+  }
+  if (normType === "attendance" || normType === "absence" || normType === "delay" || normTag.includes("att") || normTag.includes("abs")) {
+    return [
+      { action: "view_attendance", title: "📋 سجل الحضور" },
+      { action: "open_portal", title: "عرض المنظومة" },
+    ];
+  }
+  if (normType === "homework" || normTag.includes("hw")) {
+    return [
+      { action: "view_homework", title: "📖 متابعة الواجب" },
+      { action: "open_portal", title: "عرض المنظومة" },
+    ];
+  }
+  if (normType === "grade" || normType === "exam" || normTag.includes("grade") || normTag.includes("exam")) {
+    return [
+      { action: "view_exams", title: "📊 كشف الدرجات" },
+      { action: "open_portal", title: "عرض المنظومة" },
+    ];
+  }
+  if (normType === "fee" || normType === "payment" || normTag.includes("pay")) {
+    return [
+      { action: "view_payments", title: "💳 إيصال المصروفات" },
+      { action: "open_portal", title: "عرض المنظومة" },
+    ];
+  }
+  return [
+    { action: "open_portal", title: "عرض المنظومة" },
+  ];
+}
+
 // Handle FCM Background Messages
 messaging.onBackgroundMessage((payload) => {
   console.log("[firebase-messaging-sw.js] Received FCM background message:", payload);
@@ -37,6 +77,7 @@ messaging.onBackgroundMessage((payload) => {
   const notifType = payload.data?.type || "alert";
   const eventId = payload.data?.eventId || `fcm-${Date.now()}`;
   const targetUrl = payload.data?.url || (notifType === "chat" ? "/?tab=chat" : "/");
+  const actions = getNotificationActions(notifType, payload.data?.tag || eventId);
 
   const notificationOptions = {
     body,
@@ -44,6 +85,7 @@ messaging.onBackgroundMessage((payload) => {
     badge: "/icon.svg",
     vibrate: [200, 100, 200], // High-priority background vibration pattern
     silent: false, // Rings mobile device default notification chime
+    sound: "/notification.wav",
     renotify: true,
     requireInteraction: true,
     tag: payload.data?.tag || eventId,
@@ -55,16 +97,7 @@ messaging.onBackgroundMessage((payload) => {
     },
     dir: "rtl",
     lang: "ar",
-    actions:
-      notifType === "chat"
-        ? [
-            { action: "open_chat", title: "💬 فتح المحادثة" },
-            { action: "open_portal", title: "عرض المنظومة" },
-          ]
-        : [
-            { action: "open_portal", title: "عرض المنظومة" },
-            { action: "view_details", title: "عرض التفاصيل" },
-          ],
+    actions,
   };
 
   return self.registration.showNotification(title, notificationOptions);

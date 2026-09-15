@@ -7,6 +7,7 @@ import {
   syncParentAccountsFromCloud,
   subscribeToParentAccountLiveStatus,
 } from "../../utils/portalStorage";
+import { verifyParentAccountStatusInSupabase } from "../../utils/supabaseClient";
 import { PortalAuthScreen } from "./PortalAuthScreen";
 import { ParentPortalDashboard } from "./ParentPortalDashboard";
 import { AdminControlPanel } from "./AdminControlPanel";
@@ -72,6 +73,33 @@ export const PortalMasterApp: React.FC<PortalMasterAppProps> = ({
       setRevocationNotice(null);
     }
   }, []);
+
+  // ⚡ Silent Background Check on App Launch against Supabase (Active vs Disabled/Deleted)
+  // If active, keeps parent logged in instantly without showing the login screen.
+  // Only terminates if explicitly disabled or deleted by supervisor in Supabase.
+  useEffect(() => {
+    if (session?.role !== "parent") return;
+    const barcode = String(session.account?.studentBarcode || session.barcode || "").trim();
+    if (!barcode) return;
+    const phone = session.account?.parentPhone;
+
+    verifyParentAccountStatusInSupabase(barcode, phone)
+      .then((res) => {
+        if (res.status === "disabled") {
+          setRevocationNotice("تم تعطيل هذا الحساب من قِبل إدارة المنظومة.");
+          handleLogout(true);
+        } else if (res.status === "deleted") {
+          setRevocationNotice("تم حذف هذا الحساب من قِبل إدارة المنظومة.");
+          handleLogout(true);
+        } else if (res.status === "active" && res.account) {
+          setSession((prev) => (prev ? { ...prev, account: res.account } : prev));
+        }
+      })
+      .catch((err) => {
+        // Safe offline/transient fallback: Keep parent logged in
+        console.warn("Silent background account status check notice:", err);
+      });
+  }, [session?.role, session?.barcode, session?.account?.studentBarcode, handleLogout]);
 
   // Window-level remote revocation event listener (from studentLiveSync or BroadcastChannel)
   useEffect(() => {

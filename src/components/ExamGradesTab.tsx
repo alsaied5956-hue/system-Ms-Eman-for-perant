@@ -3,6 +3,7 @@ import { Student } from "../types";
 import { openWhatsApp, SCHOOL_WHATSAPP_PHONE, sortStudentsByGradeAndName } from "../utils/helpers";
 import { enqueuePlatformMessage } from "../utils/storage";
 import { playBeep } from "../utils/audio";
+import { dispatchPushNotification } from "../services/pushNotificationService";
 import { StudentSearchBox } from "./StudentSearchBox";
 import { FileCheck2, Send, Sparkles, UserCheck, MessageSquare, Clock, CheckCircle2, Loader2, Trash2 } from "lucide-react";
 
@@ -124,6 +125,18 @@ export const ExamGradesTab: React.FC<ExamGradesTabProps> = ({
       message: msg,
       channel: "in_app",
     });
+
+    // 🔔 Loud Native Background Web Push & FCM Notification to Parent Phone
+    dispatchPushNotification({
+      targetUserIds: [selectedStudent.barcode, selectedStudent.parentPhone || "", selectedStudent.phone || ""].filter(Boolean),
+      title: `📊 نتيجة اختبار: ${currentTitle}`,
+      body: `حصل الطالب (${selectedStudent.name}) على درجة ${scoreNum} من ${maxNum} (${percentage}%). ${evaluation}`,
+      type: "grade",
+      tag: `exam-${selectedStudent.barcode}-${Date.now()}`,
+      eventId: `exam-${selectedStudent.barcode}-${currentTitle}-${Date.now()}`,
+      url: "/?tab=exams",
+      sound: "/notification.wav",
+    }).catch(() => {});
 
     setFeedback({
       type: "success",
