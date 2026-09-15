@@ -1656,19 +1656,124 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
   }
 
   try {
-    // Consolidated Single-Query Fetch (<250ms):
-    // Aggregate student info, attendance, payments, and homework into ONE SINGLE relational query:
-    const { data: studentRow, error } = await withTimeout(
-      supabase
+    // 500ms Hard Timeout Guard for Cloud Hydration
+    const fetchCore = async (): Promise<any> => {
+      // 1. Optimized Parallel Fetch Engine:
+      // Primary student query AND parallel sub-queries for attendance_logs, payments, homework concurrently via Promise.all()
+      const parallelFetchPromise = (async () => {
+        const studentPromise = supabase
+          .from("students")
+          .select("*")
+          .eq("barcode", cleanBarcode)
+          .single();
+
+        const attendancePromise = supabase
+          .from("attendance_logs")
+          .select("*")
+          .eq("barcode", cleanBarcode);
+
+        const paymentsPromise = supabase
+          .from("payments")
+          .select("*, students!payments_student_id_fkey!inner(barcode)")
+          .eq("students.barcode", cleanBarcode)
+          .then((res) => {
+            if (res.error || !res.data) {
+              return studentPromise.then((st) => {
+                if (st.data?.id) {
+                  return supabase.from("payments").select("*").eq("student_id", st.data.id);
+                }
+                return res;
+              });
+            }
+            return res;
+          });
+
+        const homeworkPromise = supabase
+          .from("homework")
+          .select("*, students!homework_student_id_fkey!inner(barcode)")
+          .eq("students.barcode", cleanBarcode)
+          .then((res) => {
+            if (res.error || !res.data) {
+              return studentPromise.then((st) => {
+                if (st.data?.id) {
+                  return supabase.from("homework").select("*").eq("student_id", st.data.id);
+                }
+                return res;
+              });
+            }
+            return res;
+          });
+
+        const [stRes, attRes, payRes, hwRes] = await Promise.all([
+          studentPromise,
+          attendancePromise,
+          paymentsPromise,
+          homeworkPromise,
+        ]);
+
+        if (!stRes.data) return null;
+
+        return {
+          ...stRes.data,
+          attendance_logs: Array.isArray(attRes.data) ? attRes.data : [],
+          payments: Array.isArray(payRes.data) ? payRes.data : [],
+          homework: Array.isArray(hwRes.data) ? hwRes.data : [],
+        };
+      })();
+
+      // 2. Relational join query with 300ms circuit breaker:
+      const relationalJoinPromise = supabase
         .from("students")
         .select("*, attendance_logs(*), payments(*), homework(*)")
         .eq("barcode", cleanBarcode)
-        .single(),
-      2000,
-      "استعلام بيانات الطالب الموحدة عبر استعلام علائقي موحد"
+        .single();
+
+      // If relational join takes longer than 300ms, immediately resolve with parallel result
+      return new Promise<any>((resolve, reject) => {
+        let isDone = false;
+
+        // If parallel resolves first and is valid, resolve immediately
+        parallelFetchPromise
+          .then((pData) => {
+            if (pData && !isDone) {
+              isDone = true;
+              resolve(pData);
+            }
+          })
+          .catch(() => {});
+
+        // If relational join completes under 300ms and is valid, resolve immediately
+        Promise.resolve(relationalJoinPromise)
+          .then((rRes) => {
+            if (rRes && (rRes as any).data && !(rRes as any).error && !isDone) {
+              isDone = true;
+              resolve((rRes as any).data);
+            }
+          })
+          .catch(() => {});
+
+        // 300ms circuit breaker: if relational has not completed, resolve with parallel result immediately
+        setTimeout(async () => {
+          if (!isDone) {
+            isDone = true;
+            try {
+              const pData = await parallelFetchPromise;
+              resolve(pData);
+            } catch (err) {
+              reject(err);
+            }
+          }
+        }, 300);
+      });
+    };
+
+    const studentRow = await withTimeout(
+      fetchCore(),
+      500,
+      "استعلام بيانات الطالب الموحدة (مهلة 500 مللي ثانية)"
     );
 
-    if (error || !studentRow) {
+    if (!studentRow) {
       return {
         success: false,
         student: null,

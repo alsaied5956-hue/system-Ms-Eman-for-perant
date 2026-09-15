@@ -351,11 +351,11 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       try {
         data = await withTimeout(
           fetchUnifiedStudentPortalDataFromSupabase(cleanBarcode),
-          2000,
-          "Network connection error. Request timed out after 2 seconds"
+          500,
+          "Network connection error. Request timed out after 500ms"
         );
       } catch (timeoutErr) {
-        console.warn("[ParentPortalDashboard] Fetch timed out (<2s):", timeoutErr);
+        console.warn("[ParentPortalDashboard] Fetch timed out (<500ms):", timeoutErr);
         data = null;
       }
 
@@ -579,11 +579,13 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
           event: "*",
           schema: "public",
           table: "homework",
-          filter: `barcode=eq.${targetBarcode}`,
+          filter: activeStudentIdRef.current ? `student_id=eq.${activeStudentIdRef.current}` : undefined,
         },
         (payload) => {
           if (!isSubscribed) return;
           const newRow = payload.new as any;
+          const activeId = activeStudentIdRef.current;
+          if (activeId && newRow && newRow.student_id && newRow.student_id !== activeId) return;
           if (newRow && newRow.date_key) {
             setSupabasePortalData((prev) => {
               if (!prev) return null;
