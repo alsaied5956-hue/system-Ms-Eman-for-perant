@@ -1714,7 +1714,8 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
     paymentsList.forEach((p: any) => {
       const mKey = p.month_key;
       if (mKey) {
-        paymentsMap[mKey] = {
+        const paymentRecord = {
+          barcode: bCode,
           monthKey: mKey,
           amount: Number(p.amount_paid || 0),
           paidAmount: Number(p.amount_paid || 0),
@@ -1725,6 +1726,10 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
           notes: p.notes || "",
           recordedBy: p.received_by || "الإشراف",
           timestamp: p.created_at ? new Date(p.created_at).getTime() : Date.now(),
+        };
+        paymentsMap[mKey] = {
+          ...paymentRecord,
+          [bCode]: paymentRecord,
         };
       }
     });

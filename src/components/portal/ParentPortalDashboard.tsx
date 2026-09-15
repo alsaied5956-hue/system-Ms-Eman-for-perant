@@ -19,6 +19,7 @@ import {
   normalizeBarcode,
 } from "../../utils/portalStorage";
 import {
+  supabase,
   fetchUnifiedStudentPortalDataFromSupabase,
   UnifiedStudentPortalData,
   subscribeToStudentChanges,
@@ -302,14 +303,27 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
   const isCloudHydratedRef = useRef<boolean>(
     Boolean(initialTargetBarcode && getSessionPortalData(initialTargetBarcode)?.success)
   );
+  const currentHydratedBarcodeRef = useRef<string>(
+    initialTargetBarcode && getSessionPortalData(initialTargetBarcode)?.success ? initialTargetBarcode : ""
+  );
+  const activeStudentIdRef = useRef<string>(
+    initialTargetBarcode ? getSessionPortalData(initialTargetBarcode)?.student?.id || "" : ""
+  );
   const [isHydratingSupabase, setIsHydratingSupabase] = useState<boolean>(false);
   const [supabaseError, setSupabaseError] = useState<string | null>(null);
 
-  // In-Memory Session Caching & Cloud Timeout Guard:
-  // Re-fetch live data from Supabase ONLY on manual pull-to-refresh, page reload, or Realtime database triggers.
+  // In-Memory Session Caching & Single Source Hydration Lock:
+  // Re-fetch live data from Supabase ONLY on manual pull-to-refresh, child switch, or explicit user action.
   const fetchPortalData = useCallback(async (targetBarcode: string, force: boolean = false) => {
     const cleanBarcode = String(targetBarcode).trim();
     if (!cleanBarcode) return;
+
+    // 🔒 SINGLE SOURCE HYDRATION LOCK:
+    // Once isCloudHydrated = true is set for this barcode, prevent secondary background timer effects
+    // or un-targeted refetches from executing a setState() that mutates the active student's records.
+    if (!force && isCloudHydratedRef.current && currentHydratedBarcodeRef.current === cleanBarcode) {
+      return;
+    }
 
     // 1. In-Memory Session Caching (No Local Storage, No Mock Data):
     // Keep fetched Supabase data active in React memory state during current app session to prevent spamming Supabase API calls on every tab navigation.
@@ -320,6 +334,10 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
         setSupabaseError(null);
         setIsHydratingSupabase(false);
         isCloudHydratedRef.current = true;
+        currentHydratedBarcodeRef.current = cleanBarcode;
+        if (cached.student?.id) {
+          activeStudentIdRef.current = cached.student.id;
+        }
         setIsCloudHydrated(true);
         return;
       }
@@ -346,21 +364,25 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
         setSupabasePortalData(data);
         setSupabaseError(null);
         isCloudHydratedRef.current = true;
+        currentHydratedBarcodeRef.current = cleanBarcode;
+        if (data.student?.id) {
+          activeStudentIdRef.current = data.student.id;
+        }
         setIsCloudHydrated(true);
       } else {
-        if (!isCloudHydratedRef.current && !supabasePortalData && !baseActiveStudent) {
+        if (!isCloudHydratedRef.current) {
           setSupabaseError(data?.message || "Network connection error. Please retry");
         }
       }
     } catch (err: any) {
       console.warn("[ParentPortalDashboard] Supabase live hydration error/timeout:", err);
-      if (!isCloudHydratedRef.current && !supabasePortalData && !baseActiveStudent) {
+      if (!isCloudHydratedRef.current) {
         setSupabaseError("Network connection error. Please retry");
       }
     } finally {
       setIsHydratingSupabase(false);
     }
-  }, [baseActiveStudent, supabasePortalData]);
+  }, []);
 
   // Instant UI Hydration & Realtime Synchronization:
   useEffect(() => {
@@ -369,12 +391,187 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
 
     let isSubscribed = true;
 
-    // Fetch live or pull from in-memory session cache
-    fetchPortalData(targetBarcode, false);
+    // Single Source Hydration Lock:
+    // Only execute initial cloud fetch if not yet hydrated for this targetBarcode
+    if (!isCloudHydratedRef.current || currentHydratedBarcodeRef.current !== targetBarcode) {
+      fetchPortalData(targetBarcode, false);
+    }
 
-    // Realtime changes on students table for this barcode
+    // Direct Supabase Realtime Channel with Strict Student-Level Realtime Filtering:
+    // In all Supabase Realtime event listeners (postgres_changes / supabase.channel), enforce a strict guard:
+    // Only update the React state if payload.new.barcode === activeStudent.barcode or payload.new.student_id === activeStudent.id
+    // Reject any broad, global, or un-filtered table event from modifying the active student's rendered view.
+    const realtimeChannel = supabase
+      .channel(`portal-student-sync-${targetBarcode}-${Date.now()}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "students" },
+        (payload) => {
+          if (!isSubscribed) return;
+          const newRow = payload.new as any;
+          const oldRow = payload.old as any;
+          const activeBarcode = targetBarcode;
+          const activeId = activeStudentIdRef.current;
+
+          // Strict Student-Level Realtime Filtering Guard
+          const isTargetStudent = Boolean(
+            (newRow && (
+              String(newRow.barcode || "").trim() === activeBarcode ||
+              (activeId && (newRow.id === activeId || newRow.student_id === activeId))
+            )) ||
+            (oldRow && (
+              String(oldRow.barcode || "").trim() === activeBarcode ||
+              (activeId && (oldRow.id === activeId || oldRow.student_id === activeId))
+            ))
+          );
+
+          // Reject any broad, global, or un-filtered table event
+          if (!isTargetStudent) return;
+
+          if (payload.eventType === "DELETE") return;
+
+          if (newRow) {
+            const updatedStudentData: Partial<Student> = {
+              barcode: String(newRow.barcode || activeBarcode).trim(),
+              name: newRow.name,
+              phone: newRow.phone || "",
+              parentPhone: newRow.parent_phone || newRow.parentPhone || "",
+              groupGrade: newRow.grade || newRow.groupGrade,
+              groupDays: newRow.group_days || newRow.groupDays,
+              points: newRow.points,
+              totalAttendanceDays: newRow.total_attendance_days || newRow.totalAttendanceDays,
+              totalAbsentDays: newRow.total_absent_days || newRow.totalAbsentDays,
+              customMonthlyFee: newRow.custom_monthly_fee || newRow.customMonthlyFee,
+              lastExamScore: newRow.last_exam_score || newRow.lastExamScore,
+              lastExamTitle: newRow.last_exam_title || newRow.lastExamTitle,
+            };
+
+            const updater = (prevStudent: any) => ({
+              ...(prevStudent || {}),
+              ...updatedStudentData,
+            });
+            updateSessionPortalStudent(activeBarcode, updater);
+            setSupabasePortalData((prev) => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                student: updater(prev.student),
+              };
+            });
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "attendance_logs" },
+        (payload) => {
+          if (!isSubscribed) return;
+          const newRow = payload.new as any;
+          const oldRow = payload.old as any;
+          const activeBarcode = targetBarcode;
+          const activeId = activeStudentIdRef.current;
+
+          // Strict Student-Level Realtime Filtering Guard
+          const isTargetStudent = Boolean(
+            (newRow && (
+              String(newRow.barcode || "").trim() === activeBarcode ||
+              (activeId && (newRow.student_id === activeId || newRow.id === activeId))
+            )) ||
+            (oldRow && (
+              String(oldRow.barcode || "").trim() === activeBarcode ||
+              (activeId && (oldRow.student_id === activeId || oldRow.id === activeId))
+            ))
+          );
+
+          // Reject any broad, global, or un-filtered table event
+          if (!isTargetStudent) return;
+
+          if (newRow && newRow.date_key) {
+            const dateKey = newRow.date_key;
+            const status = newRow.status || "حضور";
+            updateSessionPortalAttendance(activeBarcode, dateKey, status);
+            setSupabasePortalData((prev) => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                attendanceHistory: {
+                  ...prev.attendanceHistory,
+                  [dateKey]: status,
+                },
+              };
+            });
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "payments" },
+        (payload) => {
+          if (!isSubscribed) return;
+          const newRow = payload.new as any;
+          const oldRow = payload.old as any;
+          const activeBarcode = targetBarcode;
+          const activeId = activeStudentIdRef.current;
+
+          // Strict Student-Level Realtime Filtering Guard
+          const isTargetStudent = Boolean(
+            (newRow && (
+              String(newRow.barcode || "").trim() === activeBarcode ||
+              (activeId && (newRow.student_id === activeId || newRow.id === activeId))
+            )) ||
+            (oldRow && (
+              String(oldRow.barcode || "").trim() === activeBarcode ||
+              (activeId && (oldRow.student_id === activeId || oldRow.id === activeId))
+            ))
+          );
+
+          // Reject any broad, global, or un-filtered table event
+          if (!isTargetStudent) return;
+
+          if (newRow && newRow.month_key) {
+            const mKey = newRow.month_key;
+            const paymentRecord = {
+              barcode: activeBarcode,
+              monthKey: mKey,
+              amount: Number(newRow.amount_paid || newRow.amount || 0),
+              paidAmount: Number(newRow.amount_paid || newRow.amount || 0),
+              requiredAmount: Number(newRow.required_amount || 0),
+              date: newRow.payment_date || new Date().toISOString(),
+              month: mKey,
+              notes: newRow.notes || "",
+            };
+            updateSessionPortalPayment(activeBarcode, mKey, paymentRecord);
+            setSupabasePortalData((prev) => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                payments: {
+                  ...prev.payments,
+                  [mKey]: {
+                    ...(prev.payments[mKey] || {}),
+                    ...paymentRecord,
+                    [activeBarcode]: paymentRecord,
+                  },
+                },
+              };
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    // Broadcast channel listeners with strict student-level filtering
     const unsubStudent = subscribeToStudentChanges((payload) => {
-      if (!isSubscribed || String(payload.barcode).trim() !== targetBarcode) return;
+      if (!isSubscribed) return;
+      const cleanPayloadBarcode = String(payload.barcode || "").trim();
+      const activeId = activeStudentIdRef.current;
+      const matchesBarcode = cleanPayloadBarcode === targetBarcode;
+      const matchesId = Boolean(activeId && (payload as any).student_id === activeId);
+
+      // Strict Student-Level Realtime Filtering:
+      // Reject any broad, global, or un-filtered table event
+      if (!matchesBarcode && !matchesId) return;
+
       const updater = (prevStudent: any) => ({
         ...(prevStudent || {}),
         ...(payload.studentData || {}),
@@ -389,9 +586,17 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       });
     });
 
-    // Realtime changes on attendance_logs table for this barcode
     const unsubAttendance = subscribeToAttendanceStatusChanges((payload) => {
-      if (!isSubscribed || String(payload.barcode).trim() !== targetBarcode) return;
+      if (!isSubscribed) return;
+      const cleanPayloadBarcode = String(payload.barcode || "").trim();
+      const activeId = activeStudentIdRef.current;
+      const matchesBarcode = cleanPayloadBarcode === targetBarcode;
+      const matchesId = Boolean(activeId && (payload as any).student_id === activeId);
+
+      // Strict Student-Level Realtime Filtering:
+      // Reject any broad, global, or un-filtered table event
+      if (!matchesBarcode && !matchesId) return;
+
       const dateKey = payload.dateKey || getTodayKey();
       updateSessionPortalAttendance(targetBarcode, dateKey, payload.status);
       setSupabasePortalData((prev) => {
@@ -406,14 +611,24 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       });
     });
 
-    // Realtime changes on payments table for this barcode
     const unsubPayment = subscribeToPaymentChanges((payload) => {
-      if (!isSubscribed || String(payload.barcode).trim() !== targetBarcode) return;
+      if (!isSubscribed) return;
+      const cleanPayloadBarcode = String(payload.barcode || "").trim();
+      const activeId = activeStudentIdRef.current;
+      const matchesBarcode = cleanPayloadBarcode === targetBarcode;
+      const matchesId = Boolean(activeId && (payload as any).student_id === activeId);
+
+      // Strict Student-Level Realtime Filtering:
+      // Reject any broad, global, or un-filtered table event
+      if (!matchesBarcode && !matchesId) return;
+
       const mKey = payload.monthKey;
       if (!mKey) return;
       const paymentRecord = {
         barcode: targetBarcode,
+        monthKey: mKey,
         amount: Number(payload.amount || 0),
+        paidAmount: Number(payload.amount || 0),
         date: payload.date || new Date().toISOString(),
         month: mKey,
         notes: payload.note || "",
@@ -427,6 +642,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
             ...prev.payments,
             [mKey]: {
               ...(prev.payments[mKey] || {}),
+              ...paymentRecord,
               [targetBarcode]: paymentRecord,
             },
           },
@@ -436,6 +652,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
 
     return () => {
       isSubscribed = false;
+      supabase.removeChannel(realtimeChannel);
       unsubStudent();
       unsubAttendance();
       unsubPayment();
@@ -447,60 +664,58 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     const targetBarcode = String(selectedStudentBarcode || account.studentBarcode).trim();
     if (supabasePortalData?.student) {
       const supaSt = supabasePortalData.student;
-      const base = baseActiveStudent || ({} as Partial<Student>);
+      // 🔒 SINGLE SOURCE HYDRATION LOCK:
+      // Cloud record is the single authoritative source of truth.
+      // Prevent secondary props changes from mutating the active student's records.
       return {
-        barcode: String(supaSt.barcode || base.barcode || targetBarcode).trim(),
-        name: supaSt.name || base.name || account.studentName || "طالب مسجل",
-        phone: supaSt.phone || base.phone || "",
-        parentPhone: supaSt.parentPhone || supaSt.parent_phone || base.parentPhone || account.parentPhone || "",
-        groupGrade: (supaSt.grade || supaSt.groupGrade || base.groupGrade || "الصف الرابع الابتدائي") as GradeName,
-        groupDays: (supaSt.group_days || supaSt.groupDays || base.groupDays || "سبت - إثنين - أربعاء") as GroupDays,
-        points: supaSt.points !== undefined ? supaSt.points : (base.points || 0),
-        totalAttendanceDays: supaSt.totalAttendanceDays !== undefined ? supaSt.totalAttendanceDays : (base.totalAttendanceDays || 0),
-        totalAbsentDays: supaSt.totalAbsentDays !== undefined ? supaSt.totalAbsentDays : (base.totalAbsentDays || 0),
+        id: supaSt.id,
+        barcode: String(supaSt.barcode || targetBarcode).trim(),
+        name: supaSt.name || account.studentName || "طالب مسجل",
+        phone: supaSt.phone || "",
+        parentPhone: supaSt.parentPhone || supaSt.parent_phone || account.parentPhone || "",
+        groupGrade: (supaSt.grade || supaSt.groupGrade || baseActiveStudent?.groupGrade || "الصف الرابع الابتدائي") as GradeName,
+        groupDays: (supaSt.group_days || supaSt.groupDays || baseActiveStudent?.groupDays || "سبت - إثنين - أربعاء") as GroupDays,
+        points: supaSt.points !== undefined ? supaSt.points : (baseActiveStudent?.points || 0),
+        totalAttendanceDays: supaSt.totalAttendanceDays !== undefined ? supaSt.totalAttendanceDays : (baseActiveStudent?.totalAttendanceDays || 0),
+        totalAbsentDays: supaSt.totalAbsentDays !== undefined ? supaSt.totalAbsentDays : (baseActiveStudent?.totalAbsentDays || 0),
         totalExamScores: (supabasePortalData.examScores && supabasePortalData.examScores.length > 0)
           ? supabasePortalData.examScores
-          : (base.totalExamScores || []),
-        lastExamTitle: supabasePortalData.lastExamTitle || base.lastExamTitle,
-        lastExamScore: supabasePortalData.lastExamScore || base.lastExamScore,
-        customMonthlyFee: supaSt.custom_monthly_fee || (supaSt as any).customMonthlyFee || base.customMonthlyFee,
+          : (supaSt.totalExamScores || baseActiveStudent?.totalExamScores || []),
+        lastExamTitle: supabasePortalData.lastExamTitle || supaSt.lastExamTitle || baseActiveStudent?.lastExamTitle,
+        lastExamScore: supabasePortalData.lastExamScore || supaSt.lastExamScore || baseActiveStudent?.lastExamScore,
+        customMonthlyFee: supaSt.custom_monthly_fee || (supaSt as any).customMonthlyFee || baseActiveStudent?.customMonthlyFee,
       };
     }
     return baseActiveStudent;
   }, [baseActiveStudent, supabasePortalData, selectedStudentBarcode, account]);
 
-  // Live Authoritative Payments Map
+  // Live Authoritative Payments Map (Single Source Hydration Lock)
   const effectivePayments = useMemo(() => {
+    const targetBarcode = String(activeStudent?.barcode || selectedStudentBarcode || account.studentBarcode).trim();
+    if (!targetBarcode) return payments;
+
     if (supabasePortalData?.payments && Object.keys(supabasePortalData.payments).length > 0) {
-      const merged: Record<string, Record<string, PaymentRecord>> = { ...payments };
-      for (const [mKey, subMap] of Object.entries(supabasePortalData.payments)) {
-        merged[mKey] = {
-          ...(merged[mKey] || {}),
-          ...(subMap as Record<string, PaymentRecord>),
-        };
-      }
-      return merged;
+      return supabasePortalData.payments;
     }
     return payments;
-  }, [payments, supabasePortalData?.payments]);
+  }, [payments, supabasePortalData?.payments, activeStudent?.barcode, selectedStudentBarcode, account.studentBarcode]);
 
-  // Live Authoritative Attendance History Map
+  // Live Authoritative Attendance History Map (Single Source Hydration Lock)
   const effectiveAttendanceHistory = useMemo(() => {
+    const targetBarcode = String(activeStudent?.barcode || selectedStudentBarcode || account.studentBarcode).trim();
+    if (!targetBarcode) return attendanceHistory;
+
     if (supabasePortalData?.attendanceHistory && Object.keys(supabasePortalData.attendanceHistory).length > 0) {
-      const merged: Record<string, Record<string, string>> = { ...attendanceHistory };
+      const result: Record<string, Record<string, string>> = {};
       for (const [dKey, status] of Object.entries(supabasePortalData.attendanceHistory)) {
-        if (!merged[dKey]) merged[dKey] = {};
-        if (activeStudent?.barcode) {
-          merged[dKey] = {
-            ...merged[dKey],
-            [activeStudent.barcode]: status,
-          };
-        }
+        result[dKey] = {
+          [targetBarcode]: String(status || ""),
+        };
       }
-      return merged;
+      return result;
     }
     return attendanceHistory;
-  }, [attendanceHistory, supabasePortalData?.attendanceHistory, activeStudent?.barcode]);
+  }, [attendanceHistory, supabasePortalData?.attendanceHistory, activeStudent?.barcode, selectedStudentBarcode, account.studentBarcode]);
 
   // Real-time chat subscription for the active student's thread
   useEffect(() => {
@@ -1438,12 +1653,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
               onClick={() => {
                 const targetBarcode = String(selectedStudentBarcode || account.studentBarcode).trim();
                 if (!targetBarcode) return;
-                setIsHydratingSupabase(true);
-                fetchUnifiedStudentPortalDataFromSupabase(targetBarcode)
-                  .then((data) => {
-                    if (data && data.success) setSupabasePortalData(data);
-                  })
-                  .finally(() => setIsHydratingSupabase(false));
+                fetchPortalData(targetBarcode, true);
               }}
               disabled={isHydratingSupabase}
               className="px-2.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-emerald-500/40 text-emerald-400 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
