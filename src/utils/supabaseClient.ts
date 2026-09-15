@@ -10,6 +10,7 @@ import { compressData, decompressData } from "./compression";
 import type { SystemData } from "./storage";
 import type { ParentAccount } from "../types/portal";
 import { withTimeout } from "./promiseTimeout";
+export { withTimeout };
 
 const SUPABASE_URL =
   (import.meta as any).env?.VITE_SUPABASE_URL || "https://lzdvmzumwuqycwdecaan.supabase.co";
@@ -1279,7 +1280,7 @@ export async function fetchPortalAccountsFromSupabase(): Promise<Record<string, 
         const account: ParentAccount = {
           studentBarcode: primaryBarcode,
           linkedBarcodes: barcodes,
-          parentPhone: row.parent_phone || "",
+          parentPhone: String(row.parent_phone || row.phone || row.phone_number || "").trim(),
           password: row.password_hash || "",
           fcmToken: row.fcm_token || "",
           status: normalizedStatus,
@@ -1344,30 +1345,64 @@ export async function saveParentAccountRecordToSupabase(account: ParentAccount):
 }
 
 /**
+ * Single Indexed Parent Account Lookup Engine.
+ * Direct indexed query filtered ONLY by student barcode UUID.
+ * Zero sequential retries, zero phone column variations, zero cascading fallback lookups.
+ */
+export async function queryParentAccountByBarcode(
+  barcode?: string | null,
+  timeoutMs: number = 2000
+): Promise<any | null> {
+  const cleanBarcode = normalizeBarcode(barcode);
+  if (!cleanBarcode) return null;
+  const uuid = barcodeToUUID(cleanBarcode);
+
+  try {
+    const { data } = await withTimeout(
+      supabase
+        .from("parent_accounts")
+        .select("*")
+        .eq("id", uuid)
+        .maybeSingle(),
+      timeoutMs,
+      "استعلام حساب ولي الأمر المباشر"
+    );
+    return data || null;
+  } catch {
+    return null;
+  }
+}
+
+// Export as queryParentAccountSafe for clean backward compatibility
+export const queryParentAccountSafe = queryParentAccountByBarcode;
+
+/**
  * Check if a student barcode is already linked to an active parent account
- * Prevents account hijacking before registration.
+ * Single direct indexed query filtered ONLY by student barcode.
  */
 export async function checkBarcodeAlreadyLinkedSupabase(
   barcode: string
 ): Promise<{ isLinked: boolean; parentPhone?: string; accountId?: string }> {
   try {
-    const cleanBarcode = String(barcode).trim();
+    const cleanBarcode = normalizeBarcode(barcode);
     if (!cleanBarcode) return { isLinked: false };
     const uuid = barcodeToUUID(cleanBarcode);
 
-    // 1. Direct ID match or Array contains match
-    const { data: matches, error } = await supabase
-      .from("parent_accounts")
-      .select("id, parent_phone, status, linked_student_barcodes")
-      .or(`id.eq.${uuid},linked_student_barcodes.cs.{${cleanBarcode}}`)
-      .eq("status", "active")
-      .limit(1);
+    const { data: match } = await withTimeout(
+      supabase
+        .from("parent_accounts")
+        .select("id, parent_phone, status")
+        .eq("id", uuid)
+        .maybeSingle(),
+      2000,
+      "التحقق المباشر من ربط كود الطالب"
+    );
 
-    if (!error && matches && matches.length > 0) {
+    if (match && String(match.status || "active").toLowerCase() === "active") {
       return {
         isLinked: true,
-        parentPhone: matches[0].parent_phone,
-        accountId: matches[0].id,
+        parentPhone: String(match.parent_phone || "").trim(),
+        accountId: match.id,
       };
     }
   } catch (err) {
@@ -1378,13 +1413,14 @@ export async function checkBarcodeAlreadyLinkedSupabase(
 
 /**
  * Update parent account status in Supabase (e.g. 'active', 'disabled', 'suspended', 'deleted')
+ * Single direct indexed query filtered ONLY by student barcode UUID.
  */
 export async function updateParentAccountStatusInSupabase(
   barcode: string,
   status: "active" | "disabled" | "suspended" | "deleted"
 ): Promise<boolean> {
   try {
-    const cleanBarcode = String(barcode).trim();
+    const cleanBarcode = normalizeBarcode(barcode);
     if (!cleanBarcode) return false;
     const uuid = barcodeToUUID(cleanBarcode);
 
@@ -1394,7 +1430,7 @@ export async function updateParentAccountStatusInSupabase(
         status,
         updated_at: new Date().toISOString(),
       })
-      .or(`id.eq.${uuid},linked_student_barcodes.cs.{${cleanBarcode}}`);
+      .eq("id", uuid);
 
     if (error) {
       console.warn("[Supabase parent_accounts] Update status error:", error.message);
@@ -1409,17 +1445,18 @@ export async function updateParentAccountStatusInSupabase(
 
 /**
  * Hard delete parent account record permanently from Supabase production table
+ * Single direct indexed query filtered ONLY by student barcode UUID.
  */
 export async function deleteParentAccountRecordFromSupabase(barcode: string): Promise<boolean> {
   try {
-    const cleanBarcode = String(barcode).trim();
+    const cleanBarcode = normalizeBarcode(barcode);
     if (!cleanBarcode) return false;
     const uuid = barcodeToUUID(cleanBarcode);
 
     const { error } = await supabase
       .from("parent_accounts")
       .delete()
-      .or(`id.eq.${uuid},linked_student_barcodes.cs.{${cleanBarcode}}`);
+      .eq("id", uuid);
 
     if (error) {
       console.warn("[Supabase parent_accounts] Delete error:", error.message);
@@ -1434,21 +1471,24 @@ export async function deleteParentAccountRecordFromSupabase(barcode: string): Pr
 
 /**
  * Save FCM token to parent account
+ * Single direct indexed query filtered ONLY by student barcode UUID.
  */
 export async function updateParentAccountFCMTokenInSupabase(
   barcode: string,
   fcmToken: string
 ): Promise<boolean> {
   try {
-    const cleanBarcode = String(barcode).trim();
+    const cleanBarcode = normalizeBarcode(barcode);
+    if (!cleanBarcode) return false;
     const uuid = barcodeToUUID(cleanBarcode);
+
     const { error } = await supabase
       .from("parent_accounts")
       .update({
         fcm_token: fcmToken,
         updated_at: new Date().toISOString(),
       })
-      .or(`id.eq.${uuid},linked_student_barcodes.cs.{${cleanBarcode}}`);
+      .eq("id", uuid);
     return !error;
   } catch {
     return false;
@@ -1457,36 +1497,31 @@ export async function updateParentAccountFCMTokenInSupabase(
 
 /**
  * Verify Parent Account Status in Supabase for silent background check on app launch
+ * Single direct indexed query filtered ONLY by student barcode UUID with 2s timeout guard.
  */
 export async function verifyParentAccountStatusInSupabase(
   barcode: string,
-  parentPhone?: string
+  _optionalPhone?: string
 ): Promise<{ exists: boolean; status: "active" | "disabled" | "deleted" | "unknown"; account?: ParentAccount }> {
   try {
-    const cleanBarcode = String(barcode).trim();
+    const cleanBarcode = normalizeBarcode(barcode);
     if (!cleanBarcode) return { exists: false, status: "unknown" };
     const uuid = barcodeToUUID(cleanBarcode);
 
-    let query = supabase.from("parent_accounts").select("*");
-    if (parentPhone) {
-      query = query.or(`id.eq.${uuid},linked_student_barcodes.cs.{${cleanBarcode}},parent_phone.eq.${parentPhone}`);
-    } else {
-      query = query.or(`id.eq.${uuid},linked_student_barcodes.cs.{${cleanBarcode}}`);
-    }
+    const { data: row, error } = await withTimeout(
+      supabase
+        .from("parent_accounts")
+        .select("*")
+        .eq("id", uuid)
+        .maybeSingle(),
+      2000,
+      "التحقق السريع من حالة حساب ولي الأمر"
+    );
 
-    const { data, error } = await query.limit(1);
-
-    if (error) {
-      console.warn("[verifyParentAccountStatusInSupabase] query notice:", error.message);
-      return { exists: true, status: "unknown" };
-    }
-
-    if (!data || data.length === 0) {
-      // Record was deleted by the supervisor from Supabase
+    if (error || !row) {
       return { exists: false, status: "deleted" };
     }
 
-    const row = data[0];
     const statusVal = String(row.status || "active").toLowerCase();
 
     if (statusVal === "disabled" || statusVal === "suspended") {
@@ -1498,19 +1533,19 @@ export async function verifyParentAccountStatusInSupabase(
     }
 
     const account: ParentAccount = {
-      studentBarcode: row.student_barcode || cleanBarcode,
+      studentBarcode: cleanBarcode,
       studentName: row.student_name || "",
-      parentPhone: row.parent_phone || "",
+      parentPhone: String(row.parent_phone || "").trim(),
       parentName: row.parent_name || "",
       role: "parent",
       status: "active",
       activatedAt: row.activated_at || row.created_at,
-      linkedBarcodes: Array.isArray(row.linked_student_barcodes) ? row.linked_student_barcodes : [],
+      linkedBarcodes: Array.isArray(row.linked_student_barcodes) ? row.linked_student_barcodes : [cleanBarcode],
     };
 
     return { exists: true, status: "active", account };
   } catch (err) {
-    console.warn("[verifyParentAccountStatusInSupabase] error:", err);
+    console.warn("[verifyParentAccountStatusInSupabase] notice:", err);
     return { exists: true, status: "unknown" };
   }
 }
@@ -1596,17 +1631,17 @@ export interface UnifiedStudentPortalData {
 }
 
 /**
- * High-Speed Authoritative Data Aggregator for Parent Student Portal
- * Fetches real-time student data, attendance logs, payment records, exams, and homework
- * directly from primary Supabase tables (students, attendance_logs, payments, homework, parent_accounts).
+ * Single Indexed High-Speed Lookup Engine for Parent Student Portal
+ * Single direct query filtered ONLY by student barcode: .eq('barcode', cleanBarcode).single().
+ * Concurrently executes student query alongside linked parent account with an absolute 2s timeout guard.
+ * Zero sequential retries, zero phone column variations, zero cascading fallback lookups.
  */
 export async function fetchUnifiedStudentPortalDataFromSupabase(
   barcodeOrPhone: string
 ): Promise<UnifiedStudentPortalData> {
   const cleanBarcode = normalizeBarcode(barcodeOrPhone);
-  const cleanPhone = normalizePhone(barcodeOrPhone);
 
-  if (!cleanBarcode && !cleanPhone) {
+  if (!cleanBarcode) {
     return {
       success: false,
       student: null,
@@ -1616,61 +1651,32 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       paymentsList: [],
       homeworkList: [],
       examScores: [],
-      message: "كود الطالب أو رقم الهاتف مطلوب",
+      message: "كود الطالب مطلوب",
     };
   }
 
   try {
-    // 1. Single Join Query + Concurrently Fetch parent_accounts in parallel with strict 3s limit
-    let studentRow: any = null;
-    let account: any = null;
+    const uuid = barcodeToUUID(cleanBarcode);
 
-    if (cleanBarcode) {
-      const [stRes, accRes] = await executeFastQuery(
-        () =>
-          Promise.all([
-            supabase
-              .from("students")
-              .select("*, attendance_logs(*), payments(*), homework(*)")
-              .eq("barcode", cleanBarcode)
-              .maybeSingle(),
-            supabase
-              .from("parent_accounts")
-              .select("*")
-              .or(`linked_student_barcodes.cs.{${cleanBarcode}}${cleanPhone ? `,parent_phone.eq.${cleanPhone},parent_phone.eq.0${cleanPhone}` : ""}`)
-              .maybeSingle(),
-          ]),
-        3000,
-        "استعلام بيانات الطالب الموحدة وحساب ولي الأمر"
-      );
+    // Concurrently execute single indexed student query alongside linked parent account with absolute 2s timeout guard
+    const [stRes, accRes] = await withTimeout(
+      Promise.all([
+        supabase
+          .from("students")
+          .select("*, attendance_logs(*), payments(*), homework(*)")
+          .eq("barcode", cleanBarcode)
+          .single(),
+        supabase
+          .from("parent_accounts")
+          .select("*")
+          .eq("id", uuid)
+          .maybeSingle(),
+      ]),
+      2000,
+      "استعلام بيانات الطالب الموحدة وحساب ولي الأمر"
+    );
 
-      if (stRes && !stRes.error && stRes.data) {
-        studentRow = stRes.data;
-      }
-      if (accRes && !accRes.error && accRes.data) {
-        account = accRes.data;
-      }
-    }
-
-    // 2. Fallback to phone lookup using exact indexed .eq() filters (zero full-table scans)
-    if (!studentRow && cleanPhone) {
-      const { data: stPhoneList } = await executeFastQuery(
-        () =>
-          supabase
-            .from("students")
-            .select("*, attendance_logs(*), payments(*), homework(*)")
-            .or(`parent_phone.eq.${cleanPhone},parent_phone.eq.0${cleanPhone},phone.eq.${cleanPhone},phone.eq.0${cleanPhone}`)
-            .limit(1),
-        3000,
-        "استعلام بيانات الطالب برقم الهاتف"
-      );
-
-      if (stPhoneList && stPhoneList.length > 0) {
-        studentRow = stPhoneList[0];
-      }
-    }
-
-    if (!studentRow) {
+    if (stRes.error || !stRes.data) {
       return {
         success: false,
         student: null,
@@ -1680,39 +1686,13 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
         paymentsList: [],
         homeworkList: [],
         examScores: [],
-        message: "لم يتم العثور على طالب بهذا الكود أو رقم الهاتف في قاعدة البيانات الموحدة",
+        message: "لم يتم العثور على طالب بهذا الكود في قاعدة البيانات الموحدة",
       };
     }
 
+    const studentRow = stRes.data;
+    const account = accRes.data || null;
     const bCode = String(studentRow.barcode).trim();
-    const uuid = barcodeToUUID(bCode);
-
-    // If account was not resolved yet, fetch using student's parent phone or UUID with 3s limit
-    if (!account) {
-      try {
-        const { data: accData } = await executeFastQuery(
-          () =>
-            supabase
-              .from("parent_accounts")
-              .select("*")
-              .or(
-                `id.eq.${uuid},linked_student_barcodes.cs.{${bCode}}${
-                  studentRow.parent_phone
-                    ? `,parent_phone.eq.${studentRow.parent_phone},parent_phone.eq.0${studentRow.parent_phone}`
-                    : ""
-                }`
-              )
-              .maybeSingle(),
-          3000,
-          "استعلام حساب ولي الأمر التكميلي"
-        );
-        if (accData) {
-          account = accData;
-        }
-      } catch (accErr) {
-        console.warn("[FastFetch] Parent account query notice:", accErr);
-      }
-    }
 
     // In-memory instant sorting & aggregation (<0.1ms overhead)
     const rawAttendance = Array.isArray(studentRow.attendance_logs) ? studentRow.attendance_logs : [];

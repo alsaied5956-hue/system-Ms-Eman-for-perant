@@ -22,6 +22,8 @@ import {
   subscribeToParentAccountSupabase,
   barcodeToUUID,
   executeFastQuery,
+  queryParentAccountSafe,
+  withTimeout,
 } from "./supabaseClient";
 
 // Storage Keys
@@ -1646,27 +1648,12 @@ export async function authenticatePortalLogin(
     };
   }
 
-  // 2. Direct Authoritative Live Query to Supabase parent_accounts FIRST
+  // 2. Direct Single Indexed Query to Supabase parent_accounts filtered ONLY by student barcode
   let accounts = getLocalParentAccounts();
   let account: ParentAccount | null = null;
 
   try {
-    const uuid = barcodeToUUID(barcodeTrimmed);
-    let query = supabase.from("parent_accounts").select("*");
-    if (cleanEnteredPhone) {
-      query = query.or(
-        `id.eq.${uuid},linked_student_barcodes.cs.{${barcodeTrimmed}},parent_phone.eq.${cleanEnteredPhone},parent_phone.eq.0${cleanEnteredPhone}`
-      );
-    } else {
-      query = query.or(
-        `id.eq.${uuid},linked_student_barcodes.cs.{${barcodeTrimmed}}`
-      );
-    }
-    const { data: supaAcc } = await executeFastQuery(
-      () => query.maybeSingle(),
-      3000,
-      "استعلام حساب ولي الأمر لتسجيل الدخول"
-    );
+    const supaAcc = await queryParentAccountSafe(barcodeTrimmed, 2000);
     if (supaAcc) {
       const barcodes: string[] =
         Array.isArray(supaAcc.linked_student_barcodes) &&
@@ -1674,11 +1661,12 @@ export async function authenticatePortalLogin(
           ? supaAcc.linked_student_barcodes
           : [barcodeTrimmed];
       const primaryBarcode = barcodes[0] || barcodeTrimmed;
+      const resolvedPhone = String(supaAcc.parent_phone || "").trim();
       account = {
         studentBarcode: primaryBarcode,
         studentName: supaAcc.student_name || "",
         linkedBarcodes: barcodes,
-        parentPhone: supaAcc.parent_phone || "",
+        parentPhone: resolvedPhone,
         password: supaAcc.password_hash || supaAcc.password || "",
         status: (supaAcc.status || "active").toLowerCase() as
           | "active"
@@ -1692,7 +1680,7 @@ export async function authenticatePortalLogin(
       saveLocalParentAccounts(accounts);
     }
   } catch (supaErr) {
-    console.warn("[Auth] Supabase direct parent_accounts check notice:", supaErr);
+    console.warn("[Auth] Supabase direct parent_accounts notice:", supaErr);
   }
 
   // Fallback to local accounts cache only if network failed to return an account
@@ -1703,7 +1691,6 @@ export async function authenticatePortalLogin(
         (a) =>
           normalizeBarcode(a.studentBarcode) === barcodeTrimmed ||
           String(a.studentBarcode).trim() === rawTrimmed ||
-          (cleanEnteredPhone && normalizePhone(a.parentPhone) === cleanEnteredPhone) ||
           (a.linkedBarcodes &&
             (a.linkedBarcodes.includes(barcodeTrimmed) ||
               a.linkedBarcodes.includes(rawTrimmed)))
@@ -1711,48 +1698,29 @@ export async function authenticatePortalLogin(
     }
   }
 
-  // Check Supabase synchronized registry if still not found
-  if (!account) {
-    try {
-      const synced = await syncParentAccountsFromCloud(true);
-      if (synced && (synced[barcodeTrimmed] || synced[rawTrimmed])) {
-        account = synced[barcodeTrimmed] || synced[rawTrimmed];
-      }
-    } catch {}
-  }
-
   if (!account || account.status === "deleted") {
-    // Check if student exists in Supabase students table to give a helpful guidance message
+    // Single direct query filtered ONLY by student barcode to check if student exists
     try {
-      const phoneFilter = cleanEnteredPhone
-        ? `,parent_phone.eq.${cleanEnteredPhone},parent_phone.eq.0${cleanEnteredPhone},phone.eq.${cleanEnteredPhone},phone.eq.0${cleanEnteredPhone}`
-        : "";
-      const { data: supaStudents } = await executeFastQuery(
-        () =>
-          supabase
-            .from("students")
-            .select("name, barcode, phone, parent_phone")
-            .or(`barcode.eq.${barcodeTrimmed}${phoneFilter}`)
-            .limit(1),
-        3000,
+      const { data: supaStudent } = await withTimeout(
+        supabase
+          .from("students")
+          .select("name, barcode")
+          .eq("barcode", barcodeTrimmed)
+          .single(),
+        2000,
         "استعلام التحقق من وجود الطالب لتسجيل الدخول"
       );
-      if (supaStudents && supaStudents.length > 0) {
+      if (supaStudent) {
         return {
           success: false,
-          message: `لم يتم تفعيل حساب ولي أمر الطالب (${supaStudents[0].name}) بعد. يرجى التوجه لتبويب "تفعيل حساب جديد" لتعيين كلمة مرور الحساب.`,
+          message: `لم يتم تفعيل حساب ولي أمر الطالب (${supaStudent.name}) بعد. يرجى التوجه لتبويب "تفعيل حساب جديد" لتعيين كلمة مرور الحساب.`,
         };
       }
     } catch {}
 
-    const cleanEntered = normalizePhone(barcodeTrimmed);
-    const studentList = students || [];
+    const studentList = Array.isArray(students) ? students : [];
     const student = studentList.find(
-      (s) =>
-        String(s.barcode).trim() === barcodeTrimmed ||
-        (cleanEntered &&
-          (normalizePhone(s.parentPhone) === cleanEntered ||
-            normalizePhone(s.phone) === cleanEntered))
+      (s) => String(s.barcode).trim() === barcodeTrimmed
     );
     if (student) {
       return {
@@ -1762,7 +1730,7 @@ export async function authenticatePortalLogin(
     }
     return {
       success: false,
-      message: "بيانات الدخول غير صحيحة. يرجى التحقق من كود الطالب أو رقم الهاتف وكلمة المرور.",
+      message: "بيانات الدخول غير صحيحة. يرجى التحقق من كود الطالب وكلمة المرور.",
     };
   }
 
