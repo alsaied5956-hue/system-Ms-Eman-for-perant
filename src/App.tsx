@@ -94,7 +94,6 @@ import { deleteParentAccount, syncParentAccountsFromCloud } from "./utils/portal
 import { PWAUpdateNotification } from "./components/portal/PWAUpdateNotification";
 import { initOnlineRealtimeSync } from "./utils/onlineRealtimeSync";
 import { broadcastStudentLiveEvent } from "./utils/studentLiveSync";
-import { withTimeout } from "./utils/promiseTimeout";
 
 export default function App() {
   const [appViewMode, setAppViewMode] = useState<"portal" | "teacher">(() => {
@@ -232,40 +231,21 @@ export default function App() {
 
   const [cloudInitError, setCloudInitError] = useState<string | null>(null);
 
-  // 1. Mandatory Cloud Fetch from Supabase with 3-Second Timeout Guard & Light Fast Retry
-  const performCloudHydration = useCallback(async (isRetry: boolean = false) => {
+  // 1. Direct Cloud Fetch from Supabase - Zero nested timeouts, zero cascades, clean single pass
+  const performCloudHydration = useCallback(async () => {
     setIsCloudHydrating(true);
     setCloudInitError(null);
     try {
-      await withTimeout(
-        Promise.allSettled([
-          pullLatestCloudDataImmediately(true),
-          syncParentAccountsFromCloud(true),
-        ]),
-        3000,
-        "Network connection error. Request timed out after 3 seconds"
-      );
+      await Promise.allSettled([
+        pullLatestCloudDataImmediately(true),
+        syncParentAccountsFromCloud(true),
+      ]);
       isCloudHydratedRef.current = true;
       setIsCloudHydrated(true);
     } catch (err: any) {
-      console.warn("[App] Supabase cloud hydration initial timeout (<3s):", err);
-      // Fast light retry once (<3s)
-      try {
-        await withTimeout(
-          Promise.allSettled([
-            pullLatestCloudDataImmediately(true),
-            syncParentAccountsFromCloud(true),
-          ]),
-          3000,
-          "Network connection error. Request timed out after 3 seconds (retry)"
-        );
-        isCloudHydratedRef.current = true;
-        setIsCloudHydrated(true);
-      } catch (retryErr: any) {
-        console.warn("[App] Supabase cloud hydration retry failed:", retryErr);
-        if (!isCloudHydratedRef.current) {
-          setCloudInitError("Network connection error. Please retry");
-        }
+      console.warn("[App] Supabase cloud hydration warning:", err);
+      if (!isCloudHydratedRef.current) {
+        setCloudInitError("Network connection error. Please retry");
       }
     } finally {
       setIsCloudHydrating(false);

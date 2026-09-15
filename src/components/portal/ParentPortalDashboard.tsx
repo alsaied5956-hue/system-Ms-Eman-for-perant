@@ -26,7 +26,6 @@ import {
   subscribeToAttendanceStatusChanges,
   subscribeToPaymentChanges,
 } from "../../utils/supabaseClient";
-import { withTimeout } from "../../utils/promiseTimeout";
 import {
   getSessionPortalData,
   setSessionPortalData,
@@ -312,53 +311,85 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
   const [isHydratingSupabase, setIsHydratingSupabase] = useState<boolean>(false);
   const [supabaseError, setSupabaseError] = useState<string | null>(null);
 
-  // In-Memory Session Caching & Single Source Hydration Lock:
-  // Re-fetch live data from Supabase ONLY on manual pull-to-refresh, child switch, or explicit user action.
-  const fetchPortalData = useCallback(async (targetBarcode: string, force: boolean = false) => {
-    const cleanBarcode = String(targetBarcode).trim();
-    if (!cleanBarcode) return;
+  const targetBarcode = String(selectedStudentBarcode || account.studentBarcode).trim();
 
-    // 🔒 SINGLE SOURCE HYDRATION LOCK:
-    // Once isCloudHydrated = true is set for this barcode, prevent secondary background timer effects
-    // or un-targeted refetches from executing a setState() that mutates the active student's records.
-    if (!force && isCloudHydratedRef.current && currentHydratedBarcodeRef.current === cleanBarcode) {
+  // 1. Clean Hydration Effect: Trigger fetchUnifiedStudentPortalDataFromSupabase ONCE inside a clean useEffect with zero dependency loops
+  useEffect(() => {
+    if (!targetBarcode) return;
+
+    // Single source hydration lock: skip duplicate network fetch if already hydrated for this barcode
+    if (isCloudHydratedRef.current && currentHydratedBarcodeRef.current === targetBarcode) {
       return;
     }
 
-    // 1. In-Memory Session Caching (No Local Storage, No Mock Data):
-    // Keep fetched Supabase data active in React memory state during current app session to prevent spamming Supabase API calls on every tab navigation.
-    if (!force) {
-      const cached = getSessionPortalData(cleanBarcode);
-      if (cached && cached.success) {
-        setSupabasePortalData(cached);
-        setSupabaseError(null);
-        setIsHydratingSupabase(false);
-        isCloudHydratedRef.current = true;
-        currentHydratedBarcodeRef.current = cleanBarcode;
-        if (cached.student?.id) {
-          activeStudentIdRef.current = cached.student.id;
-        }
-        setIsCloudHydrated(true);
-        return;
+    // Fast in-memory session cache check
+    const cached = getSessionPortalData(targetBarcode);
+    if (cached && cached.success) {
+      setSupabasePortalData(cached);
+      setSupabaseError(null);
+      setIsHydratingSupabase(false);
+      isCloudHydratedRef.current = true;
+      currentHydratedBarcodeRef.current = targetBarcode;
+      if (cached.student?.id) {
+        activeStudentIdRef.current = cached.student.id;
       }
+      setIsCloudHydrated(true);
+      return;
+    }
+
+    let isSubscribed = true;
+    setIsHydratingSupabase(true);
+    setSupabaseError(null);
+
+    fetchUnifiedStudentPortalDataFromSupabase(targetBarcode)
+      .then((data) => {
+        if (!isSubscribed) return;
+        if (data && data.success) {
+          setSessionPortalData(targetBarcode, data);
+          setSupabasePortalData(data);
+          setSupabaseError(null);
+          isCloudHydratedRef.current = true;
+          currentHydratedBarcodeRef.current = targetBarcode;
+          if (data.student?.id) {
+            activeStudentIdRef.current = data.student.id;
+          }
+          setIsCloudHydrated(true);
+        } else if (!isCloudHydratedRef.current) {
+          setSupabaseError(data?.message || "Network connection error. Please retry");
+        }
+      })
+      .catch((err) => {
+        if (!isSubscribed) return;
+        console.warn("[ParentPortalDashboard] Cloud hydration error:", err);
+        if (!isCloudHydratedRef.current) {
+          setSupabaseError("Network connection error. Please retry");
+        }
+      })
+      .finally(() => {
+        if (isSubscribed) {
+          setIsHydratingSupabase(false);
+        }
+      });
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [targetBarcode]);
+
+  // Clean manual refresh handler (pull-to-refresh, retry button, or child switch)
+  const fetchPortalData = useCallback(async (bCode: string, force: boolean = false) => {
+    const cleanBarcode = String(bCode).trim();
+    if (!cleanBarcode) return;
+
+    if (!force && isCloudHydratedRef.current && currentHydratedBarcodeRef.current === cleanBarcode) {
+      return;
     }
 
     setIsHydratingSupabase(true);
     setSupabaseError(null);
 
     try {
-      let data: any = null;
-      try {
-        data = await withTimeout(
-          fetchUnifiedStudentPortalDataFromSupabase(cleanBarcode),
-          500,
-          "Network connection error. Request timed out after 500ms"
-        );
-      } catch (timeoutErr) {
-        console.warn("[ParentPortalDashboard] Fetch timed out (<500ms):", timeoutErr);
-        data = null;
-      }
-
+      const data = await fetchUnifiedStudentPortalDataFromSupabase(cleanBarcode);
       if (data && data.success) {
         setSessionPortalData(cleanBarcode, data);
         setSupabasePortalData(data);
@@ -369,13 +400,11 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
           activeStudentIdRef.current = data.student.id;
         }
         setIsCloudHydrated(true);
-      } else {
-        if (!isCloudHydratedRef.current) {
-          setSupabaseError(data?.message || "Network connection error. Please retry");
-        }
+      } else if (!isCloudHydratedRef.current) {
+        setSupabaseError(data?.message || "Network connection error. Please retry");
       }
     } catch (err: any) {
-      console.warn("[ParentPortalDashboard] Supabase live hydration error/timeout:", err);
+      console.warn("[ParentPortalDashboard] Direct fetch notice:", err);
       if (!isCloudHydratedRef.current) {
         setSupabaseError("Network connection error. Please retry");
       }
@@ -384,23 +413,12 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     }
   }, []);
 
-  // Instant UI Hydration & Realtime Synchronization:
+  // 2. Direct Supabase Realtime Channel with Strict Server-Filtered Realtime:
   useEffect(() => {
-    const targetBarcode = String(selectedStudentBarcode || account.studentBarcode).trim();
     if (!targetBarcode) return;
 
     let isSubscribed = true;
 
-    // Single Source Hydration Lock:
-    // Only execute initial cloud fetch if not yet hydrated for this targetBarcode
-    if (!isCloudHydratedRef.current || currentHydratedBarcodeRef.current !== targetBarcode) {
-      fetchPortalData(targetBarcode, false);
-    }
-
-    // Direct Supabase Realtime Channel with Strict Server-Filtered Realtime:
-    // Configure Supabase Realtime listeners (postgres_changes) to use SERVER-SIDE filtering exclusively:
-    // filter: 'barcode=eq.${activeStudent.barcode}'
-    // When a Realtime event arrives, mutate ONLY the target item in local React state memory (In-Memory Delta Update) - DO NOT refetch full database state.
     const realtimeChannel = supabase
       .channel(`portal-student-sync-${targetBarcode}-${Date.now()}`)
       .on(
@@ -705,7 +723,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       unsubAttendance();
       unsubPayment();
     };
-  }, [selectedStudentBarcode, account.studentBarcode, fetchPortalData]);
+  }, [targetBarcode]);
 
   // Live Authoritative Student Object (Merges Live Supabase Record)
   const activeStudent = useMemo<Student | null>(() => {

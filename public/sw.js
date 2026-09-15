@@ -10,7 +10,7 @@ try {
   // Service worker continues normally without external CDN dependency
 }
 
-const CACHE_NAME = "math-center-v7.0-cloud-sync";
+const CACHE_NAME = "math-center-v7.1-direct-bypass";
 const ASSETS_TO_CACHE = [
   "/",
   "/index.html",
@@ -139,24 +139,27 @@ function getNotificationActions(type, tag) {
   ];
 }
 
-// 4. Fetch Event: Strict Network-First for HTML/Assets, STRICT NETWORK-ONLY (Zero-Cache) for Supabase & API
+// 4. Fetch Event: Direct live fetch bypass for Supabase & APIs, Network-First for HTML/Assets
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = request.url;
 
-  // STRICT NETWORK-ONLY: Never cache Supabase, backend API, Firebase, or non-GET requests
+  // 🚀 DIRECT BYPASS (Zero SW Queueing):
+  // Completely bypass the Service Worker for all *.supabase.co REST and WebSocket requests,
+  // backend API routes, Firebase/Auth, and non-GET requests.
+  // The fetch handler directly returns fetch(event.request) without queueing.
   if (
-    request.method !== "GET" ||
     url.includes("supabase.co") ||
     url.includes("lzdvmzumwuqycwdecaan") ||
     url.includes("/rest/v1") ||
     url.includes("/auth/v1") ||
-    url.includes("realtime/v1") ||
+    url.includes("/realtime/v1") ||
     url.includes("/api/") ||
     url.includes("/api/portal") ||
     url.includes("/api/notifications") ||
     url.startsWith("ws:") ||
     url.startsWith("wss:") ||
+    request.method !== "GET" ||
     url.includes("firestore.googleapis.com") ||
     url.includes("firebaseapp.com") ||
     url.includes("identitytoolkit.googleapis.com") ||
@@ -164,7 +167,7 @@ self.addEventListener("fetch", (event) => {
     url.includes("fcm.googleapis.com") ||
     url.includes("chrome-extension")
   ) {
-    // Let browser make direct live network call without SW caching
+    event.respondWith(fetch(event.request));
     return;
   }
 

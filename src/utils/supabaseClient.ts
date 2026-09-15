@@ -25,6 +25,18 @@ export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON
   global: {
     headers: {
       "x-client-info": "parent-portal-fast",
+      "Cache-Control": "no-cache",
+      "Pragma": "no-cache",
+    },
+    fetch: (url: any, options: any = {}) => {
+      const headers = new Headers(options?.headers || {});
+      headers.set("Cache-Control", "no-cache");
+      headers.set("Pragma", "no-cache");
+      return fetch(url, {
+        ...options,
+        cache: "no-cache",
+        headers,
+      });
     },
   },
   realtime: {
