@@ -88,12 +88,13 @@ import { MultiDeviceSyncModal } from "./components/MultiDeviceSyncModal";
 import { BulkHomeworkModal } from "./components/BulkHomeworkModal";
 import { HomeworkTrackerTab } from "./components/HomeworkTrackerTab";
 import { pushLiveAttendanceEvent, pushLiveAttendanceBatch } from "./utils/liveEventStream";
-import { CheckCircle2, WifiOff, RefreshCw, X, MessageSquare, Send, Cloud } from "lucide-react";
+import { CheckCircle2, WifiOff, RefreshCw, X, MessageSquare, Send, Cloud, AlertTriangle } from "lucide-react";
 import { PortalMasterApp } from "./components/portal/PortalMasterApp";
 import { deleteParentAccount, syncParentAccountsFromCloud } from "./utils/portalStorage";
 import { PWAUpdateNotification } from "./components/portal/PWAUpdateNotification";
 import { initOnlineRealtimeSync } from "./utils/onlineRealtimeSync";
 import { broadcastStudentLiveEvent } from "./utils/studentLiveSync";
+import { withTimeout } from "./utils/promiseTimeout";
 
 export default function App() {
   const [appViewMode, setAppViewMode] = useState<"portal" | "teacher">(() => {
@@ -227,20 +228,31 @@ export default function App() {
     type: "all",
   });
 
-  // 1. Mandatory Cloud Fetch from Supabase (Strict Single-Source-of-Truth, Zero Local Pre-Hydration)
-  useEffect(() => {
-    setIsCloudHydrating(true);
-    let isMounted = true;
+  const [cloudInitError, setCloudInitError] = useState<string | null>(null);
 
-    // Immediately query Supabase primary tables on mount / page refresh
-    Promise.allSettled([
-      pullLatestCloudDataImmediately(true),
-      syncParentAccountsFromCloud(true),
-    ]).finally(() => {
-      if (isMounted) {
-        setIsCloudHydrating(false);
-      }
-    });
+  // 1. Mandatory Cloud Fetch from Supabase with 10-Second Timeout Guard
+  const performCloudHydration = useCallback(async (isRetry: boolean = false) => {
+    setIsCloudHydrating(true);
+    setCloudInitError(null);
+    try {
+      await withTimeout(
+        Promise.allSettled([
+          pullLatestCloudDataImmediately(true),
+          syncParentAccountsFromCloud(true),
+        ]),
+        10000,
+        "Network connection error. Request timed out after 10 seconds"
+      );
+    } catch (err: any) {
+      console.warn("[App] Supabase cloud hydration timeout or error:", err);
+      setCloudInitError("Network connection error. Please retry");
+    } finally {
+      setIsCloudHydrating(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    performCloudHydration();
 
     // 2. Connect to Zero-Latency Realtime Multi-Device Stream
     const unsubRealtimeSync = initOnlineRealtimeSync();
@@ -256,12 +268,11 @@ export default function App() {
     document.addEventListener("visibilitychange", handleOnlineResume);
 
     return () => {
-      isMounted = false;
       unsubRealtimeSync();
       window.removeEventListener("online", handleOnlineResume);
       document.removeEventListener("visibilitychange", handleOnlineResume);
     };
-  }, []);
+  }, [performCloudHydration]);
 
   // 2. Subscribe to sync status & offline/online events
   useEffect(() => {
@@ -1598,6 +1609,41 @@ export default function App() {
   const unreadPlatformMessagesCount = useMemo(() => {
     return platformMessages.filter((m) => m.status === "pending").length;
   }, [platformMessages]);
+
+  // 1. Error state if Supabase connection drops, times out after 10s, and there are no students loaded
+  if (cloudInitError && students.length === 0) {
+    return (
+      <div dir="rtl" className="min-h-screen w-full flex flex-col items-center justify-center bg-[#070b14] text-white p-6 font-['Readex_Pro','Cairo',sans-serif]">
+        <div className="max-w-md w-full bg-slate-900/95 border border-rose-500/30 rounded-3xl p-6 sm:p-8 text-center shadow-2xl backdrop-blur-md">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400">
+            <AlertTriangle className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-bold text-white mb-1.5">خطأ في الاتصال بالشبكة</h2>
+          <p className="text-xs text-rose-400 font-medium mb-3">Network connection error. Please retry</p>
+          <p className="text-sm text-slate-400 leading-relaxed mb-6">
+            تعذر الاتصال بقاعدة البيانات السحابية (Supabase) أو استغرق الطلب أكثر من 10 ثوانٍ. يرجى التحقق من اتصال الإنترنت ثم إعادة المحاولة.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => performCloudHydration(true)}
+              className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm flex items-center justify-center gap-2 transition shadow-lg cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>إعادة المحاولة (Retry)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-sm transition cursor-pointer"
+            >
+              <span>إعادة تحميل الصفحة</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Loading screen while pulling authoritative cloud state from Supabase primary tables
   if (isCloudHydrating && students.length === 0) {

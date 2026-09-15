@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db, ensureFirebaseAuth } from "../../utils/firebase";
@@ -25,6 +25,14 @@ import {
   subscribeToAttendanceStatusChanges,
   subscribeToPaymentChanges,
 } from "../../utils/supabaseClient";
+import { withTimeout } from "../../utils/promiseTimeout";
+import {
+  getSessionPortalData,
+  setSessionPortalData,
+  updateSessionPortalStudent,
+  updateSessionPortalAttendance,
+  updateSessionPortalPayment,
+} from "../../utils/portalSessionStore";
 import {
   sendPortalNotification,
   playPortalAudioChime,
@@ -283,41 +291,84 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     return s || null;
   }, [students, selectedStudentBarcode, account]);
 
-  // Live Unified Portal Data from Supabase directly
-  const [supabasePortalData, setSupabasePortalData] = useState<UnifiedStudentPortalData | null>(null);
+  // Live Unified Portal Data from Supabase directly (pre-populated from in-memory session cache)
+  const initialTargetBarcode = String(selectedStudentBarcode || account.studentBarcode).trim();
+  const [supabasePortalData, setSupabasePortalData] = useState<UnifiedStudentPortalData | null>(() => {
+    return initialTargetBarcode ? getSessionPortalData(initialTargetBarcode) : null;
+  });
   const [isHydratingSupabase, setIsHydratingSupabase] = useState<boolean>(false);
+  const [supabaseError, setSupabaseError] = useState<string | null>(null);
 
-  // Instant UI Hydration: Directly fetch authoritative Supabase student data on authentication/student change
+  // In-Memory Session Caching & Cloud Timeout Guard:
+  // Re-fetch live data from Supabase ONLY on manual pull-to-refresh, page reload, or Realtime database triggers.
+  const fetchPortalData = useCallback(async (targetBarcode: string, force: boolean = false) => {
+    const cleanBarcode = String(targetBarcode).trim();
+    if (!cleanBarcode) return;
+
+    // 1. In-Memory Session Caching (No Local Storage, No Mock Data):
+    // Keep fetched Supabase data active in React memory state during current app session to prevent spamming Supabase API calls on every tab navigation.
+    if (!force) {
+      const cached = getSessionPortalData(cleanBarcode);
+      if (cached) {
+        setSupabasePortalData(cached);
+        setSupabaseError(null);
+        setIsHydratingSupabase(false);
+        return;
+      }
+    }
+
+    setIsHydratingSupabase(true);
+    setSupabaseError(null);
+
+    try {
+      const data = await withTimeout(
+        fetchUnifiedStudentPortalDataFromSupabase(cleanBarcode),
+        10000,
+        "Network connection error. Request timed out after 10 seconds"
+      );
+
+      if (data && data.success) {
+        setSessionPortalData(cleanBarcode, data);
+        setSupabasePortalData(data);
+        setSupabaseError(null);
+      } else {
+        if (!supabasePortalData && !baseActiveStudent) {
+          setSupabaseError(data?.message || "Network connection error. Please retry");
+        }
+      }
+    } catch (err: any) {
+      console.warn("[ParentPortalDashboard] Supabase live hydration error/timeout:", err);
+      if (!supabasePortalData && !baseActiveStudent) {
+        setSupabaseError("Network connection error. Please retry");
+      }
+    } finally {
+      setIsHydratingSupabase(false);
+    }
+  }, [baseActiveStudent, supabasePortalData]);
+
+  // Instant UI Hydration & Realtime Synchronization:
   useEffect(() => {
     const targetBarcode = String(selectedStudentBarcode || account.studentBarcode).trim();
     if (!targetBarcode) return;
 
     let isSubscribed = true;
-    setIsHydratingSupabase(true);
 
-    fetchUnifiedStudentPortalDataFromSupabase(targetBarcode)
-      .then((data) => {
-        if (isSubscribed && data && data.success) {
-          setSupabasePortalData(data);
-        }
-      })
-      .catch((err) => {
-        console.warn("[ParentPortalDashboard] Supabase live hydration notice:", err);
-      })
-      .finally(() => {
-        if (isSubscribed) {
-          setIsHydratingSupabase(false);
-        }
-      });
+    // Fetch live or pull from in-memory session cache
+    fetchPortalData(targetBarcode, false);
 
     // Realtime changes on students table for this barcode
     const unsubStudent = subscribeToStudentChanges((payload) => {
       if (!isSubscribed || String(payload.barcode).trim() !== targetBarcode) return;
+      const updater = (prevStudent: any) => ({
+        ...(prevStudent || {}),
+        ...(payload.studentData || {}),
+      });
+      updateSessionPortalStudent(targetBarcode, updater);
       setSupabasePortalData((prev) => {
         if (!prev) return null;
         return {
           ...prev,
-          student: { ...(prev.student || {}), ...(payload.studentData || {}) },
+          student: updater(prev.student),
         };
       });
     });
@@ -326,6 +377,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     const unsubAttendance = subscribeToAttendanceStatusChanges((payload) => {
       if (!isSubscribed || String(payload.barcode).trim() !== targetBarcode) return;
       const dateKey = payload.dateKey || getTodayKey();
+      updateSessionPortalAttendance(targetBarcode, dateKey, payload.status);
       setSupabasePortalData((prev) => {
         if (!prev) return null;
         return {
@@ -341,23 +393,25 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     // Realtime changes on payments table for this barcode
     const unsubPayment = subscribeToPaymentChanges((payload) => {
       if (!isSubscribed || String(payload.barcode).trim() !== targetBarcode) return;
+      const mKey = payload.monthKey;
+      if (!mKey) return;
+      const paymentRecord = {
+        barcode: targetBarcode,
+        amount: Number(payload.amount || 0),
+        date: payload.date || new Date().toISOString(),
+        month: mKey,
+        notes: payload.note || "",
+      };
+      updateSessionPortalPayment(targetBarcode, mKey, paymentRecord);
       setSupabasePortalData((prev) => {
         if (!prev) return null;
-        const mKey = payload.monthKey;
-        if (!mKey) return prev;
         return {
           ...prev,
           payments: {
             ...prev.payments,
             [mKey]: {
               ...(prev.payments[mKey] || {}),
-              [targetBarcode]: {
-                barcode: targetBarcode,
-                amount: Number(payload.amount || 0),
-                date: payload.date || new Date().toISOString(),
-                month: mKey,
-                notes: payload.note || "",
-              },
+              [targetBarcode]: paymentRecord,
             },
           },
         };
@@ -370,7 +424,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       unsubAttendance();
       unsubPayment();
     };
-  }, [selectedStudentBarcode, account.studentBarcode]);
+  }, [selectedStudentBarcode, account.studentBarcode, fetchPortalData]);
 
   // Live Authoritative Student Object (Merges Live Supabase Record)
   const activeStudent = useMemo<Student | null>(() => {
@@ -474,7 +528,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
   useEffect(() => {
     const handleReadEvent = (e: Event) => {
       const detail = (e as CustomEvent).detail;
-      if (detail && detail.chatId === activeStudent.barcode) {
+      if (detail && activeStudent?.barcode && detail.chatId === activeStudent.barcode) {
         setChatMessages((prev) =>
           prev.map((m) => {
             const isTarget =
@@ -490,7 +544,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     };
     window.addEventListener("eman_chat_messages_read", handleReadEvent);
     return () => window.removeEventListener("eman_chat_messages_read", handleReadEvent);
-  }, [activeStudent.barcode]);
+  }, [activeStudent?.barcode]);
 
   // Unread chat messages count from admin (instantly 0 if currently viewing chat)
   const unreadChatCount = useMemo(() => {
@@ -787,7 +841,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
   // Reset thread message tracker when switching between child barcodes
   useEffect(() => {
     knownMsgIdsRef.current = new Set();
-  }, [activeStudent.barcode]);
+  }, [activeStudent?.barcode]);
 
   useEffect(() => {
     if (!chatMessages || chatMessages.length === 0) return;
@@ -841,7 +895,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
   // 1. Approved Original Monthly Fee for Student
   const studentGrade = ((activeStudent?.groupGrade || (activeStudent as any)?.grade) || "الصف الرابع الابتدائي") as GradeName;
   const standardMonthlyFee = useMemo(() => {
-    if (activeStudent?.customMonthlyFee !== undefined && activeStudent?.customMonthlyFee !== null && activeStudent.customMonthlyFee > 0) {
+    if (activeStudent?.customMonthlyFee !== undefined && activeStudent?.customMonthlyFee !== null && Number(activeStudent.customMonthlyFee) > 0) {
       return activeStudent.customMonthlyFee;
     }
     if (groupPrices && groupPrices[studentGrade] !== undefined) {
@@ -923,7 +977,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
   // 5. Full Academic Ledger Entries
   const ledgerEntries = useMemo(() => {
     return academicMonths.map((m) => {
-      const pay = effectivePayments[m.key]?.[activeStudent.barcode];
+      const pay = activeStudent?.barcode ? effectivePayments[m.key]?.[activeStudent.barcode] : undefined;
       const isPaid = !!pay;
       const paidAmount = pay ? pay.amount : 0;
       const requiredAmount = standardMonthlyFee;
@@ -941,7 +995,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
         isPastOrCurrent,
       };
     });
-  }, [academicMonths, effectivePayments, activeStudent.barcode, standardMonthlyFee, currentMonthKey]);
+  }, [academicMonths, effectivePayments, activeStudent?.barcode, standardMonthlyFee, currentMonthKey]);
 
   // Full Ledger Totals
   const totalRequiredAnnual = useMemo(() => ledgerEntries.reduce((acc, curr) => acc + curr.requiredAmount, 0), [ledgerEntries]);
@@ -952,6 +1006,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
 
   // 6. Attendance & Absence Logs with Dynamic Date Series & Schedule Isolation (Group A: Sat/Mon/Wed, Group B: Sun/Tue/Thu)
   const attendanceScheduleLogs = useMemo(() => {
+    if (!activeStudent?.barcode) return [];
     const studentGroupDays = activeStudent.groupDays || "سبت - إثنين - أربعاء";
     const logs: AttendanceScheduleLog[] = [];
     const todayKey = getTodayKey();
@@ -966,7 +1021,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     });
 
     // Also include today's live scan if active
-    if (attendanceToday[activeStudent.barcode]) {
+    if (activeStudent.barcode && attendanceToday[activeStudent.barcode]) {
       recordedDatesMap[todayKey] = attendanceToday[activeStudent.barcode];
     }
 
@@ -1021,7 +1076,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       }
 
       const rawStatus = dateStr === todayKey
-        ? (attendanceToday[activeStudent.barcode] || recordedDatesMap[dateStr])
+        ? (activeStudent.barcode && attendanceToday[activeStudent.barcode] ? attendanceToday[activeStudent.barcode] : recordedDatesMap[dateStr])
         : recordedDatesMap[dateStr];
 
       // Timezone-safe Arabic day name calculation
@@ -1045,7 +1100,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
           date: dateStr,
           dayName,
           status: finalStatus,
-          timeRecorded: dateStr === todayKey ? scanLogTimes[activeStudent.barcode] : undefined,
+          timeRecorded: dateStr === todayKey && activeStudent.barcode ? scanLogTimes[activeStudent.barcode] : undefined,
           isOfficialScheduledDay: true,
           isSubstituteDay: false,
           isAutoGenerated: false,
@@ -1069,7 +1124,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     });
 
     return logs;
-  }, [activeStudent, attendanceHistory, attendanceToday, scanLogTimes]);
+  }, [activeStudent, effectiveAttendanceHistory, attendanceToday, scanLogTimes]);
 
   // Filtered attendance logs based on tab selection
   const filteredAttendanceLogs = useMemo(() => {
@@ -1083,13 +1138,13 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
   // Attendance counts & rates
   const realAttendanceCount = useMemo(() => {
     const listCount = attendanceScheduleLogs.filter((l) => l.status === "حضور" || l.status === "تأخير").length;
-    return Math.max(activeStudent.totalAttendanceDays || 0, listCount);
-  }, [attendanceScheduleLogs, activeStudent.totalAttendanceDays]);
+    return Math.max(activeStudent?.totalAttendanceDays || 0, listCount);
+  }, [attendanceScheduleLogs, activeStudent?.totalAttendanceDays]);
 
   const realAbsentCount = useMemo(() => {
     const listCount = attendanceScheduleLogs.filter((l) => l.status === "غائب").length;
-    return activeStudent.totalAbsentDays !== undefined ? activeStudent.totalAbsentDays : listCount;
-  }, [attendanceScheduleLogs, activeStudent.totalAbsentDays]);
+    return activeStudent?.totalAbsentDays !== undefined ? activeStudent.totalAbsentDays : listCount;
+  }, [attendanceScheduleLogs, activeStudent?.totalAbsentDays]);
 
   const attendanceRate = useMemo(() => {
     const total = realAttendanceCount + realAbsentCount;
@@ -1104,6 +1159,8 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
   // 5. Exams and Evaluation Scores
   const examHistoryList = useMemo(() => {
     const list: { title: string; scoreStr: string; pct: number; isLatest?: boolean }[] = [];
+    if (!activeStudent) return list;
+
     if (activeStudent.lastExamTitle && activeStudent.lastExamScore) {
       // Parse percentage if possible
       const match = activeStudent.lastExamScore.match(/\((\d+)%\)/);
@@ -1119,7 +1176,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     if (activeStudent.totalExamScores && activeStudent.totalExamScores.length > 0) {
       activeStudent.totalExamScores.forEach((pct, idx) => {
         // Only add historical if not identical latest
-        if (list.length === 0 || idx < activeStudent.totalExamScores.length - 1) {
+        if (list.length === 0 || idx < (activeStudent.totalExamScores?.length || 0) - 1) {
           list.push({
             title: `تقييم دوري #${idx + 1}`,
             scoreStr: `${pct}%`,
@@ -1170,7 +1227,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
   // 7. Handle sending direct chat message
   const handleSendChat = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newChatText.trim() || isSendingChat) return;
+    if (!newChatText.trim() || isSendingChat || !activeStudent?.barcode) return;
 
     setIsSendingChat(true);
     const text = newChatText.trim();
@@ -1180,7 +1237,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       await sendParentChatMessage(
         activeStudent.barcode,
         "parent",
-        `ولي أمر (${activeStudent.name})`,
+        `ولي أمر (${activeStudent?.name || "طالب"})`,
         text
       );
     } catch (err) {
@@ -1189,6 +1246,79 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       setIsSendingChat(false);
     }
   };
+
+  // Pull-to-refresh touch support on mobile
+  const [isPulling, setIsPulling] = useState<boolean>(false);
+  const touchStartY = useRef<number>(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (typeof window !== "undefined" && window.scrollY <= 5) {
+      touchStartY.current = e.touches[0].clientY;
+    } else {
+      touchStartY.current = 0;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartY.current > 0 && typeof window !== "undefined" && window.scrollY <= 5) {
+      const currentY = e.touches[0].clientY;
+      const diff = currentY - touchStartY.current;
+      if (diff > 55) {
+        setIsPulling(true);
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (isPulling) {
+      setIsPulling(false);
+      const targetBarcode = String(selectedStudentBarcode || account.studentBarcode).trim();
+      if (targetBarcode) {
+        fetchPortalData(targetBarcode, true);
+      }
+    }
+    touchStartY.current = 0;
+  };
+
+  // Cloud Timeout Guard & Error State:
+  // If Supabase fails to respond or network drops, replace the infinite animated loader with a clean, user-friendly error screen with a "Retry" button.
+  if (supabaseError && !activeStudent && !supabasePortalData && !baseActiveStudent) {
+    return (
+      <div dir="rtl" className="min-h-screen w-full flex flex-col items-center justify-center bg-[#060812] text-white p-6 font-['Readex_Pro','Cairo',sans-serif]">
+        <div className="max-w-md w-full bg-slate-900/95 border border-rose-500/30 rounded-3xl p-6 sm:p-8 text-center shadow-2xl backdrop-blur-md">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400">
+            <AlertTriangle className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-bold text-white mb-1.5">خطأ في الاتصال بالشبكة</h2>
+          <p className="text-xs text-rose-400 font-medium mb-3">Network connection error. Please retry</p>
+          <p className="text-sm text-slate-400 leading-relaxed mb-6">
+            تعذر الاتصال بخوادم Supabase Cloud أو انتهت مهلة الاستجابة (10 ثوانٍ). يرجى التأكد من اتصال الإنترنت ثم إعادة المحاولة.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                const targetBarcode = String(selectedStudentBarcode || account.studentBarcode).trim();
+                fetchPortalData(targetBarcode, true);
+              }}
+              className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 transition shadow-lg cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>إعادة المحاولة (Retry)</span>
+            </button>
+            <button
+              type="button"
+              onClick={onLogout}
+              className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-sm flex items-center justify-center gap-2 transition cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>تسجيل الخروج</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Mandatory Cloud Loading State: While querying live Supabase data, remain in loading state
   if (!activeStudent || (isHydratingSupabase && !supabasePortalData && !baseActiveStudent)) {
@@ -1211,11 +1341,24 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-[#060812] text-slate-100 font-tajawal selection:bg-amber-500 selection:text-black">
+    <div
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      className="min-h-screen bg-[#060812] text-slate-100 font-tajawal selection:bg-amber-500 selection:text-black relative"
+    >
+      {/* Pull to refresh visual indicator on mobile */}
+      {isPulling && (
+        <div className="fixed top-2 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-amber-500 text-slate-950 font-bold text-xs shadow-xl flex items-center gap-2 animate-bounce">
+          <RefreshCw className="w-4 h-4 animate-spin" />
+          <span>حرّر للتحديث المباشر من السحابة...</span>
+        </div>
+      )}
+
       {/* MANDATORY / ESSENTIAL NOTIFICATION SETUP MODAL AT STARTUP */}
       <NotificationPermissionModal
         isOpen={showNotifModal && !hasNotifPerm && isNotificationSupported()}
-        studentName={activeStudent.name}
+        studentName={activeStudent?.name || "طالب"}
         onClose={handleCloseNotifModal}
         onPermissionGranted={() => {
           setHasNotifPerm(true);

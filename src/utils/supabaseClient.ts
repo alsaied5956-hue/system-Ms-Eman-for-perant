@@ -9,6 +9,7 @@ import { isOfficialGroupDay } from "./helpers";
 import { compressData, decompressData } from "./compression";
 import type { SystemData } from "./storage";
 import type { ParentAccount } from "../types/portal";
+import { withTimeout } from "./promiseTimeout";
 
 const SUPABASE_URL =
   (import.meta as any).env?.VITE_SUPABASE_URL || "https://lzdvmzumwuqycwdecaan.supabase.co";
@@ -1583,29 +1584,33 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       );
     }
 
-    // 2. Concurrently fetch attendance_logs, payments, homework, and parent_accounts
+    // 2. Concurrently fetch attendance_logs, payments, homework, and parent_accounts with 10s timeout
     // Note: payments and homework tables do NOT have a barcode column, they use student_id (UUID)
-    const [attRes, payRes, hwRes, accRes] = await Promise.allSettled([
-      supabase
-        .from("attendance_logs")
-        .select("*")
-        .or(`student_id.eq.${sId},barcode.eq.${bCode}`)
-        .order("date_key", { ascending: false })
-        .limit(500),
-      supabase
-        .from("payments")
-        .select("*")
-        .eq("student_id", sId)
-        .order("month_key", { ascending: false })
-        .limit(100),
-      supabase
-        .from("homework")
-        .select("*")
-        .eq("student_id", sId)
-        .order("date_key", { ascending: false })
-        .limit(100),
-      parentAccountQuery.maybeSingle(),
-    ]);
+    const [attRes, payRes, hwRes, accRes] = await withTimeout(
+      Promise.allSettled([
+        supabase
+          .from("attendance_logs")
+          .select("*")
+          .or(`student_id.eq.${sId},barcode.eq.${bCode}`)
+          .order("date_key", { ascending: false })
+          .limit(500),
+        supabase
+          .from("payments")
+          .select("*")
+          .eq("student_id", sId)
+          .order("month_key", { ascending: false })
+          .limit(100),
+        supabase
+          .from("homework")
+          .select("*")
+          .eq("student_id", sId)
+          .order("date_key", { ascending: false })
+          .limit(100),
+        parentAccountQuery.maybeSingle(),
+      ]),
+      10000,
+      "انتهت مهلة استعلام بيانات الطالب والتقارير من السحابة (10 ثوانٍ)"
+    );
 
     // Format Attendance
     const attendanceLogs = attRes.status === "fulfilled" && attRes.value.data ? attRes.value.data : [];

@@ -11,6 +11,7 @@ import { Student, PaymentRecord } from "../types";
 import { ParentAccount } from "../types/portal";
 import { supabase } from "../utils/supabaseClient";
 import { subscribeToStudentLiveBarcode, executeInstantRemoteLogout } from "../utils/studentLiveSync";
+import { withTimeout } from "../utils/promiseTimeout";
 
 export interface ChildBatchedData {
   student: Student;
@@ -93,13 +94,17 @@ export const ParentChildProvider: React.FC<ParentChildProviderProps> = ({
         }
       });
 
-      // 2. Single batched query to Supabase `students` table
+      // 2. Single batched query to Supabase `students` table with 10s Cloud Timeout Guard
       const barcodesToQuery = linkedBarcodes.filter(Boolean);
       if (barcodesToQuery.length > 0) {
-        const { data: supaStudents, error } = await supabase
-          .from("students")
-          .select("*")
-          .in("barcode", barcodesToQuery);
+        const { data: supaStudents, error } = await withTimeout<any>(
+          supabase
+            .from("students")
+            .select("*")
+            .in("barcode", barcodesToQuery),
+          10000,
+          "انتهت مهلة استعلام بيانات الطلاب من السحابة (10 ثوانٍ)"
+        );
 
         if (!error && supaStudents && supaStudents.length > 0) {
           supaStudents.forEach((row: any) => {
