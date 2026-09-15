@@ -1038,10 +1038,13 @@ export async function pullFullStateFromSupabase(): Promise<Partial<SystemData> |
       supabase.from("payments").select("*"),
       supabase
         .from("attendance_logs")
-        .select("barcode, date_key, status, time_recorded")
+        .select("student_id, barcode, date_key, status, time_recorded")
         .order("date_key", { ascending: false })
-        .limit(2000),
+        .limit(3000),
     ]);
+
+    // Build student id to barcode map
+    const studentIdToBarcode = new Map<string, string>();
 
     // Merge students table
     if (studentsRes.status === "fulfilled" && studentsRes.value.data && studentsRes.value.data.length > 0) {
@@ -1052,15 +1055,20 @@ export async function pullFullStateFromSupabase(): Promise<Partial<SystemData> |
 
       studentsRes.value.data.forEach((row: any) => {
         const b = String(row.barcode).trim();
+        if (row.id && b) {
+          studentIdToBarcode.set(row.id, b);
+        }
         const existing = studentMap.get(b) || {};
         studentMap.set(b, {
           ...existing,
+          id: row.id,
           barcode: b,
           name: row.name || existing.name || "طالب بدون اسم",
           phone: row.phone && row.phone !== "0" ? row.phone : existing.phone || "0",
           parentPhone: row.parent_phone && row.parent_phone !== "0" ? row.parent_phone : existing.parentPhone || "0",
           groupGrade: row.grade || existing.groupGrade || "الصف الرابع الابتدائي",
           groupDays: row.group_days || existing.groupDays || "سبت - إثنين - أربعاء",
+          groupTime: row.group_time || existing.groupTime || "04:00 م",
           customMonthlyFee: row.monthly_fee !== undefined && row.monthly_fee !== null ? Number(row.monthly_fee) : existing.customMonthlyFee,
           discountReason: row.notes || existing.discountReason,
           notes: row.notes || existing.notes,
@@ -1070,12 +1078,37 @@ export async function pullFullStateFromSupabase(): Promise<Partial<SystemData> |
       baseState.students = Array.from(studentMap.values());
     }
 
+    // Merge payments table (using student_id to barcode mapping)
+    if (paymentsRes.status === "fulfilled" && paymentsRes.value.data && paymentsRes.value.data.length > 0) {
+      const paymentsMap: Record<string, Record<string, any>> = baseState.payments ? { ...baseState.payments } : {};
+      paymentsRes.value.data.forEach((p: any) => {
+        const mKey = p.month_key;
+        const b = p.barcode ? String(p.barcode).trim() : (p.student_id ? studentIdToBarcode.get(p.student_id) : null);
+        if (!mKey || !b) return;
+        if (!paymentsMap[mKey]) paymentsMap[mKey] = {};
+        paymentsMap[mKey][b] = {
+          monthKey: mKey,
+          amount: Number(p.amount_paid || 0),
+          paidAmount: Number(p.amount_paid || 0),
+          requiredAmount: Number(p.required_amount || 0),
+          discount: Number(p.discount || 0),
+          date: p.payment_date ? p.payment_date.slice(0, 10) : "",
+          time: p.payment_date ? p.payment_date.slice(11, 16) : "",
+          note: p.notes || "",
+          notes: p.notes || "",
+          recordedBy: p.received_by || "الإشراف",
+          timestamp: p.created_at ? new Date(p.created_at).getTime() : Date.now(),
+        };
+      });
+      baseState.payments = paymentsMap;
+    }
+
     // Merge attendance records
     if (attendanceRes.status === "fulfilled" && attendanceRes.value.data && attendanceRes.value.data.length > 0) {
       const history: Record<string, Record<string, string>> = baseState.attendanceHistory ? { ...baseState.attendanceHistory } : {};
       attendanceRes.value.data.forEach((att: any) => {
         const dKey = att.date_key;
-        const b = String(att.barcode).trim();
+        const b = att.barcode ? String(att.barcode).trim() : (att.student_id ? studentIdToBarcode.get(att.student_id) : null);
         if (!dKey || !b) return;
         if (!history[dKey]) history[dKey] = {};
         history[dKey][b] = att.status || "حضور";
@@ -1410,14 +1443,27 @@ export function subscribeToParentAccountSupabase(
       },
       (payload) => {
         try {
+          const uuid = barcodeToUUID(cleanBarcode);
           if (payload.eventType === "DELETE") {
             const oldRow = payload.old as any;
-            if (!oldRow || String(oldRow.id).trim() === cleanBarcode) {
+            const matchesBarcode =
+              !oldRow ||
+              String(oldRow.id).toLowerCase() === uuid.toLowerCase() ||
+              String(oldRow.id).trim() === cleanBarcode ||
+              (Array.isArray(oldRow.linked_student_barcodes) &&
+                oldRow.linked_student_barcodes.includes(cleanBarcode));
+            if (matchesBarcode) {
               onStatusChanged("deleted", "تم إلغاء تفعيل هذا الحساب من قبل الإدارة");
             }
           } else if (payload.eventType === "UPDATE") {
             const newRow = payload.new as any;
-            if (newRow && String(newRow.id).trim() === cleanBarcode) {
+            const matchesBarcode =
+              newRow &&
+              (String(newRow.id).toLowerCase() === uuid.toLowerCase() ||
+                String(newRow.id).trim() === cleanBarcode ||
+                (Array.isArray(newRow.linked_student_barcodes) &&
+                  newRow.linked_student_barcodes.includes(cleanBarcode)));
+            if (matchesBarcode) {
               const currentStatus = String(newRow.status || "").toLowerCase();
               if (currentStatus !== "active") {
                 onStatusChanged(
@@ -1523,8 +1569,22 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
 
     const sId = studentRow.id;
     const bCode = String(studentRow.barcode).trim();
+    const uuid = barcodeToUUID(bCode);
+
+    // Build parent_accounts query filter using UUID and linked_student_barcodes
+    let parentAccountQuery = supabase.from("parent_accounts").select("*");
+    if (studentRow.parent_phone) {
+      parentAccountQuery = parentAccountQuery.or(
+        `id.eq.${uuid},linked_student_barcodes.cs.{${bCode}},parent_phone.eq.${studentRow.parent_phone}`
+      );
+    } else {
+      parentAccountQuery = parentAccountQuery.or(
+        `id.eq.${uuid},linked_student_barcodes.cs.{${bCode}}`
+      );
+    }
 
     // 2. Concurrently fetch attendance_logs, payments, homework, and parent_accounts
+    // Note: payments and homework tables do NOT have a barcode column, they use student_id (UUID)
     const [attRes, payRes, hwRes, accRes] = await Promise.allSettled([
       supabase
         .from("attendance_logs")
@@ -1535,20 +1595,16 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       supabase
         .from("payments")
         .select("*")
-        .or(`student_id.eq.${sId},barcode.eq.${bCode}`)
+        .eq("student_id", sId)
         .order("month_key", { ascending: false })
         .limit(100),
       supabase
         .from("homework")
         .select("*")
-        .or(`student_id.eq.${sId},barcode.eq.${bCode}`)
+        .eq("student_id", sId)
         .order("date_key", { ascending: false })
         .limit(100),
-      supabase
-        .from("parent_accounts")
-        .select("*")
-        .or(`id.eq.${bCode},parent_phone.eq.${studentRow.parent_phone}`)
-        .maybeSingle(),
+      parentAccountQuery.maybeSingle(),
     ]);
 
     // Format Attendance
@@ -1611,7 +1667,7 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       notes: studentRow.notes || "",
       points: studentRow.points || 0,
       totalAttendanceDays: studentRow.total_attendance_days !== undefined ? Number(studentRow.total_attendance_days) : attendanceLogs.filter((a: any) => a.status === "حضور").length,
-      totalAbsentDays: studentRow.total_absent_days !== undefined ? Number(studentRow.total_absent_days) : attendanceLogs.filter((a: any) => a.status === "غائب").length,
+      totalAbsentDays: studentRow.total_absent_days !== undefined ? Number(studentRow.total_absent_days) : attendanceLogs.filter((a: any) => a.status === "غياب" || a.status === "غائب").length,
       totalExamScores: parsedScores,
       lastExamTitle: studentRow.last_exam_title || "",
       lastExamScore: studentRow.last_exam_score || "",

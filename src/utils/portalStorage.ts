@@ -280,7 +280,26 @@ export async function syncParentAccountsFromCloud(force: boolean = false): Promi
   }
   syncAccountsInFlight = (async () => {
     try {
-      // 1. Fast Express Server Cache Sync (<5ms, zero Firestore quota)
+      // 1. Direct Production Supabase Table public.parent_accounts Query FIRST (Zero Quota Limits)
+      try {
+        const sbAccounts = await fetchPortalAccountsFromSupabase();
+        if (sbAccounts && typeof sbAccounts === "object" && Object.keys(sbAccounts).length > 0) {
+          const reconciled: Record<string, ParentAccount> = {};
+          for (const [b, acc] of Object.entries(sbAccounts)) {
+            const bCode = String(b).trim();
+            if (bCode && acc && acc.status !== "deleted") {
+              reconciled[bCode] = acc;
+            }
+          }
+          saveLocalParentAccounts(reconciled);
+          lastAccountsSyncTime = Date.now();
+          return reconciled;
+        }
+      } catch (sbErr) {
+        console.warn("[syncParentAccounts] Supabase direct fetch notice:", sbErr);
+      }
+
+      // 2. Fast Express Server Cache Sync (<5ms)
       try {
         const resp = await fetch("/api/portal/accounts-sync");
         if (resp.ok) {
@@ -331,25 +350,8 @@ export async function syncParentAccountsFromCloud(force: boolean = false): Promi
           }
         }
       } catch {
-        // Fall back to Supabase / Firestore below
+        // Fall back to Firestore below
       }
-
-      // 2. Fast Supabase Cloud Database (Zero Quota Limits)
-      try {
-        const sbAccounts = await fetchPortalAccountsFromSupabase();
-        if (sbAccounts && typeof sbAccounts === "object" && Object.keys(sbAccounts).length > 0) {
-          const reconciled: Record<string, ParentAccount> = {};
-          for (const [b, acc] of Object.entries(sbAccounts)) {
-            const bCode = String(b).trim();
-            if (bCode && acc && acc.status !== "deleted") {
-              reconciled[bCode] = acc;
-            }
-          }
-          saveLocalParentAccounts(reconciled);
-          lastAccountsSyncTime = Date.now();
-          return reconciled;
-        }
-      } catch {}
 
       await ensureFirebaseAuth();
       if (db) {
@@ -1139,16 +1141,43 @@ export async function verifyStudentForActivation(
     return { success: false, message: "يرجى إدخال كود باركود الطالب ورقم الهاتف المسجل." };
   }
 
-  // 1. Check local roster first (0ms)
-  let student = students.find((s) => String(s.barcode).trim() === barcodeTrimmed);
+  // 1. Direct Live Query to Supabase students table FIRST
+  let student: Student | undefined;
+  try {
+    const { data: supaStudent } = await supabase
+      .from("students")
+      .select("*")
+      .or(`barcode.eq.${barcodeTrimmed},barcode.eq.${Number(barcodeTrimmed) || 0}`)
+      .maybeSingle();
+
+    if (supaStudent) {
+      student = {
+        id: supaStudent.id,
+        barcode: String(supaStudent.barcode),
+        name: supaStudent.name,
+        phone: supaStudent.phone || "",
+        parentPhone: supaStudent.parent_phone || supaStudent.parentPhone || "",
+        groupGrade: supaStudent.grade || supaStudent.groupGrade || "",
+        groupDays: supaStudent.group_days || supaStudent.groupDays || "",
+        points: supaStudent.points || 0,
+      } as any;
+    }
+  } catch (err) {
+    console.warn("Supabase student lookup notice:", err);
+  }
+
+  // Fallback to local roster only if network request fails
   if (!student) {
-    const localData = loadLocalData();
-    if (localData?.students) {
-      student = localData.students.find((s) => String(s.barcode).trim() === barcodeTrimmed);
+    student = students.find((s) => String(s.barcode).trim() === barcodeTrimmed);
+    if (!student) {
+      const localData = loadLocalData();
+      if (localData?.students) {
+        student = localData.students.find((s) => String(s.barcode).trim() === barcodeTrimmed);
+      }
     }
   }
 
-  // Numeric equivalence
+  // Numeric equivalence fallback
   if (!student && !isNaN(Number(barcodeTrimmed))) {
     const num = Number(barcodeTrimmed);
     student = students.find((s) => Number(s.barcode) === num);
@@ -1157,32 +1186,6 @@ export async function verifyStudentForActivation(
       if (localData?.students) {
         student = localData.students.find((s) => Number(s.barcode) === num);
       }
-    }
-  }
-
-  // 2. Query Supabase `students` table directly if not found locally or to ensure authoritative sync
-  if (!student) {
-    try {
-      const { data: supaStudent } = await supabase
-        .from("students")
-        .select("*")
-        .or(`barcode.eq.${barcodeTrimmed},barcode.eq.${Number(barcodeTrimmed) || 0}`)
-        .maybeSingle();
-
-      if (supaStudent) {
-        student = {
-          id: supaStudent.id,
-          barcode: String(supaStudent.barcode),
-          name: supaStudent.name,
-          phone: supaStudent.phone || "",
-          parentPhone: supaStudent.parent_phone || supaStudent.parentPhone || "",
-          groupGrade: supaStudent.grade || supaStudent.groupGrade || "",
-          groupDays: supaStudent.group_days || supaStudent.groupDays || "",
-          points: supaStudent.points || 0,
-        } as any;
-      }
-    } catch (err) {
-      console.warn("Supabase student lookup notice:", err);
     }
   }
 
@@ -1264,12 +1267,39 @@ export async function registerParentAccount(
     return { success: false, message: "يرجى إدخال جميع الحقول المطلوبة (كود الباركود، رقم الهاتف، وكلمة المرور)" };
   }
 
-  // 1. Match student in registered students roster (with multi-layer fallback across all sources)
-  let student = students.find((s) => String(s.barcode).trim() === barcodeTrimmed);
+  // 1. Direct Live Query to Supabase students table FIRST
+  let student: Student | undefined;
+  try {
+    const { data: supaStudent } = await supabase
+      .from("students")
+      .select("*")
+      .or(`barcode.eq.${barcodeTrimmed},barcode.eq.${Number(barcodeTrimmed) || 0}`)
+      .maybeSingle();
+
+    if (supaStudent) {
+      student = {
+        id: supaStudent.id,
+        barcode: String(supaStudent.barcode),
+        name: supaStudent.name,
+        phone: supaStudent.phone || "",
+        parentPhone: supaStudent.parent_phone || supaStudent.parentPhone || "",
+        groupGrade: supaStudent.grade || supaStudent.groupGrade || "",
+        groupDays: supaStudent.group_days || supaStudent.groupDays || "",
+        points: supaStudent.points || 0,
+      } as any;
+    }
+  } catch (err) {
+    console.warn("Supabase student lookup notice:", err);
+  }
+
+  // Fallback to local roster only if network request fails
   if (!student) {
-    const localData = loadLocalData();
-    if (localData?.students) {
-      student = localData.students.find((s) => String(s.barcode).trim() === barcodeTrimmed);
+    student = students.find((s) => String(s.barcode).trim() === barcodeTrimmed);
+    if (!student) {
+      const localData = loadLocalData();
+      if (localData?.students) {
+        student = localData.students.find((s) => String(s.barcode).trim() === barcodeTrimmed);
+      }
     }
   }
 
@@ -1283,30 +1313,6 @@ export async function registerParentAccount(
         student = localData.students.find((s) => Number(s.barcode) === num);
       }
     }
-  }
-
-  // Fallback to Supabase `students` table query directly
-  if (!student) {
-    try {
-      const { data: supaStudent } = await supabase
-        .from("students")
-        .select("*")
-        .or(`barcode.eq.${barcodeTrimmed},barcode.eq.${Number(barcodeTrimmed) || 0}`)
-        .maybeSingle();
-
-      if (supaStudent) {
-        student = {
-          id: supaStudent.id,
-          barcode: String(supaStudent.barcode),
-          name: supaStudent.name,
-          phone: supaStudent.phone || "",
-          parentPhone: supaStudent.parent_phone || supaStudent.parentPhone || "",
-          groupGrade: supaStudent.grade || supaStudent.groupGrade || "",
-          groupDays: supaStudent.group_days || supaStudent.groupDays || "",
-          points: supaStudent.points || 0,
-        } as any;
-      }
-    } catch {}
   }
 
   if (!student) {
@@ -1635,77 +1641,71 @@ export async function authenticatePortalLogin(
     };
   }
 
-  // 2. Check Parent credentials from LocalStorage first (Instant 0ms)
+  // 2. Direct Authoritative Live Query to Supabase parent_accounts FIRST
   let accounts = getLocalParentAccounts();
-  let account = accounts[barcodeTrimmed] || accounts[rawTrimmed];
+  let account: ParentAccount | null = null;
 
-  // If not found by direct barcode, check numeric matching or phone number
-  if (!account) {
-    account = Object.values(accounts).find(
-      (a) =>
-        normalizeBarcode(a.studentBarcode) === barcodeTrimmed ||
-        String(a.studentBarcode).trim() === rawTrimmed ||
-        (cleanEnteredPhone && normalizePhone(a.parentPhone) === cleanEnteredPhone) ||
-        (a.linkedBarcodes && (a.linkedBarcodes.includes(barcodeTrimmed) || a.linkedBarcodes.includes(rawTrimmed)))
-    );
-  }
-
-  // 3. Fast Supabase Authoritative Fallback
-  if (!account || account.password !== passTrimmed) {
-    try {
-      const uuid = barcodeToUUID(barcodeTrimmed);
-      let query = supabase.from("parent_accounts").select("*");
-      if (cleanEnteredPhone) {
-        query = query.or(`id.eq.${uuid},linked_student_barcodes.cs.{${barcodeTrimmed}},parent_phone.eq.${cleanEnteredPhone}`);
-      } else {
-        query = query.or(`id.eq.${uuid},linked_student_barcodes.cs.{${barcodeTrimmed}}`);
-      }
-      const { data: supaAcc } = await query.maybeSingle();
-      if (supaAcc) {
-        const barcodes: string[] = Array.isArray(supaAcc.linked_student_barcodes) && supaAcc.linked_student_barcodes.length > 0
+  try {
+    const uuid = barcodeToUUID(barcodeTrimmed);
+    let query = supabase.from("parent_accounts").select("*");
+    if (cleanEnteredPhone) {
+      query = query.or(
+        `id.eq.${uuid},linked_student_barcodes.cs.{${barcodeTrimmed}},parent_phone.eq.${cleanEnteredPhone}`
+      );
+    } else {
+      query = query.or(
+        `id.eq.${uuid},linked_student_barcodes.cs.{${barcodeTrimmed}}`
+      );
+    }
+    const { data: supaAcc } = await query.maybeSingle();
+    if (supaAcc) {
+      const barcodes: string[] =
+        Array.isArray(supaAcc.linked_student_barcodes) &&
+        supaAcc.linked_student_barcodes.length > 0
           ? supaAcc.linked_student_barcodes
           : [barcodeTrimmed];
-        const primaryBarcode = barcodes[0] || barcodeTrimmed;
-        account = {
-          studentBarcode: primaryBarcode,
-          studentName: supaAcc.student_name || "",
-          linkedBarcodes: barcodes,
-          parentPhone: supaAcc.parent_phone || "",
-          password: supaAcc.password_hash || supaAcc.password || "",
-          status: (supaAcc.status || "active").toLowerCase() as "active" | "disabled" | "deleted",
-          createdAt: supaAcc.created_at,
-          activatedAt: supaAcc.created_at,
-          updatedAt: supaAcc.updated_at,
-        };
-        accounts[account.studentBarcode] = account;
-        saveLocalParentAccounts(accounts);
-      }
-    } catch {}
+      const primaryBarcode = barcodes[0] || barcodeTrimmed;
+      account = {
+        studentBarcode: primaryBarcode,
+        studentName: supaAcc.student_name || "",
+        linkedBarcodes: barcodes,
+        parentPhone: supaAcc.parent_phone || "",
+        password: supaAcc.password_hash || supaAcc.password || "",
+        status: (supaAcc.status || "active").toLowerCase() as
+          | "active"
+          | "disabled"
+          | "deleted",
+        createdAt: supaAcc.created_at,
+        activatedAt: supaAcc.created_at,
+        updatedAt: supaAcc.updated_at,
+      };
+      accounts[account.studentBarcode] = account;
+      saveLocalParentAccounts(accounts);
+    }
+  } catch (supaErr) {
+    console.warn("[Auth] Supabase direct parent_accounts check notice:", supaErr);
   }
 
-  // 4. Fast Firestore Fallback
-  if (!account || account.password !== passTrimmed) {
-    try {
-      await ensureFirebaseAuth();
-      if (db) {
-        const docSnap = await getDoc(doc(db, "parent_accounts", barcodeTrimmed));
-        if (docSnap && docSnap.exists()) {
-          const cloudAcc = docSnap.data() as ParentAccount;
-          if (cloudAcc && cloudAcc.studentBarcode) {
-            account = cloudAcc;
-            accounts = getLocalParentAccounts();
-            accounts[account.studentBarcode] = account;
-            saveLocalParentAccounts(accounts);
-          }
-        }
-      }
-    } catch {}
+  // Fallback to local accounts cache only if network failed to return an account
+  if (!account) {
+    account = accounts[barcodeTrimmed] || accounts[rawTrimmed];
+    if (!account) {
+      account = Object.values(accounts).find(
+        (a) =>
+          normalizeBarcode(a.studentBarcode) === barcodeTrimmed ||
+          String(a.studentBarcode).trim() === rawTrimmed ||
+          (cleanEnteredPhone && normalizePhone(a.parentPhone) === cleanEnteredPhone) ||
+          (a.linkedBarcodes &&
+            (a.linkedBarcodes.includes(barcodeTrimmed) ||
+              a.linkedBarcodes.includes(rawTrimmed)))
+      );
+    }
   }
 
-  // If still not found, check synchronized registry
+  // Check Supabase synchronized registry if still not found
   if (!account) {
     try {
-      const synced = await syncParentAccountsFromCloud();
+      const synced = await syncParentAccountsFromCloud(true);
       if (synced && (synced[barcodeTrimmed] || synced[rawTrimmed])) {
         account = synced[barcodeTrimmed] || synced[rawTrimmed];
       }
@@ -1713,7 +1713,23 @@ export async function authenticatePortalLogin(
   }
 
   if (!account || account.status === "deleted") {
-    // Check if student exists in roster to give a helpful guidance message
+    // Check if student exists in Supabase students table to give a helpful guidance message
+    try {
+      const { data: supaStudents } = await supabase
+        .from("students")
+        .select("name, barcode, phone, parent_phone")
+        .or(
+          `barcode.eq.${barcodeTrimmed}${cleanEnteredPhone ? `,parent_phone.ilike.%${cleanEnteredPhone}%,phone.ilike.%${cleanEnteredPhone}%` : ""}`
+        )
+        .limit(1);
+      if (supaStudents && supaStudents.length > 0) {
+        return {
+          success: false,
+          message: `لم يتم تفعيل حساب ولي أمر الطالب (${supaStudents[0].name}) بعد. يرجى التوجه لتبويب "تفعيل حساب جديد" لتعيين كلمة مرور الحساب.`,
+        };
+      }
+    } catch {}
+
     const cleanEntered = normalizePhone(barcodeTrimmed);
     let studentList = students;
     if (!studentList || studentList.length === 0) {
@@ -1730,7 +1746,7 @@ export async function authenticatePortalLogin(
     if (student) {
       return {
         success: false,
-        message: `لم يتم تفعيل حساب ولي أمر الطالب (${student.name}) بعد. يرجى مراجعة إدارة المركز للتفعيل، أو استخدام تبويب "تفعيل حساب جديد".`,
+        message: `لم يتم تفعيل حساب ولي أمر الطالب (${student.name}) بعد. يرجى التوجه لتبويب "تفعيل حساب جديد" لتعيين كلمة مرور الحساب.`,
       };
     }
     return {

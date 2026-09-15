@@ -82,6 +82,7 @@ import {
   PhoneCall,
   Phone,
   MessageCircle,
+  RefreshCw,
 } from "lucide-react";
 
 interface ParentPortalDashboardProps {
@@ -267,8 +268,8 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     return Array.from(new Set([account.studentBarcode, ...(account.linkedBarcodes || [])]));
   }, [parentChild?.linkedBarcodes, account]);
 
-  // Current active child student object
-  const activeStudent = useMemo(() => {
+  // Current active child student base object
+  const baseActiveStudent = useMemo(() => {
     const target = String(selectedStudentBarcode || account.studentBarcode).trim();
     let s =
       students.find((item) => String(item.barcode).trim() === target) ||
@@ -309,6 +310,151 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       }
     );
   }, [students, selectedStudentBarcode, account]);
+
+  // Live Unified Portal Data from Supabase directly
+  const [supabasePortalData, setSupabasePortalData] = useState<UnifiedStudentPortalData | null>(null);
+  const [isHydratingSupabase, setIsHydratingSupabase] = useState<boolean>(false);
+
+  // Instant UI Hydration: Directly fetch authoritative Supabase student data on authentication/student change
+  useEffect(() => {
+    const targetBarcode = String(selectedStudentBarcode || account.studentBarcode).trim();
+    if (!targetBarcode) return;
+
+    let isSubscribed = true;
+    setIsHydratingSupabase(true);
+
+    fetchUnifiedStudentPortalDataFromSupabase(targetBarcode)
+      .then((data) => {
+        if (isSubscribed && data && data.success) {
+          setSupabasePortalData(data);
+        }
+      })
+      .catch((err) => {
+        console.warn("[ParentPortalDashboard] Supabase live hydration notice:", err);
+      })
+      .finally(() => {
+        if (isSubscribed) {
+          setIsHydratingSupabase(false);
+        }
+      });
+
+    // Realtime changes on students table for this barcode
+    const unsubStudent = subscribeToStudentChanges((payload) => {
+      if (!isSubscribed || String(payload.barcode).trim() !== targetBarcode) return;
+      setSupabasePortalData((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          student: { ...(prev.student || {}), ...(payload.studentData || {}) },
+        };
+      });
+    });
+
+    // Realtime changes on attendance_logs table for this barcode
+    const unsubAttendance = subscribeToAttendanceStatusChanges((payload) => {
+      if (!isSubscribed || String(payload.barcode).trim() !== targetBarcode) return;
+      const dateKey = payload.dateKey || getTodayKey();
+      setSupabasePortalData((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          attendanceHistory: {
+            ...prev.attendanceHistory,
+            [dateKey]: payload.status,
+          },
+        };
+      });
+    });
+
+    // Realtime changes on payments table for this barcode
+    const unsubPayment = subscribeToPaymentChanges((payload) => {
+      if (!isSubscribed || String(payload.barcode).trim() !== targetBarcode) return;
+      setSupabasePortalData((prev) => {
+        if (!prev) return null;
+        const mKey = payload.monthKey;
+        if (!mKey) return prev;
+        return {
+          ...prev,
+          payments: {
+            ...prev.payments,
+            [mKey]: {
+              ...(prev.payments[mKey] || {}),
+              [targetBarcode]: {
+                barcode: targetBarcode,
+                amount: Number(payload.amount || 0),
+                date: payload.date || new Date().toISOString(),
+                month: mKey,
+                notes: payload.note || "",
+              },
+            },
+          },
+        };
+      });
+    });
+
+    return () => {
+      isSubscribed = false;
+      unsubStudent();
+      unsubAttendance();
+      unsubPayment();
+    };
+  }, [selectedStudentBarcode, account.studentBarcode]);
+
+  // Live Authoritative Student Object (Merges Live Supabase Record)
+  const activeStudent = useMemo<Student>(() => {
+    if (supabasePortalData?.student) {
+      const supaSt = supabasePortalData.student;
+      return {
+        ...baseActiveStudent,
+        ...supaSt,
+        name: supaSt.name || baseActiveStudent.name,
+        phone: supaSt.phone || baseActiveStudent.phone,
+        parentPhone: supaSt.parentPhone || supaSt.parent_phone || baseActiveStudent.parentPhone,
+        groupGrade: (supaSt.grade || supaSt.groupGrade || baseActiveStudent.groupGrade) as GradeName,
+        groupDays: (supaSt.group_days || supaSt.groupDays || baseActiveStudent.groupDays) as GroupDays,
+        points: supaSt.points !== undefined ? supaSt.points : baseActiveStudent.points,
+        totalAttendanceDays: supaSt.totalAttendanceDays !== undefined ? supaSt.totalAttendanceDays : baseActiveStudent.totalAttendanceDays,
+        totalAbsentDays: supaSt.totalAbsentDays !== undefined ? supaSt.totalAbsentDays : baseActiveStudent.totalAbsentDays,
+        totalExamScores: (supabasePortalData.examScores && supabasePortalData.examScores.length > 0)
+          ? supabasePortalData.examScores
+          : (baseActiveStudent.totalExamScores || []),
+        lastExamTitle: supabasePortalData.lastExamTitle || baseActiveStudent.lastExamTitle,
+        lastExamScore: supabasePortalData.lastExamScore || baseActiveStudent.lastExamScore,
+      };
+    }
+    return baseActiveStudent;
+  }, [baseActiveStudent, supabasePortalData]);
+
+  // Live Authoritative Payments Map
+  const effectivePayments = useMemo(() => {
+    if (supabasePortalData?.payments && Object.keys(supabasePortalData.payments).length > 0) {
+      const merged: Record<string, Record<string, PaymentRecord>> = { ...payments };
+      for (const [mKey, subMap] of Object.entries(supabasePortalData.payments)) {
+        merged[mKey] = {
+          ...(merged[mKey] || {}),
+          ...(subMap as Record<string, PaymentRecord>),
+        };
+      }
+      return merged;
+    }
+    return payments;
+  }, [payments, supabasePortalData?.payments]);
+
+  // Live Authoritative Attendance History Map
+  const effectiveAttendanceHistory = useMemo(() => {
+    if (supabasePortalData?.attendanceHistory && Object.keys(supabasePortalData.attendanceHistory).length > 0) {
+      const merged: Record<string, Record<string, string>> = { ...attendanceHistory };
+      for (const [dKey, status] of Object.entries(supabasePortalData.attendanceHistory)) {
+        if (!merged[dKey]) merged[dKey] = {};
+        merged[dKey] = {
+          ...merged[dKey],
+          [activeStudent.barcode]: status,
+        };
+      }
+      return merged;
+    }
+    return attendanceHistory;
+  }, [attendanceHistory, supabasePortalData?.attendanceHistory, activeStudent.barcode]);
 
   // Real-time chat subscription for the active student's thread
   useEffect(() => {
@@ -738,15 +884,15 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
   }, []);
 
   const currentMonthPayment = useMemo(() => {
-    const monthMap = payments[currentMonthKey] || {};
+    const monthMap = effectivePayments[currentMonthKey] || {};
     return monthMap[activeStudent.barcode];
-  }, [payments, currentMonthKey, activeStudent.barcode]);
+  }, [effectivePayments, currentMonthKey, activeStudent.barcode]);
 
   // 3. Payment History (All recorded payments for this student)
   const paymentHistoryList = useMemo(() => {
     const list: PaymentRecord[] = [];
-    Object.keys(payments || {}).forEach((mKey) => {
-      const rec = payments[mKey]?.[activeStudent.barcode];
+    Object.keys(effectivePayments || {}).forEach((mKey) => {
+      const rec = effectivePayments[mKey]?.[activeStudent.barcode];
       if (rec) {
         list.push(rec);
       }
@@ -757,7 +903,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       const dateB = b.date || b.monthKey || b.month || "";
       return dateB.localeCompare(dateA);
     });
-  }, [payments, activeStudent.barcode]);
+  }, [effectivePayments, activeStudent.barcode]);
 
   // 4. Academic Months (Full 12-Month Academic Ledger: August -> July)
   const academicMonths = useMemo(() => {
@@ -783,8 +929,8 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     ];
 
     // Also include any payment months that exist in payments for this student outside standard list
-    Object.keys(payments || {}).forEach((mKey) => {
-      if (payments[mKey]?.[activeStudent.barcode] && !list.some((item) => item.key === mKey)) {
+    Object.keys(effectivePayments || {}).forEach((mKey) => {
+      if (effectivePayments[mKey]?.[activeStudent.barcode] && !list.some((item) => item.key === mKey)) {
         list.push({
           key: mKey,
           label: mKey,
@@ -795,12 +941,12 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     });
 
     return list;
-  }, [payments, activeStudent.barcode]);
+  }, [effectivePayments, activeStudent.barcode]);
 
   // 5. Full Academic Ledger Entries
   const ledgerEntries = useMemo(() => {
     return academicMonths.map((m) => {
-      const pay = payments[m.key]?.[activeStudent.barcode];
+      const pay = effectivePayments[m.key]?.[activeStudent.barcode];
       const isPaid = !!pay;
       const paidAmount = pay ? pay.amount : 0;
       const requiredAmount = standardMonthlyFee;
@@ -818,7 +964,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
         isPastOrCurrent,
       };
     });
-  }, [academicMonths, payments, activeStudent.barcode, standardMonthlyFee, currentMonthKey]);
+  }, [academicMonths, effectivePayments, activeStudent.barcode, standardMonthlyFee, currentMonthKey]);
 
   // Full Ledger Totals
   const totalRequiredAnnual = useMemo(() => ledgerEntries.reduce((acc, curr) => acc + curr.requiredAmount, 0), [ledgerEntries]);
@@ -835,8 +981,8 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
 
     // 1. Gather all real dates where attendance was explicitly recorded in database/history for this student
     const recordedDatesMap: Record<string, string> = {};
-    Object.keys(attendanceHistory || {}).forEach((dateStr) => {
-      const st = attendanceHistory[dateStr]?.[activeStudent.barcode];
+    Object.keys(effectiveAttendanceHistory || {}).forEach((dateStr) => {
+      const st = effectiveAttendanceHistory[dateStr]?.[activeStudent.barcode];
       if (st) {
         recordedDatesMap[dateStr] = st;
       }
@@ -1129,6 +1275,27 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
                 })}
               </div>
             ) : null}
+
+            {/* Direct Supabase Live Refresh Button */}
+            <button
+              type="button"
+              onClick={() => {
+                const targetBarcode = String(selectedStudentBarcode || account.studentBarcode).trim();
+                if (!targetBarcode) return;
+                setIsHydratingSupabase(true);
+                fetchUnifiedStudentPortalDataFromSupabase(targetBarcode)
+                  .then((data) => {
+                    if (data && data.success) setSupabasePortalData(data);
+                  })
+                  .finally(() => setIsHydratingSupabase(false));
+              }}
+              disabled={isHydratingSupabase}
+              className="px-2.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-emerald-500/40 text-emerald-400 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              title="تحديث مباشر من قاعدة بيانات سوبابيز (Supabase Live)"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isHydratingSupabase ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">مباشر</span>
+            </button>
 
             {/* Add Another Child Button */}
             <button
@@ -2410,19 +2577,63 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
                   يتم التحقق من أداء الواجب المنزلي في بداية كل حصة دراسية. الطلاب الملتزمون يحصلون على نقاط تميز إضافية، بينما يتم إرسال تنبيه في حال عدم إنجاز التكليف.
                 </p>
 
-                <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400">الواجب الأخير:</span>
-                    <span className="font-bold text-emerald-400 flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      تم الحل بالكامل
-                    </span>
+                {/* Live Homework Records from Supabase public.homework table */}
+                {supabasePortalData?.homeworkList && supabasePortalData.homeworkList.length > 0 ? (
+                  <div className="space-y-3">
+                    {supabasePortalData.homeworkList.map((hw: any, idx: number) => {
+                      const isDone = hw.status === "done";
+                      const isIncomplete = hw.status === "incomplete";
+                      const isNotDone = hw.status === "not_done";
+                      return (
+                        <div key={hw.id || idx} className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-bold text-white">{hw.title || `واجب درس ${hw.date_key || ""}`}</span>
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold flex items-center gap-1 ${
+                              isDone
+                                ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-400"
+                                : isIncomplete
+                                ? "bg-amber-500/15 border border-amber-500/30 text-amber-400"
+                                : isNotDone
+                                ? "bg-rose-500/15 border border-rose-500/30 text-rose-400"
+                                : "bg-slate-800 text-slate-300"
+                            }`}>
+                              {isDone ? <CheckCircle2 className="w-3.5 h-3.5" /> : null}
+                              {isDone ? "تم الحل بالكامل" : isIncomplete ? "غير مكتمل" : isNotDone ? "لم يتم الحل" : (hw.status || "تم الرصد")}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-slate-400">
+                            <span>التاريخ: {hw.date_key || hw.created_at?.slice(0, 10)}</span>
+                            {hw.score !== undefined && hw.score !== null && (
+                              <span className="font-mono font-bold text-amber-300">
+                                الدرجة: {hw.score} {hw.max_score ? `/ ${hw.max_score}` : ""}
+                              </span>
+                            )}
+                          </div>
+                          {hw.notes && (
+                            <div className="text-xs text-slate-300 bg-slate-900/60 p-2 rounded-xl">
+                              <span className="text-slate-400">ملاحظة: </span>{hw.notes}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400">ملاحظات المعلمة:</span>
-                    <span className="text-slate-300">مستوى دقة وتنسيق ممتاز في حل المسائل.</span>
+                ) : (
+                  <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-400">سجل التكليفات:</span>
+                      <span className="font-bold text-slate-300 flex items-center gap-1">
+                        لا توجد واجبات مسجلة حالياً في السجل
+                      </span>
+                    </div>
+                    {activeStudent.notes && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-400">ملاحظات المعلمة:</span>
+                        <span className="text-slate-300">{activeStudent.notes}</span>
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Delays Card */}

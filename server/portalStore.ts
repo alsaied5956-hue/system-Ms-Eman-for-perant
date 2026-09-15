@@ -193,17 +193,92 @@ export function initPortalStore(): void {
       } catch {}
     }
 
-    // 5. Hydrate authoritative parent accounts from production Supabase table
+    // 5. Hydrate authoritative parent accounts and core data from production Supabase tables
     if (supabaseServer) {
-      Promise.resolve(
+      Promise.allSettled([
+        supabaseServer.from("students").select("*"),
+        supabaseServer.from("payments").select("*"),
         supabaseServer
-          .from("parent_accounts")
-          .select("*")
-      )
-        .then(({ data, error }) => {
-          if (!error && Array.isArray(data)) {
+          .from("attendance_logs")
+          .select("student_id, barcode, date_key, status")
+          .order("date_key", { ascending: false })
+          .limit(3000),
+        supabaseServer.from("parent_accounts").select("*"),
+      ])
+        .then(([studentsRes, paymentsRes, attendanceRes, accountsRes]) => {
+          const studentIdToBarcode = new Map<string, string>();
+
+          // A. Hydrate Students
+          if (studentsRes.status === "fulfilled" && Array.isArray(studentsRes.value.data)) {
+            const list: StudentRecord[] = [];
+            for (const row of studentsRes.value.data) {
+              const b = String(row.barcode).trim();
+              if (row.id && b) {
+                studentIdToBarcode.set(row.id, b);
+              }
+              list.push({
+                id: row.id,
+                barcode: b,
+                name: row.name || "طالب بدون اسم",
+                phone: row.phone || "",
+                parentPhone: row.parent_phone || "",
+                groupGrade: row.grade || "الصف الرابع الابتدائي",
+                groupDays: row.group_days || "سبت - إثنين - أربعاء",
+                points: row.points || 0,
+                totalAttendanceDays: Number(row.total_attendance_days || 0),
+                totalAbsentDays: Number(row.total_absent_days || 0),
+                createdAt: row.created_at,
+                notes: row.notes || "",
+              });
+            }
+            systemDataCache.students = list;
+            console.log(`[PortalStore] Synced ${list.length} students from Supabase.`);
+          }
+
+          // B. Hydrate Payments
+          if (paymentsRes.status === "fulfilled" && Array.isArray(paymentsRes.value.data)) {
+            const paymentsMap: Record<string, Record<string, any>> = {};
+            for (const p of paymentsRes.value.data) {
+              const mKey = p.month_key;
+              const b = p.barcode ? String(p.barcode).trim() : (p.student_id ? studentIdToBarcode.get(p.student_id) : null);
+              if (!mKey || !b) continue;
+              if (!paymentsMap[mKey]) paymentsMap[mKey] = {};
+              paymentsMap[mKey][b] = {
+                monthKey: mKey,
+                amount: Number(p.amount_paid || 0),
+                paidAmount: Number(p.amount_paid || 0),
+                requiredAmount: Number(p.required_amount || 0),
+                discount: Number(p.discount || 0),
+                date: p.payment_date ? p.payment_date.slice(0, 10) : "",
+                time: p.payment_date ? p.payment_date.slice(11, 16) : "",
+                note: p.notes || "",
+                notes: p.notes || "",
+                recordedBy: p.received_by || "الإشراف",
+                timestamp: p.created_at ? new Date(p.created_at).getTime() : Date.now(),
+              };
+            }
+            systemDataCache.payments = paymentsMap;
+            console.log(`[PortalStore] Synced payments across ${Object.keys(paymentsMap).length} months from Supabase.`);
+          }
+
+          // C. Hydrate Attendance
+          if (attendanceRes.status === "fulfilled" && Array.isArray(attendanceRes.value.data)) {
+            const history: Record<string, Record<string, string>> = {};
+            for (const att of attendanceRes.value.data) {
+              const dKey = att.date_key;
+              const b = att.barcode ? String(att.barcode).trim() : (att.student_id ? studentIdToBarcode.get(att.student_id) : null);
+              if (!dKey || !b) continue;
+              if (!history[dKey]) history[dKey] = {};
+              history[dKey][b] = att.status || "حضور";
+            }
+            systemDataCache.attendanceHistory = history;
+            console.log(`[PortalStore] Synced attendance logs across ${Object.keys(history).length} days from Supabase.`);
+          }
+
+          // D. Hydrate Parent Accounts
+          if (accountsRes.status === "fulfilled" && Array.isArray(accountsRes.value.data)) {
             let loadedCount = 0;
-            for (const row of data) {
+            for (const row of accountsRes.value.data) {
               const barcodes: string[] = Array.isArray(row.linked_student_barcodes) && row.linked_student_barcodes.length > 0
                 ? row.linked_student_barcodes
                 : [];
@@ -236,7 +311,7 @@ export function initPortalStore(): void {
             console.log(`[PortalStore] Synced ${loadedCount} accounts from Supabase production table.`);
           }
         })
-        .catch((e: any) => console.warn("[PortalStore] Initial Supabase accounts hydration notice:", e));
+        .catch((e: any) => console.warn("[PortalStore] Initial Supabase store hydration notice:", e));
     }
   } catch (err) {
     console.error("[PortalStore] Init error:", err);
@@ -512,7 +587,20 @@ export async function getStudentPortalData(query: string): Promise<{
         const sId = studentRow.id;
         const bCode = String(studentRow.barcode).trim();
 
+        const uuid = barcodeToUUID(bCode);
+        let parentAccountQuery = supabaseServer.from("parent_accounts").select("*");
+        if (studentRow.parent_phone) {
+          parentAccountQuery = parentAccountQuery.or(
+            `id.eq.${uuid},linked_student_barcodes.cs.{${bCode}},parent_phone.eq.${studentRow.parent_phone}`
+          );
+        } else {
+          parentAccountQuery = parentAccountQuery.or(
+            `id.eq.${uuid},linked_student_barcodes.cs.{${bCode}}`
+          );
+        }
+
         // Concurrently fetch attendance_logs, payments, homework, and parent_accounts
+        // payments table only uses student_id (UUID), no barcode column exists
         const [attRes, payRes, accRes] = await Promise.allSettled([
           supabaseServer
             .from("attendance_logs")
@@ -523,14 +611,10 @@ export async function getStudentPortalData(query: string): Promise<{
           supabaseServer
             .from("payments")
             .select("*")
-            .or(`student_id.eq.${sId},barcode.eq.${bCode}`)
+            .eq("student_id", sId)
             .order("month_key", { ascending: false })
             .limit(100),
-          supabaseServer
-            .from("parent_accounts")
-            .select("*")
-            .or(`id.eq.${bCode},parent_phone.eq.${studentRow.parent_phone}`)
-            .maybeSingle(),
+          parentAccountQuery.maybeSingle(),
         ]);
 
         const studentHistory: Record<string, string> = {};

@@ -1499,7 +1499,31 @@ export async function pullLatestCloudDataImmediately(force = false): Promise<boo
 
   pullInFlightPromise = (async () => {
     try {
-      // 1. Ultra-fast HTTP ETag sync from local Express server cache (<5ms, zero Firestore quota)
+      // 1. Direct Production Supabase Cloud Sync FIRST (Authoritative Primary Database)
+      try {
+        const supabaseData = await pullFullStateFromSupabase();
+        if (supabaseData && Array.isArray(supabaseData.students) && supabaseData.students.length > 0) {
+          const currentLocal = loadLocalData();
+          const merged = mergeCloudDataWithLocal(currentLocal, supabaseData);
+
+          lastSyncedDataHash = JSON.stringify(merged);
+          localStorage.setItem(PENDING_SYNC_KEY, "false");
+          saveToLocalStorage(merged, false);
+          notifySyncStatusChange();
+          notifyCloudDataListeners(merged);
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("center-data-updated", { detail: merged }));
+          }
+
+          lastSnapshotReceivedAt = Date.now();
+          lastSuccessfulPullTime = Date.now();
+          return true;
+        }
+      } catch (sbErr) {
+        console.warn("[Storage] Supabase direct pull notice:", sbErr);
+      }
+
+      // 2. HTTP ETag sync from local Express server cache (<5ms)
       try {
         const syncResp = await fetch("/api/portal/system-sync", {
           headers: lastSystemSyncETag ? { "If-None-Match": lastSystemSyncETag } : {},
@@ -1534,31 +1558,7 @@ export async function pullLatestCloudDataImmediately(force = false): Promise<boo
           }
         }
       } catch {
-        // Fall back to Supabase / Firestore if server is unreachable
-      }
-
-      // 2. Direct Supabase Cloud Sync (Original Unlimited Account - Zero Quota Limit)
-      try {
-        const supabaseData = await pullFullStateFromSupabase();
-        if (supabaseData && Array.isArray(supabaseData.students) && supabaseData.students.length > 0) {
-          const currentLocal = loadLocalData();
-          const merged = mergeCloudDataWithLocal(currentLocal, supabaseData);
-
-          lastSyncedDataHash = JSON.stringify(merged);
-          localStorage.setItem(PENDING_SYNC_KEY, "false");
-          saveToLocalStorage(merged, false);
-          notifySyncStatusChange();
-          notifyCloudDataListeners(merged);
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent("center-data-updated", { detail: merged }));
-          }
-
-          lastSnapshotReceivedAt = Date.now();
-          lastSuccessfulPullTime = Date.now();
-          return true;
-        }
-      } catch (sbErr) {
-        console.warn("Supabase pull notice:", sbErr);
+        // Fall back to Firestore if server is unreachable
       }
 
       // 3. Fallback to Firestore getDoc if server was unreachable and Supabase had no state
