@@ -21,6 +21,7 @@ import {
   updateParentAccountFCMTokenInSupabase,
   subscribeToParentAccountSupabase,
   barcodeToUUID,
+  executeFastQuery,
 } from "./supabaseClient";
 
 // Storage Keys
@@ -1166,14 +1167,19 @@ export async function verifyStudentForActivation(
     return { success: false, message: "يرجى إدخال كود باركود الطالب ورقم الهاتف المسجل." };
   }
 
-  // 1. Direct Live Query to Supabase students table FIRST
+  // 1. Direct Live Query to Supabase students table FIRST with strict 3s limit
   let student: Student | undefined;
   try {
-    const { data: supaStudent } = await supabase
-      .from("students")
-      .select("*")
-      .or(`barcode.eq.${barcodeTrimmed},barcode.eq.${Number(barcodeTrimmed) || 0}`)
-      .maybeSingle();
+    const { data: supaStudent } = await executeFastQuery(
+      () =>
+        supabase
+          .from("students")
+          .select("*")
+          .eq("barcode", barcodeTrimmed)
+          .maybeSingle(),
+      3000,
+      "استعلام بيانات الطالب المباشر"
+    );
 
     if (supaStudent) {
       student = {
@@ -1280,14 +1286,19 @@ export async function registerParentAccount(
     return { success: false, message: "يرجى إدخال جميع الحقول المطلوبة (كود الباركود، رقم الهاتف، وكلمة المرور)" };
   }
 
-  // 1. Direct Live Query to Supabase students table FIRST
+  // 1. Direct Live Query to Supabase students table FIRST with strict 3s limit
   let student: Student | undefined;
   try {
-    const { data: supaStudent } = await supabase
-      .from("students")
-      .select("*")
-      .or(`barcode.eq.${barcodeTrimmed},barcode.eq.${Number(barcodeTrimmed) || 0}`)
-      .maybeSingle();
+    const { data: supaStudent } = await executeFastQuery(
+      () =>
+        supabase
+          .from("students")
+          .select("*")
+          .eq("barcode", barcodeTrimmed)
+          .maybeSingle(),
+      3000,
+      "استعلام بيانات الطالب المباشر"
+    );
 
     if (supaStudent) {
       student = {
@@ -1644,14 +1655,18 @@ export async function authenticatePortalLogin(
     let query = supabase.from("parent_accounts").select("*");
     if (cleanEnteredPhone) {
       query = query.or(
-        `id.eq.${uuid},linked_student_barcodes.cs.{${barcodeTrimmed}},parent_phone.eq.${cleanEnteredPhone}`
+        `id.eq.${uuid},linked_student_barcodes.cs.{${barcodeTrimmed}},parent_phone.eq.${cleanEnteredPhone},parent_phone.eq.0${cleanEnteredPhone}`
       );
     } else {
       query = query.or(
         `id.eq.${uuid},linked_student_barcodes.cs.{${barcodeTrimmed}}`
       );
     }
-    const { data: supaAcc } = await query.maybeSingle();
+    const { data: supaAcc } = await executeFastQuery(
+      () => query.maybeSingle(),
+      3000,
+      "استعلام حساب ولي الأمر لتسجيل الدخول"
+    );
     if (supaAcc) {
       const barcodes: string[] =
         Array.isArray(supaAcc.linked_student_barcodes) &&
@@ -1709,13 +1724,19 @@ export async function authenticatePortalLogin(
   if (!account || account.status === "deleted") {
     // Check if student exists in Supabase students table to give a helpful guidance message
     try {
-      const { data: supaStudents } = await supabase
-        .from("students")
-        .select("name, barcode, phone, parent_phone")
-        .or(
-          `barcode.eq.${barcodeTrimmed}${cleanEnteredPhone ? `,parent_phone.ilike.%${cleanEnteredPhone}%,phone.ilike.%${cleanEnteredPhone}%` : ""}`
-        )
-        .limit(1);
+      const phoneFilter = cleanEnteredPhone
+        ? `,parent_phone.eq.${cleanEnteredPhone},parent_phone.eq.0${cleanEnteredPhone},phone.eq.${cleanEnteredPhone},phone.eq.0${cleanEnteredPhone}`
+        : "";
+      const { data: supaStudents } = await executeFastQuery(
+        () =>
+          supabase
+            .from("students")
+            .select("name, barcode, phone, parent_phone")
+            .or(`barcode.eq.${barcodeTrimmed}${phoneFilter}`)
+            .limit(1),
+        3000,
+        "استعلام التحقق من وجود الطالب لتسجيل الدخول"
+      );
       if (supaStudents && supaStudents.length > 0) {
         return {
           success: false,

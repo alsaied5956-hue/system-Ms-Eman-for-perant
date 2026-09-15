@@ -329,11 +329,21 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     setSupabaseError(null);
 
     try {
-      const data = await withTimeout(
-        fetchUnifiedStudentPortalDataFromSupabase(cleanBarcode),
-        10000,
-        "Network connection error. Request timed out after 10 seconds"
-      );
+      let data: any = null;
+      try {
+        data = await withTimeout(
+          fetchUnifiedStudentPortalDataFromSupabase(cleanBarcode),
+          3000,
+          "Network connection error. Request timed out after 3 seconds"
+        );
+      } catch (firstErr) {
+        console.warn("[ParentPortalDashboard] Initial fetch timed out (<3s). Running fast retry...");
+        data = await withTimeout(
+          fetchUnifiedStudentPortalDataFromSupabase(cleanBarcode),
+          3000,
+          "Network connection error. Request timed out after 3 seconds (retry)"
+        );
+      }
 
       if (data && data.success) {
         setSessionPortalData(cleanBarcode, data);

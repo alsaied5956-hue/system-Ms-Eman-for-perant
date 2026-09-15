@@ -232,7 +232,7 @@ export default function App() {
 
   const [cloudInitError, setCloudInitError] = useState<string | null>(null);
 
-  // 1. Mandatory Cloud Fetch from Supabase with 10-Second Timeout Guard
+  // 1. Mandatory Cloud Fetch from Supabase with 3-Second Timeout Guard & Light Fast Retry
   const performCloudHydration = useCallback(async (isRetry: boolean = false) => {
     setIsCloudHydrating(true);
     setCloudInitError(null);
@@ -242,15 +242,30 @@ export default function App() {
           pullLatestCloudDataImmediately(true),
           syncParentAccountsFromCloud(true),
         ]),
-        10000,
-        "Network connection error. Request timed out after 10 seconds"
+        3000,
+        "Network connection error. Request timed out after 3 seconds"
       );
       isCloudHydratedRef.current = true;
       setIsCloudHydrated(true);
     } catch (err: any) {
-      console.warn("[App] Supabase cloud hydration timeout or error:", err);
-      if (!isCloudHydratedRef.current) {
-        setCloudInitError("Network connection error. Please retry");
+      console.warn("[App] Supabase cloud hydration initial timeout (<3s):", err);
+      // Fast light retry once (<3s)
+      try {
+        await withTimeout(
+          Promise.allSettled([
+            pullLatestCloudDataImmediately(true),
+            syncParentAccountsFromCloud(true),
+          ]),
+          3000,
+          "Network connection error. Request timed out after 3 seconds (retry)"
+        );
+        isCloudHydratedRef.current = true;
+        setIsCloudHydrated(true);
+      } catch (retryErr: any) {
+        console.warn("[App] Supabase cloud hydration retry failed:", retryErr);
+        if (!isCloudHydratedRef.current) {
+          setCloudInitError("Network connection error. Please retry");
+        }
       }
     } finally {
       setIsCloudHydrating(false);

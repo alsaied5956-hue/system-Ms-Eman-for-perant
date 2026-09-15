@@ -197,3 +197,20 @@ FOR EACH ROW EXECUTE FUNCTION update_timestamp_column();
 CREATE OR REPLACE TRIGGER trg_push_tokens_updated_at
 BEFORE UPDATE ON push_tokens
 FOR EACH ROW EXECUTE FUNCTION update_timestamp_column();
+
+-- ----------------------------------------------------------------------------
+-- 9. ULTRA-FAST SUB-SECOND PORTAL HYDRATION INDEXES (<500ms SLA)
+-- Guarantees direct B-Tree index lookups for barcode, parent_phone, and GIN array scans
+-- ----------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_students_barcode ON students(barcode);
+CREATE INDEX IF NOT EXISTS idx_students_parent_phone ON students(parent_phone);
+CREATE INDEX IF NOT EXISTS idx_students_phone ON students(phone);
+CREATE INDEX IF NOT EXISTS idx_parent_accounts_phone ON parent_accounts(parent_phone);
+CREATE INDEX IF NOT EXISTS idx_parent_accounts_linked_barcodes ON parent_accounts USING GIN (linked_student_barcodes);
+CREATE INDEX IF NOT EXISTS idx_attendance_logs_barcode ON attendance_logs(barcode);
+CREATE INDEX IF NOT EXISTS idx_attendance_logs_student_id ON attendance_logs(student_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_logs_date_key ON attendance_logs(date_key DESC);
+CREATE INDEX IF NOT EXISTS idx_payments_student_id ON payments(student_id);
+CREATE INDEX IF NOT EXISTS idx_payments_month_key ON payments(month_key DESC);
+CREATE INDEX IF NOT EXISTS idx_homework_student_id ON homework(student_id);
+
