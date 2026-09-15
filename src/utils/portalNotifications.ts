@@ -156,7 +156,8 @@ export function isNotificationSupported(): boolean {
 }
 
 /**
- * Request permission for web push notifications
+ * Request permission for web push notifications.
+ * MUST be triggered by an explicit user gesture (e.g. click/tap) to comply with mobile audio autoplay policies.
  */
 export async function requestNotificationPermission(
   userId?: string,
@@ -167,7 +168,18 @@ export async function requestNotificationPermission(
     return "denied";
   }
   try {
-    const perm = await Notification.requestPermission();
+    // Unlock and resume AudioContext synchronously within user gesture call stack
+    const ctx = getAudioContext();
+    if (ctx && ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+
+    const permPromise = Notification.requestPermission();
+    const perm =
+      permPromise instanceof Promise
+        ? await permPromise
+        : await new Promise<NotificationPermission>((res) => (Notification as any).requestPermission(res));
+
     if (perm === "granted" && userId) {
       import("../services/pushNotificationService")
         .then(({ registerPushSubscription }) => {

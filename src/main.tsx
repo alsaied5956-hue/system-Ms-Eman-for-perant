@@ -11,10 +11,31 @@ if (typeof window !== 'undefined') {
   });
 
   if ('serviceWorker' in navigator) {
-    const registerSW = () => {
-      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch((err) => {
+    const registerSW = async () => {
+      try {
+        // Clean up legacy or duplicate service workers
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const reg of registrations) {
+          const scriptUrl = reg.active?.scriptURL || reg.installing?.scriptURL || reg.waiting?.scriptURL || '';
+          if (scriptUrl && !scriptUrl.endsWith('/sw.js')) {
+            console.log('[SW] Unregistering legacy worker:', scriptUrl);
+            await reg.unregister();
+          }
+        }
+
+        const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+        if (registration) {
+          registration.update().catch(() => {});
+        }
+
+        // Detect newly activated service worker and ensure clean sync
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          console.log('[SW] Controller changed. Clean sync active against live Supabase.');
+          window.dispatchEvent(new CustomEvent('sw-controller-updated'));
+        });
+      } catch (err) {
         console.warn('Service Worker registration skipped or failed:', err);
-      });
+      }
     };
 
     if (document.readyState === 'complete' || document.readyState === 'interactive') {

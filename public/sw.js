@@ -19,8 +19,9 @@ const ASSETS_TO_CACHE = [
   "/notification.wav"
 ];
 
-// 1. Install Event: Cache essential shell and activate immediately
+// 1. Install Event: Immediate Cache Invalidation & Activation
 self.addEventListener("install", (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches
       .open(CACHE_NAME)
@@ -30,22 +31,34 @@ self.addEventListener("install", (event) => {
   );
 });
 
-// 2. Activate Event: Clean up ALL legacy caches to prevent stale data divergence
+// 2. Activate Event: Immediate Client Claim & Clean Up Legacy Caches
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((cacheNames) =>
-        Promise.all(
-          cacheNames.map((name) => {
-            if (name !== CACHE_NAME) {
-              console.log("[SW] Purging outdated cache:", name);
-              return caches.delete(name);
-            }
-          })
-        )
-      )
-      .then(() => self.clients.claim())
+    Promise.all([
+      self.clients.claim(),
+      caches
+        .keys()
+        .then((cacheNames) =>
+          Promise.all(
+            cacheNames.map((name) => {
+              if (name !== CACHE_NAME) {
+                console.log("[SW] Purging outdated cache:", name);
+                return caches.delete(name);
+              }
+            })
+          )
+        ),
+    ]).then(() => {
+      return self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+        clients.forEach((client) => {
+          client.postMessage({
+            type: "SW_ACTIVATED_CLAIMED",
+            cacheName: CACHE_NAME,
+            timestamp: Date.now(),
+          });
+        });
+      });
+    })
   );
 });
 
@@ -136,7 +149,14 @@ self.addEventListener("fetch", (event) => {
     request.method !== "GET" ||
     url.includes("supabase.co") ||
     url.includes("lzdvmzumwuqycwdecaan") ||
+    url.includes("/rest/v1") ||
+    url.includes("/auth/v1") ||
+    url.includes("realtime/v1") ||
     url.includes("/api/") ||
+    url.includes("/api/portal") ||
+    url.includes("/api/notifications") ||
+    url.startsWith("ws:") ||
+    url.startsWith("wss:") ||
     url.includes("firestore.googleapis.com") ||
     url.includes("firebaseapp.com") ||
     url.includes("identitytoolkit.googleapis.com") ||

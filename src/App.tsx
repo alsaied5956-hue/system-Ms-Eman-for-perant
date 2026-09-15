@@ -218,6 +218,8 @@ export default function App() {
   const [gradeWhatsAppLinks, setGradeWhatsAppLinks] = useState<Record<string, string>>({});
   const [isWhatsAppOutboxOpen, setIsWhatsAppOutboxOpen] = useState<boolean>(false);
   const [isCloudHydrating, setIsCloudHydrating] = useState<boolean>(true);
+  const [isCloudHydrated, setIsCloudHydrated] = useState<boolean>(false);
+  const isCloudHydratedRef = useRef<boolean>(false);
 
   // Print PDF Modal State
   const [printModal, setPrintModal] = useState<{
@@ -243,9 +245,13 @@ export default function App() {
         10000,
         "Network connection error. Request timed out after 10 seconds"
       );
+      isCloudHydratedRef.current = true;
+      setIsCloudHydrated(true);
     } catch (err: any) {
       console.warn("[App] Supabase cloud hydration timeout or error:", err);
-      setCloudInitError("Network connection error. Please retry");
+      if (!isCloudHydratedRef.current) {
+        setCloudInitError("Network connection error. Please retry");
+      }
     } finally {
       setIsCloudHydrating(false);
     }
@@ -329,7 +335,15 @@ export default function App() {
       (cloudData) => {
         if (cloudData) {
           setIsCloudHydrating(false);
-          if (cloudData.students) setStudents(cloudData.students);
+          if (cloudData.students) {
+            if (cloudData.students.length > 0 || !isCloudHydratedRef.current) {
+              setStudents(cloudData.students);
+              if (cloudData.students.length > 0) {
+                isCloudHydratedRef.current = true;
+                setIsCloudHydrated(true);
+              }
+            }
+          }
           if (cloudData.attendanceToday) setAttendanceToday(cloudData.attendanceToday);
           if (cloudData.attendanceHistory) setAttendanceHistory(cloudData.attendanceHistory);
           if (Array.isArray(cloudData.scanLogOrder)) setScanLogOrder(cloudData.scanLogOrder);
@@ -358,7 +372,15 @@ export default function App() {
           return;
         }
         const d = customEvent.detail;
-        if (d.students) setStudents(d.students);
+        if (d.students) {
+          if (d.students.length > 0 || !isCloudHydratedRef.current) {
+            setStudents(d.students);
+            if (d.students.length > 0) {
+              isCloudHydratedRef.current = true;
+              setIsCloudHydrated(true);
+            }
+          }
+        }
         if (d.attendanceToday) setAttendanceToday(d.attendanceToday);
         if (d.attendanceHistory) setAttendanceHistory(d.attendanceHistory);
         if (Array.isArray(d.scanLogOrder)) setScanLogOrder(d.scanLogOrder);

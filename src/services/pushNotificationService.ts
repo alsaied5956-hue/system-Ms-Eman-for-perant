@@ -52,8 +52,19 @@ export async function registerPushSubscription(
   }
 
   try {
-    // 1. Request Notification Permission
-    const permission = await Notification.requestPermission();
+    // 1. Verify Notification Permission
+    let permission = Notification.permission;
+    if (permission !== "granted") {
+      try {
+        const permPromise = Notification.requestPermission();
+        permission =
+          permPromise instanceof Promise
+            ? await permPromise
+            : await new Promise<NotificationPermission>((res) => (Notification as any).requestPermission(res));
+      } catch {
+        permission = "denied";
+      }
+    }
     if (permission !== "granted") {
       console.warn("Notification permission was denied or dismissed.");
       return null;

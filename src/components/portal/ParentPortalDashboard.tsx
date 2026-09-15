@@ -296,6 +296,12 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
   const [supabasePortalData, setSupabasePortalData] = useState<UnifiedStudentPortalData | null>(() => {
     return initialTargetBarcode ? getSessionPortalData(initialTargetBarcode) : null;
   });
+  const [isCloudHydrated, setIsCloudHydrated] = useState<boolean>(() => {
+    return Boolean(initialTargetBarcode && getSessionPortalData(initialTargetBarcode)?.success);
+  });
+  const isCloudHydratedRef = useRef<boolean>(
+    Boolean(initialTargetBarcode && getSessionPortalData(initialTargetBarcode)?.success)
+  );
   const [isHydratingSupabase, setIsHydratingSupabase] = useState<boolean>(false);
   const [supabaseError, setSupabaseError] = useState<string | null>(null);
 
@@ -309,10 +315,12 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     // Keep fetched Supabase data active in React memory state during current app session to prevent spamming Supabase API calls on every tab navigation.
     if (!force) {
       const cached = getSessionPortalData(cleanBarcode);
-      if (cached) {
+      if (cached && cached.success) {
         setSupabasePortalData(cached);
         setSupabaseError(null);
         setIsHydratingSupabase(false);
+        isCloudHydratedRef.current = true;
+        setIsCloudHydrated(true);
         return;
       }
     }
@@ -331,14 +339,16 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
         setSessionPortalData(cleanBarcode, data);
         setSupabasePortalData(data);
         setSupabaseError(null);
+        isCloudHydratedRef.current = true;
+        setIsCloudHydrated(true);
       } else {
-        if (!supabasePortalData && !baseActiveStudent) {
+        if (!isCloudHydratedRef.current && !supabasePortalData && !baseActiveStudent) {
           setSupabaseError(data?.message || "Network connection error. Please retry");
         }
       }
     } catch (err: any) {
       console.warn("[ParentPortalDashboard] Supabase live hydration error/timeout:", err);
-      if (!supabasePortalData && !baseActiveStudent) {
+      if (!isCloudHydratedRef.current && !supabasePortalData && !baseActiveStudent) {
         setSupabaseError("Network connection error. Please retry");
       }
     } finally {
@@ -1282,7 +1292,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
 
   // Cloud Timeout Guard & Error State:
   // If Supabase fails to respond or network drops, replace the infinite animated loader with a clean, user-friendly error screen with a "Retry" button.
-  if (supabaseError && !activeStudent && !supabasePortalData && !baseActiveStudent) {
+  if (supabaseError && !isCloudHydrated && !activeStudent && !supabasePortalData && !baseActiveStudent) {
     return (
       <div dir="rtl" className="min-h-screen w-full flex flex-col items-center justify-center bg-[#060812] text-white p-6 font-['Readex_Pro','Cairo',sans-serif]">
         <div className="max-w-md w-full bg-slate-900/95 border border-rose-500/30 rounded-3xl p-6 sm:p-8 text-center shadow-2xl backdrop-blur-md">
@@ -1321,7 +1331,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
   }
 
   // Mandatory Cloud Loading State: While querying live Supabase data, remain in loading state
-  if (!activeStudent || (isHydratingSupabase && !supabasePortalData && !baseActiveStudent)) {
+  if (!activeStudent || (isHydratingSupabase && !isCloudHydrated && !supabasePortalData && !baseActiveStudent)) {
     return (
       <div dir="rtl" className="min-h-screen w-full flex flex-col items-center justify-center bg-[#060812] text-white p-6 font-['Readex_Pro','Cairo',sans-serif]">
         <div className="relative flex items-center justify-center mb-6">
