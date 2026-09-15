@@ -9,7 +9,7 @@ import {
   AdminActivityLog,
 } from "../types/portal";
 import { playPortalAudioChime } from "./portalNotifications";
-import { loadLocalData, isFirestoreQuotaError } from "./storage";
+import { isFirestoreQuotaError } from "./storage";
 import {
   savePortalAccountsToSupabase,
   fetchPortalAccountsFromSupabase,
@@ -1191,27 +1191,15 @@ export async function verifyStudentForActivation(
     console.warn("Supabase student lookup notice:", err);
   }
 
-  // Fallback to local roster only if network request fails
+  // Match student from live cloud roster
   if (!student) {
     student = students.find((s) => String(s.barcode).trim() === barcodeTrimmed);
-    if (!student) {
-      const localData = loadLocalData();
-      if (localData?.students) {
-        student = localData.students.find((s) => String(s.barcode).trim() === barcodeTrimmed);
-      }
-    }
   }
 
-  // Numeric equivalence fallback
+  // Numeric equivalence match
   if (!student && !isNaN(Number(barcodeTrimmed))) {
     const num = Number(barcodeTrimmed);
     student = students.find((s) => Number(s.barcode) === num);
-    if (!student) {
-      const localData = loadLocalData();
-      if (localData?.students) {
-        student = localData.students.find((s) => Number(s.barcode) === num);
-      }
-    }
   }
 
   if (!student) {
@@ -1317,27 +1305,15 @@ export async function registerParentAccount(
     console.warn("Supabase student lookup notice:", err);
   }
 
-  // Fallback to local roster only if network request fails
+  // Match student from live cloud roster
   if (!student) {
     student = students.find((s) => String(s.barcode).trim() === barcodeTrimmed);
-    if (!student) {
-      const localData = loadLocalData();
-      if (localData?.students) {
-        student = localData.students.find((s) => String(s.barcode).trim() === barcodeTrimmed);
-      }
-    }
   }
 
   // Try matching numeric equivalence if leading zeros differ
   if (!student && !isNaN(Number(barcodeTrimmed))) {
     const num = Number(barcodeTrimmed);
     student = students.find((s) => Number(s.barcode) === num);
-    if (!student) {
-      const localData = loadLocalData();
-      if (localData?.students) {
-        student = localData.students.find((s) => Number(s.barcode) === num);
-      }
-    }
   }
 
   if (!student) {
@@ -1472,11 +1448,6 @@ export async function activateParentAccountDirectly(
 
   // Find student name from roster if not already known
   let studentName = existing?.studentName;
-  if (!studentName) {
-    const localData = loadLocalData();
-    const st = localData?.students?.find((s) => String(s.barcode).trim() === cleanBarcode);
-    if (st) studentName = st.name;
-  }
 
   const nowIso = new Date().toISOString();
   const newAccount: ParentAccount = {
@@ -1527,7 +1498,6 @@ export async function batchActivateParentAccounts(
   defaultPassword: string
 ): Promise<number> {
   const accounts = getLocalParentAccounts();
-  const localData = loadLocalData();
   let count = 0;
   const activatedList: ParentAccount[] = [];
 
@@ -1536,10 +1506,9 @@ export async function batchActivateParentAccounts(
     const bCode = item.studentBarcode.trim();
     if (!bCode) continue;
     if (!accounts[bCode] || accounts[bCode].status !== "active") {
-      const st = localData?.students?.find((s) => String(s.barcode).trim() === bCode);
       const acc: ParentAccount = {
         studentBarcode: bCode,
-        studentName: st?.name || accounts[bCode]?.studentName,
+        studentName: accounts[bCode]?.studentName || "طالب مسجل",
         linkedBarcodes: [bCode],
         parentPhone: item.phone.trim() || "0",
         password: defaultPassword.trim() || "1234",
@@ -1756,11 +1725,7 @@ export async function authenticatePortalLogin(
     } catch {}
 
     const cleanEntered = normalizePhone(barcodeTrimmed);
-    let studentList = students;
-    if (!studentList || studentList.length === 0) {
-      const localData = loadLocalData();
-      if (localData?.students) studentList = localData.students;
-    }
+    const studentList = students || [];
     const student = studentList.find(
       (s) =>
         String(s.barcode).trim() === barcodeTrimmed ||
@@ -1836,10 +1801,6 @@ export async function linkChildToParent(
   }
 
   let childStudent = students.find((s) => s.barcode === childBarcode);
-  if (!childStudent) {
-    const localData = loadLocalData();
-    childStudent = localData?.students?.find((s) => String(s.barcode).trim() === childBarcode);
-  }
   if (!childStudent) {
     try {
       const { data: supaStudent } = await supabase
@@ -2010,19 +1971,6 @@ export async function sendParentChatMessage(
 
       let studentParentPhone = "";
       let studentPhone = "";
-      try {
-        const rawCenterData = localStorage.getItem("center_data_v2");
-        if (rawCenterData) {
-          const parsed = JSON.parse(rawCenterData);
-          const found = (parsed.students || []).find(
-            (s: any) => s.barcode === chatId || s.parentPhone === chatId || s.phone === chatId
-          );
-          if (found) {
-            studentParentPhone = found.parentPhone || "";
-            studentPhone = found.phone || "";
-          }
-        }
-      } catch {}
 
       const targetUserIds = Array.from(
         new Set([

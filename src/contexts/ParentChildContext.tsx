@@ -24,7 +24,7 @@ export interface ChildBatchedData {
 interface ParentChildContextType {
   account: ParentAccount | null;
   activeBarcode: string;
-  activeStudent: Student;
+  activeStudent: Student | null;
   allChildren: Student[];
   linkedBarcodes: string[];
   isLoadingBatch: boolean;
@@ -38,21 +38,21 @@ const ParentChildContext = createContext<ParentChildContextType | null>(null);
 export interface ParentChildProviderProps {
   children: ReactNode;
   account: ParentAccount | null;
-  initialStudent: Student;
+  initialStudent?: Student | null;
   allSystemStudents?: Student[];
 }
 
 export const ParentChildProvider: React.FC<ParentChildProviderProps> = ({
   children,
   account,
-  initialStudent,
+  initialStudent = null,
   allSystemStudents = [],
 }) => {
   const [activeBarcode, setActiveBarcode] = useState<string>(
-    initialStudent.barcode || account?.studentBarcode || ""
+    initialStudent?.barcode || account?.studentBarcode || ""
   );
 
-  // In-memory cache of all linked students to guarantee 0ms switching with zero extra API reads
+  // In-memory cache of all linked students
   const [childrenMap, setChildrenMap] = useState<Record<string, Student>>(() => {
     const map: Record<string, Student> = {};
     if (initialStudent?.barcode) {
@@ -65,7 +65,7 @@ export const ParentChildProvider: React.FC<ParentChildProviderProps> = ({
 
   // All linked barcodes for this parent account
   const linkedBarcodes = useMemo<string[]>(() => {
-    if (!account) return [initialStudent.barcode].filter(Boolean);
+    if (!account) return [initialStudent?.barcode].filter(Boolean) as string[];
     const set = new Set<string>();
     if (account.studentBarcode) set.add(account.studentBarcode);
     if (account.linkedBarcodes && Array.isArray(account.linkedBarcodes)) {
@@ -73,7 +73,7 @@ export const ParentChildProvider: React.FC<ParentChildProviderProps> = ({
     }
     if (initialStudent?.barcode) set.add(initialStudent.barcode);
     return Array.from(set);
-  }, [account, initialStudent.barcode]);
+  }, [account, initialStudent?.barcode]);
 
   // Single Batched Fetch from Supabase (Free-Tier Optimization)
   const reloadChildrenBatch = useCallback(async () => {
@@ -109,8 +109,8 @@ export const ParentChildProvider: React.FC<ParentChildProviderProps> = ({
               name: row.name || `طالب (${b})`,
               phone: row.phone || "",
               parentPhone: row.parent_phone || row.parentPhone || "",
-              groupGrade: row.grade || row.groupGrade || "الصف الرابع الابتدائي",
-              groupDays: row.group_days || row.groupDays || "سبت - إثنين - أربعاء",
+              groupGrade: row.grade || row.groupGrade || "",
+              groupDays: row.group_days || row.groupDays || "",
               points: row.points || 0,
               totalAttendanceDays: row.total_attendance_days || 0,
               totalAbsentDays: row.total_absent_days || 0,
@@ -201,33 +201,20 @@ export const ParentChildProvider: React.FC<ParentChildProviderProps> = ({
     };
   }, [linkedBarcodes, activeBarcode, account?.studentBarcode, initialStudent]);
 
-  // Active student object (computed instantly from in-memory map)
-  const activeStudent = useMemo<Student>(() => {
+  // Active student object (computed from in-memory map)
+  const activeStudent = useMemo<Student | null>(() => {
     if (childrenMap[activeBarcode]) {
       return childrenMap[activeBarcode];
     }
-    return initialStudent;
+    return initialStudent || null;
   }, [childrenMap, activeBarcode, initialStudent]);
 
-  // All linked children array
+  // All linked children array - pure cloud-sourced data only
   const allChildren = useMemo<Student[]>(() => {
-    return linkedBarcodes.map((b) => {
-      return (
-        childrenMap[b] || {
-          barcode: b,
-          name: `طالب (${b})`,
-          phone: "",
-          parentPhone: account?.parentPhone || "",
-          groupGrade: "الصف الرابع الابتدائي",
-          groupDays: "سبت - إثنين - أربعاء",
-          points: 0,
-          totalAttendanceDays: 0,
-          totalAbsentDays: 0,
-          totalExamScores: [],
-        }
-      );
-    });
-  }, [linkedBarcodes, childrenMap, account?.parentPhone]);
+    return linkedBarcodes
+      .map((b) => childrenMap[b])
+      .filter(Boolean) as Student[];
+  }, [linkedBarcodes, childrenMap]);
 
   // Ultra-Fast 0ms In-Memory Child Switching (Zero duplicate network calls)
   const switchChild = useCallback((barcode: string) => {

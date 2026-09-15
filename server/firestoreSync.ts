@@ -170,8 +170,11 @@ export async function initFirestoreSync(db: Firestore): Promise<void> {
 
   // 1. Initial hydration on cold start: load authoritative Firestore cloud state
   try {
-    const snap = await getDoc(dRef);
-    if (snap.exists()) {
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Firestore cold-start getDoc timeout")), 4000)
+    );
+    const snap = (await Promise.race([getDoc(dRef), timeoutPromise])) as any;
+    if (snap && snap.exists && snap.exists()) {
       const data = snap.data();
       const hydrated = decompressServerPayload(data);
       if (hydrated && Array.isArray(hydrated.students) && hydrated.students.length > 0) {

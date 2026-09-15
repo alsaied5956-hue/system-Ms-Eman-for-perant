@@ -181,21 +181,10 @@ export const PortalMasterApp: React.FC<PortalMasterAppProps> = ({
 
   // 3. Logged in as Parent -> Show Parent Portal Dashboard
   if (session.role === "parent" && session.account) {
-    const initialStudent: Student =
+    const initialStudent: Student | null =
       students.find(
         (s) => String(s.barcode).trim() === String(session.account?.studentBarcode).trim()
-      ) || {
-        barcode: session.account.studentBarcode,
-        name: session.account.studentName || `طالب (${session.account.studentBarcode})`,
-        phone: "",
-        parentPhone: session.account.parentPhone,
-        groupGrade: "الصف الرابع الابتدائي",
-        groupDays: "سبت - إثنين - أربعاء",
-        points: 0,
-        totalAttendanceDays: 0,
-        totalAbsentDays: 0,
-        totalExamScores: [],
-      };
+      ) || null;
 
     return (
       <ParentChildProvider

@@ -284,9 +284,15 @@ async function syncSubscriptionsFromFirestore(): Promise<void> {
     return;
   }
   try {
-    const snap = await getDocs(collection(db, "push_subscriptions"));
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Firestore timeout")), 4000)
+    );
+    const snap = (await Promise.race([
+      getDocs(collection(db, "push_subscriptions")),
+      timeoutPromise,
+    ])) as any;
     let count = 0;
-    snap.forEach((d) => {
+    snap.forEach((d: any) => {
       const data = d.data();
       if (data.endpoint && data.p256dh && data.auth) {
         subscriptionsCache.set(data.endpoint, {
@@ -2370,8 +2376,6 @@ function setupAutonomousBackgroundPushListeners() {
 // ----------------------------------------------------
 async function startServer() {
   loadStoredSubscriptions();
-  await syncSubscriptionsFromFirestore();
-  setupAutonomousBackgroundPushListeners();
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -2409,6 +2413,11 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`[Eman Math System] Server running on http://0.0.0.0:${PORT}`);
+    // Non-blocking background sync
+    syncSubscriptionsFromFirestore().catch((err) => {
+      console.warn("[Push] Background subscription sync notice:", err?.message || err);
+    });
+    setupAutonomousBackgroundPushListeners();
   });
 }
 

@@ -4,8 +4,12 @@
  * Imports 728 Students, All Historical & Today Attendance Logs, and Payments into Supabase.
  */
 
+const fs = require("fs");
+const path = require("path");
 const { createClient } = require("@supabase/supabase-js");
-const backupData = require("../src/data/centerBackup.json");
+
+const backupFilePath = path.join(__dirname, "../src/data/centerBackup.json");
+const backupData = fs.existsSync(backupFilePath) ? JSON.parse(fs.readFileSync(backupFilePath, "utf8")) : { students: [], payments: {}, attendanceHistory: {} };
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://lzdvmzumwuqycwdecaan.supabase.co";
 const SUPABASE_KEY =

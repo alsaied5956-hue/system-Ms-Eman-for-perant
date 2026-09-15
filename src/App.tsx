@@ -11,7 +11,6 @@ import {
 } from "./types";
 import {
   loadInitialData,
-  loadLocalData,
   saveStudentsData,
   saveAttendanceTodayData,
   saveAttendanceAndStudentsBatch,
@@ -203,53 +202,21 @@ export default function App() {
     }
   }, [theme]);
 
-  // Core Datasets with guaranteed initial default arrays/objects loaded synchronously from local disk
-  const [students, setStudents] = useState<Student[]>(() => {
-    const d = loadLocalData();
-    return Array.isArray(d?.students) && d.students.length > 0 ? d.students : [];
-  });
-  const [attendanceToday, setAttendanceToday] = useState<Record<string, string>>(() => {
-    const d = loadLocalData();
-    return d?.attendanceToday || {};
-  });
-  const [attendanceHistory, setAttendanceHistory] = useState<Record<string, Record<string, string>>>(() => {
-    const d = loadLocalData();
-    return d?.attendanceHistory || {};
-  });
-  const [scanLogOrder, setScanLogOrder] = useState<string[]>(() => {
-    const d = loadLocalData();
-    return Array.isArray(d?.scanLogOrder) ? d.scanLogOrder : [];
-  });
-  const [scanLogTimes, setScanLogTimes] = useState<Record<string, string>>(() => {
-    const d = loadLocalData();
-    return d?.scanLogTimes || {};
-  });
-  const [payments, setPayments] = useState<Record<string, Record<string, PaymentRecord>>>(() => {
-    const d = loadLocalData();
-    return d?.payments || {};
-  });
-  const [groupPrices, setGroupPrices] = useState<Record<GradeName, number>>(() => {
-    const d = loadLocalData();
-    return d?.groupPrices || ({} as Record<GradeName, number>);
-  });
-  const [usersList, setUsersList] = useState<UserAccount[]>(() => {
-    const d = loadLocalData();
-    return Array.isArray(d?.usersList) ? d.usersList : [];
-  });
-  const [platformMessages, setPlatformMessages] = useState<PlatformMessage[]>(() => {
-    const d = loadLocalData();
-    return Array.isArray(d?.platformMessages) ? d.platformMessages : [];
-  });
-  const [pendingWhatsAppMessages, setPendingWhatsAppMessages] = useState<PendingWhatsAppMessage[]>(() => {
-    const d = loadLocalData();
-    return Array.isArray(d?.pendingWhatsAppMessages) ? d.pendingWhatsAppMessages : [];
-  });
-  const [gradeWhatsAppLinks, setGradeWhatsAppLinks] = useState<Record<string, string>>(() => {
-    const d = loadLocalData();
-    return d?.gradeWhatsAppLinks || {};
-  });
+  // Pure Cloud-Only Architecture: Strict Single-Source-of-Truth
+  // Initial state initializers evaluate strictly to empty arrays/objects until live Supabase fetch completes
+  const [students, setStudents] = useState<Student[]>([]);
+  const [attendanceToday, setAttendanceToday] = useState<Record<string, string>>({});
+  const [attendanceHistory, setAttendanceHistory] = useState<Record<string, Record<string, string>>>({});
+  const [scanLogOrder, setScanLogOrder] = useState<string[]>([]);
+  const [scanLogTimes, setScanLogTimes] = useState<Record<string, string>>({});
+  const [payments, setPayments] = useState<Record<string, Record<string, PaymentRecord>>>({});
+  const [groupPrices, setGroupPrices] = useState<Record<GradeName, number>>({} as Record<GradeName, number>);
+  const [usersList, setUsersList] = useState<UserAccount[]>([]);
+  const [platformMessages, setPlatformMessages] = useState<PlatformMessage[]>([]);
+  const [pendingWhatsAppMessages, setPendingWhatsAppMessages] = useState<PendingWhatsAppMessage[]>([]);
+  const [gradeWhatsAppLinks, setGradeWhatsAppLinks] = useState<Record<string, string>>({});
   const [isWhatsAppOutboxOpen, setIsWhatsAppOutboxOpen] = useState<boolean>(false);
-  const [isCloudHydrating, setIsCloudHydrating] = useState<boolean>(() => students.length === 0);
+  const [isCloudHydrating, setIsCloudHydrating] = useState<boolean>(true);
 
   // Print PDF Modal State
   const [printModal, setPrintModal] = useState<{
@@ -260,33 +227,22 @@ export default function App() {
     type: "all",
   });
 
-  // 1. Initial Local Data Load (Instant Speed 0ms) + Guaranteed Auto-Push of Local Disk Data to Cloud
+  // 1. Mandatory Cloud Fetch from Supabase (Strict Single-Source-of-Truth, Zero Local Pre-Hydration)
   useEffect(() => {
-    const data = loadInitialData();
-    if (data) {
-      setStudents(data.students || []);
-      setAttendanceToday(data.attendanceToday || {});
-      setAttendanceHistory(data.attendanceHistory || {});
-      setScanLogOrder(data.scanLogOrder || []);
-      setScanLogTimes(data.scanLogTimes || {});
-      setPayments(data.payments || {});
-      setGroupPrices(data.groupPrices || ({} as Record<GradeName, number>));
-      setUsersList(data.usersList || []);
-      setPlatformMessages(data.platformMessages || []);
-      setPendingWhatsAppMessages(data.pendingWhatsAppMessages || []);
-      setGradeWhatsAppLinks(data.gradeWhatsAppLinks || {});
-      if (data.activeSessionSlotId) {
-        setActiveSessionSlotId(data.activeSessionSlotId);
+    setIsCloudHydrating(true);
+    let isMounted = true;
+
+    // Immediately query Supabase primary tables on mount / page refresh
+    Promise.allSettled([
+      pullLatestCloudDataImmediately(true),
+      syncParentAccountsFromCloud(true),
+    ]).finally(() => {
+      if (isMounted) {
+        setIsCloudHydrating(false);
       }
-    }
+    });
 
-    // 1. Immediately pull latest cloud state if device was turned off/offline
-    pullLatestCloudDataImmediately(true)
-      .then(() => setIsCloudHydrating(false))
-      .catch(() => setIsCloudHydrating(false));
-    syncParentAccountsFromCloud(true).catch(() => {});
-
-    // 2. Connect to Zero-Latency Realtime SSE Multi-Device Stream (<30ms instant updates, 0 quota)
+    // 2. Connect to Zero-Latency Realtime Multi-Device Stream
     const unsubRealtimeSync = initOnlineRealtimeSync();
 
     // 3. Re-sync whenever device comes online or tab is resumed
@@ -300,6 +256,7 @@ export default function App() {
     document.addEventListener("visibilitychange", handleOnlineResume);
 
     return () => {
+      isMounted = false;
       unsubRealtimeSync();
       window.removeEventListener("online", handleOnlineResume);
       document.removeEventListener("visibilitychange", handleOnlineResume);
@@ -1642,18 +1599,22 @@ export default function App() {
     return platformMessages.filter((m) => m.status === "pending").length;
   }, [platformMessages]);
 
-  // Loading screen while pulling authoritative cloud state if dataset is not yet hydrated
+  // Loading screen while pulling authoritative cloud state from Supabase primary tables
   if (isCloudHydrating && students.length === 0) {
     return (
       <div dir="rtl" className="min-h-screen w-full flex flex-col items-center justify-center bg-[#070b14] text-white p-6 font-['Readex_Pro','Cairo',sans-serif]">
         <div className="relative flex items-center justify-center mb-6">
-          <div className="w-16 h-16 rounded-full border-4 border-amber-500/20 border-t-amber-500 animate-spin" />
-          <Cloud className="w-7 h-7 text-amber-400 absolute animate-pulse" />
+          <div className="w-16 h-16 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 animate-spin" />
+          <Cloud className="w-7 h-7 text-emerald-400 absolute animate-pulse" />
         </div>
-        <h2 className="text-xl font-black text-white mb-2 tracking-tight">جاري مزامنة بيانات السنتر من السحابة الإلكترونية مباشرة...</h2>
-        <p className="text-sm text-slate-400 text-center max-w-md leading-relaxed">
-          يتم جلب البيانات السحابية الحية الموحدة لضمان مطابقة جميع الأجهزة والتليفونات بنسبة 100% بدون أي اعتماد على الذاكرة القديمة أو الديسك.
+        <h2 className="text-xl font-black text-white mb-2 tracking-tight">جاري استعلام السحابة مباشرة (Supabase Cloud)...</h2>
+        <p className="text-sm text-slate-400 text-center max-w-md leading-relaxed mb-4">
+          يتم تحميل البيانات السحابية الحية مباشرة من الجداول الأساسية (<span className="text-emerald-400 font-mono">students</span>, <span className="text-emerald-400 font-mono">parent_accounts</span>, <span className="text-emerald-400 font-mono">payments</span>, <span className="text-emerald-400 font-mono">attendance_logs</span>) بدون أي اعتماد على بيانات محلية أو تجريبية.
         </p>
+        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-slate-800 text-xs text-slate-400">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="font-mono text-[11px] text-emerald-300">lzdvmzumwuqycwdecaan.supabase.co</span>
+        </div>
       </div>
     );
   }

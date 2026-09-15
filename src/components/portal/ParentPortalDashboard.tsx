@@ -42,11 +42,11 @@ import {
   resolveEffectiveGroupForDate,
 } from "../../utils/helpers";
 import { printElement } from "../../utils/print";
-import { loadLocalData } from "../../utils/storage";
 import { PWAInstallButton } from "./PWAInstallButton";
 import { NotificationPermissionModal } from "./NotificationPermissionModal";
 import { subscribeToStudentLiveBarcode, executeInstantRemoteLogout } from "../../utils/studentLiveSync";
 import {
+  Cloud,
   User,
   Users,
   CalendarCheck2,
@@ -268,47 +268,19 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     return Array.from(new Set([account.studentBarcode, ...(account.linkedBarcodes || [])]));
   }, [parentChild?.linkedBarcodes, account]);
 
-  // Current active child student base object
-  const baseActiveStudent = useMemo(() => {
+  // Current active child student base object (from authoritative cloud state)
+  const baseActiveStudent = useMemo<Student | null>(() => {
     const target = String(selectedStudentBarcode || account.studentBarcode).trim();
     let s =
       students.find((item) => String(item.barcode).trim() === target) ||
       students.find((item) => String(item.barcode).trim() === String(account.studentBarcode).trim());
 
-    if (!s) {
-      const local = loadLocalData();
-      if (local?.students) {
-        s =
-          local.students.find((item) => String(item.barcode).trim() === target) ||
-          local.students.find((item) => String(item.barcode).trim() === String(account.studentBarcode).trim());
-      }
-    }
-
     if (!s && !isNaN(Number(target))) {
       const num = Number(target);
       s = students.find((item) => Number(item.barcode) === num);
-      if (!s) {
-        const local = loadLocalData();
-        if (local?.students) {
-          s = local.students.find((item) => Number(item.barcode) === num);
-        }
-      }
     }
 
-    return (
-      s || {
-        barcode: target,
-        name: account.studentName || "طالب مسجل",
-        phone: "",
-        parentPhone: account.parentPhone,
-        groupGrade: "الصف الرابع الابتدائي" as any,
-        groupDays: "سبت - إثنين - أربعاء" as GroupDays,
-        points: 0,
-        totalAttendanceDays: 0,
-        totalAbsentDays: 0,
-        totalExamScores: [],
-      }
-    );
+    return s || null;
   }, [students, selectedStudentBarcode, account]);
 
   // Live Unified Portal Data from Supabase directly
@@ -401,29 +373,31 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
   }, [selectedStudentBarcode, account.studentBarcode]);
 
   // Live Authoritative Student Object (Merges Live Supabase Record)
-  const activeStudent = useMemo<Student>(() => {
+  const activeStudent = useMemo<Student | null>(() => {
+    const targetBarcode = String(selectedStudentBarcode || account.studentBarcode).trim();
     if (supabasePortalData?.student) {
       const supaSt = supabasePortalData.student;
+      const base = baseActiveStudent || ({} as Partial<Student>);
       return {
-        ...baseActiveStudent,
-        ...supaSt,
-        name: supaSt.name || baseActiveStudent.name,
-        phone: supaSt.phone || baseActiveStudent.phone,
-        parentPhone: supaSt.parentPhone || supaSt.parent_phone || baseActiveStudent.parentPhone,
-        groupGrade: (supaSt.grade || supaSt.groupGrade || baseActiveStudent.groupGrade) as GradeName,
-        groupDays: (supaSt.group_days || supaSt.groupDays || baseActiveStudent.groupDays) as GroupDays,
-        points: supaSt.points !== undefined ? supaSt.points : baseActiveStudent.points,
-        totalAttendanceDays: supaSt.totalAttendanceDays !== undefined ? supaSt.totalAttendanceDays : baseActiveStudent.totalAttendanceDays,
-        totalAbsentDays: supaSt.totalAbsentDays !== undefined ? supaSt.totalAbsentDays : baseActiveStudent.totalAbsentDays,
+        barcode: String(supaSt.barcode || base.barcode || targetBarcode).trim(),
+        name: supaSt.name || base.name || account.studentName || "طالب مسجل",
+        phone: supaSt.phone || base.phone || "",
+        parentPhone: supaSt.parentPhone || supaSt.parent_phone || base.parentPhone || account.parentPhone || "",
+        groupGrade: (supaSt.grade || supaSt.groupGrade || base.groupGrade || "الصف الرابع الابتدائي") as GradeName,
+        groupDays: (supaSt.group_days || supaSt.groupDays || base.groupDays || "سبت - إثنين - أربعاء") as GroupDays,
+        points: supaSt.points !== undefined ? supaSt.points : (base.points || 0),
+        totalAttendanceDays: supaSt.totalAttendanceDays !== undefined ? supaSt.totalAttendanceDays : (base.totalAttendanceDays || 0),
+        totalAbsentDays: supaSt.totalAbsentDays !== undefined ? supaSt.totalAbsentDays : (base.totalAbsentDays || 0),
         totalExamScores: (supabasePortalData.examScores && supabasePortalData.examScores.length > 0)
           ? supabasePortalData.examScores
-          : (baseActiveStudent.totalExamScores || []),
-        lastExamTitle: supabasePortalData.lastExamTitle || baseActiveStudent.lastExamTitle,
-        lastExamScore: supabasePortalData.lastExamScore || baseActiveStudent.lastExamScore,
+          : (base.totalExamScores || []),
+        lastExamTitle: supabasePortalData.lastExamTitle || base.lastExamTitle,
+        lastExamScore: supabasePortalData.lastExamScore || base.lastExamScore,
+        customMonthlyFee: supaSt.custom_monthly_fee || (supaSt as any).customMonthlyFee || base.customMonthlyFee,
       };
     }
     return baseActiveStudent;
-  }, [baseActiveStudent, supabasePortalData]);
+  }, [baseActiveStudent, supabasePortalData, selectedStudentBarcode, account]);
 
   // Live Authoritative Payments Map
   const effectivePayments = useMemo(() => {
@@ -446,19 +420,21 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       const merged: Record<string, Record<string, string>> = { ...attendanceHistory };
       for (const [dKey, status] of Object.entries(supabasePortalData.attendanceHistory)) {
         if (!merged[dKey]) merged[dKey] = {};
-        merged[dKey] = {
-          ...merged[dKey],
-          [activeStudent.barcode]: status,
-        };
+        if (activeStudent?.barcode) {
+          merged[dKey] = {
+            ...merged[dKey],
+            [activeStudent.barcode]: status,
+          };
+        }
       }
       return merged;
     }
     return attendanceHistory;
-  }, [attendanceHistory, supabasePortalData?.attendanceHistory, activeStudent.barcode]);
+  }, [attendanceHistory, supabasePortalData?.attendanceHistory, activeStudent?.barcode]);
 
   // Real-time chat subscription for the active student's thread
   useEffect(() => {
-    if (!activeStudent.barcode) return;
+    if (!activeStudent?.barcode) return;
     const unsub = subscribeToThreadChat(activeStudent.barcode, (msgs) => {
       setChatMessages(msgs);
       // If parent is currently viewing the chat tab, instantly mark supervisor messages as read
@@ -477,7 +453,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     return () => {
       unsub();
     };
-  }, [activeStudent.barcode, activeTab]);
+  }, [activeStudent?.barcode, activeTab]);
 
   // When parent switches to the chat tab or active student changes:
   useEffect(() => {
@@ -539,18 +515,18 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
           account.studentBarcode,
           ...(account.linkedBarcodes || []),
           account.parentPhone,
-          activeStudent.barcode,
-          activeStudent.parentPhone,
-          activeStudent.phone,
+          activeStudent?.barcode,
+          activeStudent?.parentPhone,
+          activeStudent?.phone,
         ])
       ).filter(Boolean) as string[];
 
-      const targetId = activeStudent.barcode || account.parentPhone;
+      const targetId = activeStudent?.barcode || account.parentPhone;
       if (targetId) {
         registerPushSubscription(targetId, "parent", allAliases).catch(() => {});
       }
     }
-  }, [activeStudent.barcode, account.parentPhone, account.studentBarcode, account.linkedBarcodes]);
+  }, [activeStudent?.barcode, account.parentPhone, account.studentBarcode, account.linkedBarcodes]);
 
   // ⚡ Scoped Realtime Live Sync: Listens directly to `/students_live/{barcode}`
   // 0ms instant deletion purge, remote logout, and record updates without global quota consumption
@@ -584,13 +560,13 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
         account.studentBarcode,
         ...(account.linkedBarcodes || []),
         account.parentPhone,
-        activeStudent.barcode,
-        activeStudent.parentPhone,
-        activeStudent.phone,
+        activeStudent?.barcode,
+        activeStudent?.parentPhone,
+        activeStudent?.phone,
       ])
     ).filter(Boolean) as string[];
 
-    const targetId = activeStudent.barcode || account.parentPhone;
+    const targetId = activeStudent?.barcode || account.parentPhone;
     const perm = await requestNotificationPermission(targetId, "parent", allAliases);
     if (perm === "granted") {
       setHasNotifPerm(true);
@@ -863,9 +839,9 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
   // ----------------------------------------------------
 
   // 1. Approved Original Monthly Fee for Student
-  const studentGrade = (activeStudent.groupGrade || activeStudent.grade || "الصف الرابع الابتدائي") as GradeName;
+  const studentGrade = ((activeStudent?.groupGrade || (activeStudent as any)?.grade) || "الصف الرابع الابتدائي") as GradeName;
   const standardMonthlyFee = useMemo(() => {
-    if (activeStudent.customMonthlyFee !== undefined && activeStudent.customMonthlyFee !== null && activeStudent.customMonthlyFee > 0) {
+    if (activeStudent?.customMonthlyFee !== undefined && activeStudent?.customMonthlyFee !== null && activeStudent.customMonthlyFee > 0) {
       return activeStudent.customMonthlyFee;
     }
     if (groupPrices && groupPrices[studentGrade] !== undefined) {
@@ -875,7 +851,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       return DEFAULT_GRADE_PRICES[studentGrade];
     }
     return 100;
-  }, [activeStudent.customMonthlyFee, groupPrices, studentGrade]);
+  }, [activeStudent?.customMonthlyFee, groupPrices, studentGrade]);
 
   // 2. Current Month Key
   const currentMonthKey = useMemo(() => {
@@ -885,12 +861,13 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
 
   const currentMonthPayment = useMemo(() => {
     const monthMap = effectivePayments[currentMonthKey] || {};
-    return monthMap[activeStudent.barcode];
-  }, [effectivePayments, currentMonthKey, activeStudent.barcode]);
+    return activeStudent?.barcode ? monthMap[activeStudent.barcode] : undefined;
+  }, [effectivePayments, currentMonthKey, activeStudent?.barcode]);
 
   // 3. Payment History (All recorded payments for this student)
   const paymentHistoryList = useMemo(() => {
     const list: PaymentRecord[] = [];
+    if (!activeStudent?.barcode) return list;
     Object.keys(effectivePayments || {}).forEach((mKey) => {
       const rec = effectivePayments[mKey]?.[activeStudent.barcode];
       if (rec) {
@@ -903,7 +880,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       const dateB = b.date || b.monthKey || b.month || "";
       return dateB.localeCompare(dateA);
     });
-  }, [effectivePayments, activeStudent.barcode]);
+  }, [effectivePayments, activeStudent?.barcode]);
 
   // 4. Academic Months (Full 12-Month Academic Ledger: August -> July)
   const academicMonths = useMemo(() => {
@@ -930,7 +907,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
 
     // Also include any payment months that exist in payments for this student outside standard list
     Object.keys(effectivePayments || {}).forEach((mKey) => {
-      if (effectivePayments[mKey]?.[activeStudent.barcode] && !list.some((item) => item.key === mKey)) {
+      if (activeStudent?.barcode && effectivePayments[mKey]?.[activeStudent.barcode] && !list.some((item) => item.key === mKey)) {
         list.push({
           key: mKey,
           label: mKey,
@@ -941,7 +918,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     });
 
     return list;
-  }, [effectivePayments, activeStudent.barcode]);
+  }, [effectivePayments, activeStudent?.barcode]);
 
   // 5. Full Academic Ledger Entries
   const ledgerEntries = useMemo(() => {
@@ -1212,6 +1189,26 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       setIsSendingChat(false);
     }
   };
+
+  // Mandatory Cloud Loading State: While querying live Supabase data, remain in loading state
+  if (!activeStudent || (isHydratingSupabase && !supabasePortalData && !baseActiveStudent)) {
+    return (
+      <div dir="rtl" className="min-h-screen w-full flex flex-col items-center justify-center bg-[#060812] text-white p-6 font-['Readex_Pro','Cairo',sans-serif]">
+        <div className="relative flex items-center justify-center mb-6">
+          <div className="w-16 h-16 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 animate-spin" />
+          <Cloud className="w-7 h-7 text-emerald-400 absolute animate-pulse" />
+        </div>
+        <h2 className="text-xl font-black text-white mb-2 tracking-tight">جاري استعلام بيانات الطالب وسجلاته من السحابة...</h2>
+        <p className="text-sm text-slate-400 text-center max-w-md leading-relaxed mb-4">
+          يتم استعلام الجداول الأساسية (students, parent_accounts, payments, attendance_logs) من خوادم Supabase Cloud مباشرة بدون أي اعتماد على الذاكرة المؤقتة أو بيانات تجريبية.
+        </p>
+        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-slate-800 text-xs text-slate-400">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="font-mono text-[11px] text-emerald-300">lzdvmzumwuqycwdecaan.supabase.co</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#060812] text-slate-100 font-tajawal selection:bg-amber-500 selection:text-black">
