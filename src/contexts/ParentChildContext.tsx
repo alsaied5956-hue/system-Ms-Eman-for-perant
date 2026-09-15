@@ -156,7 +156,7 @@ export const ParentChildProvider: React.FC<ParentChildProviderProps> = ({
         if (ev.action === "account_revoked" || (ev.action === "delete" && ev.deletedItemType === "student")) {
           // If active student deleted, execute instant remote logout
           if (bCode === activeBarcode || bCode === account?.studentBarcode) {
-            executeInstantRemoteLogout(ev.reason || "تم حذف حساب الطالب من قِبل إدارة المنظومة وفصل الجلسة فوراً.");
+            executeInstantRemoteLogout(ev.reason || "تم حذف حساب الطالب من قِبل إدارة المنظومة وفصل الجلسة فوراً.", bCode);
             return;
           }
           // If a linked child was deleted, purge from local map immediately (0ms DOM purge)

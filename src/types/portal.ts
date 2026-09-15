@@ -56,6 +56,7 @@ export interface PortalSession {
   currentStudentBarcode?: string;
   account?: ParentAccount;
   token?: string;
+  isSupervisor?: boolean;
 }
 
 export type ParentPortalTab =

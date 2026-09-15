@@ -23,10 +23,13 @@ import {
   subscribeToAllParentAccounts,
   getAdminActivityLogs,
   subscribeToAdminActivityLogs,
+  getSavedPortalSession,
+  savePortalSession,
 } from "../../utils/portalStorage";
 import {
   updateParentAccountStatusInSupabase,
   deleteParentAccountRecordFromSupabase,
+  updateParentAccountFCMTokenInSupabase,
 } from "../../utils/supabaseClient";
 import { AdminActivityLog } from "../../types/portal";
 import { openWhatsApp } from "../../utils/helpers";
@@ -735,8 +738,14 @@ export const AdminControlPanel: React.FC<AdminControlPanelProps> = ({
     setIsDeletingAccount(true);
 
     try {
-      // 1. Await hard delete from production Supabase database, server, and cloud FIRST
+      // 🛡️ ISOLATE SUPERVISOR SESSION STATE:
+      // Cache current supervisor session so it is never purged, mutated, or logged out
+      const currentSupervisorSession = getSavedPortalSession();
+      const supervisorBarcode = currentSupervisorSession?.barcode || "1";
+
+      // 1. Target ONLY the specified parent account: Invalidate FCM token & delete database record in Supabase
       await Promise.allSettled([
+        updateParentAccountFCMTokenInSupabase(barcode, ""),
         deleteParentAccountRecordFromSupabase(barcode),
         deleteParentAccount(barcode),
         fetch(`/api/portal/admin/accounts/${encodeURIComponent(barcode)}?mode=hard`, {
@@ -745,18 +754,39 @@ export const AdminControlPanel: React.FC<AdminControlPanelProps> = ({
             "x-user-role": "admin",
           },
         }),
+        fetch("/api/account-revoke", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            barcode,
+            reason: "تم حذف هذا الحساب من قِبل إدارة المنظومة.",
+          }),
+        }),
       ]);
 
-      // 2. Update local state only after DB deletion completes
+      // 🛡️ Ensure supervisor session context (isSupervisor = true) is preserved intact
+      savePortalSession({
+        role: "admin",
+        barcode: supervisorBarcode,
+        token: currentSupervisorSession?.token || `sess-supervisor-${Date.now()}`,
+        isSupervisor: true,
+      });
+
+      // 2. Live Local State Removal: Remove deleted account and linked barcodes immediately from UI
       setAccounts((prev) => {
-        const next = { ...prev };
+        const next: Record<string, ParentAccount> = { ...prev };
         delete next[barcode];
+        for (const [k, acc] of Object.entries(next)) {
+          if (acc?.linkedBarcodes?.includes(barcode) || acc?.studentBarcode === barcode) {
+            delete next[k];
+          }
+        }
         return next;
       });
 
       // 3. Positive affirmative feedback
       setLiveActionFeedback(
-        `🗑️ تم حذف حساب ولي أمر (${studentName}) نهائياً من قاعدة البيانات، وتم فصل جلسة الهاتف فوراً.`
+        `🗑️ تم حذف حساب ولي أمر (${studentName}) نهائياً من قاعدة البيانات، وتم فصل جلسة الهاتف فوراً مع بقاء جلسة المشرف نشطة.`
       );
       setTimeout(() => setLiveActionFeedback(null), 4500);
     } catch (err) {

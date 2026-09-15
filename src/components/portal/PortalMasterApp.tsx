@@ -31,7 +31,15 @@ export const PortalMasterApp: React.FC<PortalMasterAppProps> = ({
 }) => {
   // Portal session state
   const [session, setSession] = useState<PortalSession | null>(() => {
-    return getSavedPortalSession();
+    const saved = getSavedPortalSession();
+    if (saved && (saved.role === "admin" || saved.isSupervisor)) {
+      return {
+        ...saved,
+        role: "admin",
+        isSupervisor: true,
+      };
+    }
+    return saved;
   });
 
   // Notice when session is revoked remotely by admin (disable or delete)
@@ -69,16 +77,31 @@ export const PortalMasterApp: React.FC<PortalMasterAppProps> = ({
   useEffect(() => {
     const handleRevoked = (ev: Event) => {
       const customEv = ev as CustomEvent;
+      const targetBarcode = String(customEv.detail?.barcode || "").trim();
       const reason = customEv.detail?.reason || "تم فصل الجلسة وإلغاء تنشيط الحساب من قِبل إدارة المنظومة.";
-      setRevocationNotice(reason);
-      handleLogout(true);
+
+      // 🛡️ ISOLATE SUPERVISOR SESSION:
+      // Never terminate supervisor/admin session context during account deletion or revocation
+      if (session?.role === "admin" || session?.isSupervisor) {
+        return;
+      }
+
+      // If current session is a parent, ONLY log out if the target barcode strictly matches this parent
+      if (session?.role === "parent") {
+        const myBarcode = String(session.account?.studentBarcode || session.barcode || "").trim();
+        const linked = Array.isArray(session.account?.linkedBarcodes) ? session.account.linkedBarcodes.map(String) : [];
+        if (targetBarcode && (targetBarcode === myBarcode || linked.includes(targetBarcode))) {
+          setRevocationNotice(reason);
+          handleLogout(true);
+        }
+      }
     };
 
     window.addEventListener("eman_account_revoked", handleRevoked);
     return () => {
       window.removeEventListener("eman_account_revoked", handleRevoked);
     };
-  }, [handleLogout]);
+  }, [handleLogout, session]);
 
   // Live remote logout watcher:
   // If admin explicitly disables or revokes account, force remote logout
@@ -116,6 +139,7 @@ export const PortalMasterApp: React.FC<PortalMasterAppProps> = ({
       account,
       barcode: barcode || account?.studentBarcode || "1",
       token: `sess-${Date.now()}`,
+      isSupervisor: role === "admin",
     };
     setSession(newSession);
     savePortalSession(newSession);

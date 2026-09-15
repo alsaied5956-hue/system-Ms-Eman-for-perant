@@ -166,7 +166,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       const myBarcode = String(account.studentBarcode).trim();
       const targetBarcode = String(customEv.detail?.barcode || "").trim();
       const linked = Array.isArray(account.linkedBarcodes) ? account.linkedBarcodes.map(String) : [];
-      if (!targetBarcode || targetBarcode === myBarcode || linked.includes(targetBarcode)) {
+      if (targetBarcode && (targetBarcode === myBarcode || linked.includes(targetBarcode))) {
         onLogout();
       }
     };
@@ -175,7 +175,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     return () => {
       window.removeEventListener("eman_account_revoked", handleRemoteRevoke);
     };
-  }, [account.studentBarcode, onLogout]);
+  }, [account.studentBarcode, account.linkedBarcodes, onLogout]);
 
   // Financial Sub-Tab: "ledger" (full academic year) vs "receipts" (recorded receipts)
   const [activeFinancialSubTab, setActiveFinancialSubTab] = useState<"ledger" | "receipts">("ledger");
@@ -560,7 +560,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     const unsub = subscribeToStudentLiveBarcode(activeStudent.barcode, (ev) => {
       // 1. Instant Remote Logout on Account Revocation or Student Deletion
       if (ev.action === "account_revoked" || (ev.action === "delete" && ev.deletedItemType === "student")) {
-        executeInstantRemoteLogout(ev.reason || "تم حذف هذا الحساب من قِبل إدارة المنظومة.");
+        executeInstantRemoteLogout(ev.reason || "تم حذف هذا الحساب من قِبل إدارة المنظومة.", activeStudent.barcode);
         return;
       }
 

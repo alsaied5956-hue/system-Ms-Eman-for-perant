@@ -18,6 +18,7 @@ import {
   checkBarcodeAlreadyLinkedSupabase,
   updateParentAccountStatusInSupabase,
   deleteParentAccountRecordFromSupabase,
+  updateParentAccountFCMTokenInSupabase,
   subscribeToParentAccountSupabase,
   barcodeToUUID,
 } from "./supabaseClient";
@@ -577,21 +578,31 @@ export async function deleteParentAccount(studentBarcode: string): Promise<void>
   delete accounts[cleanBarcode];
   saveLocalParentAccounts(accounts);
 
-  // If local active session matches deleted account, clear session immediately
+  // 🛡️ ISOLATE SUPERVISOR SESSION:
+  // Never clear, mutate, or log out the currently logged-in supervisor/admin state.
+  // Target ONLY the parent account if this device is logged in as the deleted parent.
   const curSess = getSavedPortalSession();
   if (
-    curSess?.role === "parent" &&
+    curSess &&
+    curSess.role === "parent" &&
+    !curSess.isSupervisor &&
     (allBarcodesToRevoke.has(String(curSess.barcode).trim()) ||
       allBarcodesToRevoke.has(String(curSess.account?.studentBarcode).trim()))
   ) {
     savePortalSession(null);
     try {
+      sessionStorage.removeItem(LS_PORTAL_SESSION);
       localStorage.removeItem(LS_PORTAL_SESSION);
     } catch {}
   }
 
-  // 1. Broadcast revocation immediately across same device tabs & local window
+  // 1. Broadcast targeted revocation immediately across same device tabs & local window
   for (const b of allBarcodesToRevoke) {
+    // Clear parent FCM token and database record in Supabase
+    updateParentAccountFCMTokenInSupabase(b, "").catch(() => {});
+    deleteParentAccountRecordFromSupabase(b).catch(() => {});
+    updateParentAccountStatusInSupabase(b, "deleted").catch(() => {});
+
     accountEventsBus?.postMessage({
       type: "ACCOUNT_REVOKED",
       barcode: b,
@@ -612,8 +623,6 @@ export async function deleteParentAccount(studentBarcode: string): Promise<void>
 
     // 2. High-speed Direct Server Broadcast (Sub-50ms) to trigger immediate mobile logout & cascading deletion
     try {
-      deleteParentAccountRecordFromSupabase(b).catch(() => {});
-      updateParentAccountStatusInSupabase(b, "deleted").catch(() => {});
       fetch("/api/account-revoke", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -896,6 +905,23 @@ export function subscribeToParentAccountLiveStatus(
 
   const triggerRevoke = (reason?: string) => {
     if (isCancelled || hasFiredRevocation) return;
+
+    // 🛡️ ISOLATE SUPERVISOR SESSION:
+    // If the active session is a supervisor/admin, NEVER trigger revocation or logout!
+    const curSess = getSavedPortalSession();
+    if (curSess?.role === "admin" || curSess?.isSupervisor) {
+      return;
+    }
+
+    // Verify current session is parent and belongs to this targetBarcode
+    if (curSess?.role === "parent") {
+      const myBarcode = String(curSess.account?.studentBarcode || curSess.barcode || "").trim();
+      const linked = Array.isArray(curSess.account?.linkedBarcodes) ? curSess.account.linkedBarcodes.map(String) : [];
+      if (targetBarcode !== myBarcode && !linked.includes(targetBarcode)) {
+        return;
+      }
+    }
+
     hasFiredRevocation = true;
 
     const finalReason = reason || "تم إلغاء تفعيل هذا الحساب من قبل الإدارة";
@@ -905,12 +931,11 @@ export function subscribeToParentAccountLiveStatus(
       playPortalAudioChime("absence");
     } catch {}
 
-    // Purge local credentials instantly so browser / refresh cannot resurrect it
+    // Targeted revocation: Purge only the parent's session token without calling global sessionStorage.clear()
     savePortalSession(null);
     try {
       if (typeof window !== "undefined") {
         sessionStorage.removeItem(LS_PORTAL_SESSION);
-        sessionStorage.clear();
         localStorage.removeItem(LS_PORTAL_SESSION);
       }
     } catch {}
@@ -975,7 +1000,7 @@ export function subscribeToParentAccountLiveStatus(
   const handleRevokeWindowEvent = (ev: Event) => {
     const customEv = ev as CustomEvent;
     const evBarcode = String(customEv.detail?.barcode || "").trim();
-    if (!evBarcode || evBarcode === targetBarcode) {
+    if (evBarcode && evBarcode === targetBarcode) {
       triggerRevoke(
         customEv.detail?.reason || "تم حذف هذا الحساب من قِبل إدارة المنظومة."
       );
@@ -2436,7 +2461,14 @@ export function getSavedPortalSession(): PortalSession | null {
   try {
     if (typeof window !== "undefined") {
       const raw = sessionStorage.getItem(LS_PORTAL_SESSION) || localStorage.getItem(LS_PORTAL_SESSION);
-      if (raw) return JSON.parse(raw);
+      if (raw) {
+        const parsed: PortalSession = JSON.parse(raw);
+        if (parsed && (parsed.role === "admin" || parsed.isSupervisor)) {
+          parsed.role = "admin";
+          parsed.isSupervisor = true;
+        }
+        return parsed;
+      }
     }
   } catch {}
   return null;
@@ -2446,6 +2478,10 @@ export function savePortalSession(session: PortalSession | null): void {
   try {
     if (typeof window !== "undefined") {
       if (session) {
+        if (session.role === "admin" || session.isSupervisor) {
+          session.role = "admin";
+          session.isSupervisor = true;
+        }
         sessionStorage.setItem(LS_PORTAL_SESSION, JSON.stringify(session));
         // Remove from localStorage so closing the browser window forces fresh login
         localStorage.removeItem(LS_PORTAL_SESSION);

@@ -176,7 +176,7 @@ export function subscribeToStudentLiveBarcode(
 
     // Handle student deletion / revocation remotely
     if (ev.action === "account_revoked" || (ev.action === "delete" && ev.deletedItemType === "student")) {
-      executeInstantRemoteLogout(ev.reason || "تم حذف هذا الطالب أو الحساب من قِبل إدارة المنظومة.");
+      executeInstantRemoteLogout(ev.reason || "تم حذف هذا الطالب أو الحساب من قِبل إدارة المنظومة.", cleanBarcode);
     }
 
     onEvent(ev);
@@ -260,15 +260,35 @@ export function subscribeToStudentLiveBarcode(
 }
 
 /**
- * Triggers instant remote logout, purges sessionStorage & local storage, and hard-redirects
+ * Triggers instant remote logout, purges parent session storage, and hard-redirects ONLY for parents
  */
-export function executeInstantRemoteLogout(reason?: string): void {
+export function executeInstantRemoteLogout(reason?: string, targetBarcode?: string): void {
   const finalReason = reason || "تم حذف هذا الحساب من قِبل إدارة المنظومة وفصل الجلسة فوراً.";
 
   if (typeof window === "undefined") return;
 
+  // 🛡️ ISOLATE SUPERVISOR SESSION:
+  // Under NO circumstances terminate or redirect supervisor/admin sessions!
   try {
-    sessionStorage.clear();
+    const raw = sessionStorage.getItem("eman_portal_session") || localStorage.getItem("eman_portal_session");
+    if (raw) {
+      const sess = JSON.parse(raw);
+      if (sess?.role === "admin" || sess?.isSupervisor) {
+        return; // Guard supervisor session intact!
+      }
+      if (targetBarcode && sess?.role === "parent") {
+        const myBarcode = String(sess.account?.studentBarcode || sess.barcode || "").trim();
+        const linked = Array.isArray(sess.account?.linkedBarcodes) ? sess.account.linkedBarcodes.map(String) : [];
+        if (targetBarcode !== myBarcode && !linked.includes(targetBarcode)) {
+          return; // Targeted revocation was for a different student/parent
+        }
+      }
+    }
+  } catch {}
+
+  // Targeted revocation of parent credentials (NEVER clear global sessionStorage)
+  try {
+    sessionStorage.removeItem("eman_portal_session");
   } catch {}
 
   try {
@@ -280,23 +300,25 @@ export function executeInstantRemoteLogout(reason?: string): void {
     const bus = new BroadcastChannel("eman_portal_accounts_bus");
     bus.postMessage({
       type: "ACCOUNT_REVOKED",
+      barcode: targetBarcode,
       reason: finalReason,
       timestamp: Date.now(),
     });
     bus.close();
   } catch {}
 
-  // Dispatches to local state listeners
+  // Dispatches to local state listeners with targeted barcode
   window.dispatchEvent(
     new CustomEvent("eman_account_revoked", {
       detail: {
+        barcode: targetBarcode,
         reason: finalReason,
         revokedAt: new Date().toISOString(),
       },
     })
   );
 
-  // Safely redirect to root login screen with notification
+  // Safely redirect to root login screen with notification ONLY for parents
   try {
     if (window.location.search.includes("notice=")) {
       return;
