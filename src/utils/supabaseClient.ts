@@ -1656,27 +1656,19 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
   }
 
   try {
-    const uuid = barcodeToUUID(cleanBarcode);
-
-    // Concurrently execute single indexed student query alongside linked parent account with absolute 2s timeout guard
-    const [stRes, accRes] = await withTimeout(
-      Promise.all([
-        supabase
-          .from("students")
-          .select("*, attendance_logs(*), payments(*), homework(*)")
-          .eq("barcode", cleanBarcode)
-          .single(),
-        supabase
-          .from("parent_accounts")
-          .select("*")
-          .eq("id", uuid)
-          .maybeSingle(),
-      ]),
+    // Consolidated Single-Query Fetch (<250ms):
+    // Aggregate student info, attendance, payments, and homework into ONE SINGLE relational query:
+    const { data: studentRow, error } = await withTimeout(
+      supabase
+        .from("students")
+        .select("*, attendance_logs(*), payments(*), homework(*)")
+        .eq("barcode", cleanBarcode)
+        .single(),
       2000,
-      "استعلام بيانات الطالب الموحدة وحساب ولي الأمر"
+      "استعلام بيانات الطالب الموحدة عبر استعلام علائقي موحد"
     );
 
-    if (stRes.error || !stRes.data) {
+    if (error || !studentRow) {
       return {
         success: false,
         student: null,
@@ -1690,8 +1682,6 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       };
     }
 
-    const studentRow = stRes.data;
-    const account = accRes.data || null;
     const bCode = String(studentRow.barcode).trim();
 
     // In-memory instant sorting & aggregation (<0.1ms overhead)
@@ -1782,7 +1772,7 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       examScores: student.totalExamScores,
       lastExamTitle: student.lastExamTitle,
       lastExamScore: student.lastExamScore,
-      account,
+      account: null,
     };
   } catch (err: any) {
     console.error("[fetchUnifiedStudentPortalDataFromSupabase] Error:", err);

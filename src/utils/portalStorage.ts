@@ -1121,10 +1121,8 @@ export function subscribeToParentAccountLiveStatus(
     document.addEventListener("visibilitychange", handleVisibilityChange);
   }
 
-  // Active heartbeat for server cache check (zero Firestore quota)
-  const pollInterval = setInterval(checkStatus, 15000);
-
-  // Run initial check immediately
+  // Event-driven real-time updates only (SSE, Supabase Realtime CDC, window events) - Zero Polling
+  // Run initial check once on mount
   checkStatus();
 
   return () => {
@@ -1140,7 +1138,6 @@ export function subscribeToParentAccountLiveStatus(
       window.removeEventListener("pageshow", checkStatus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     }
-    clearInterval(pollInterval);
     unsubSupabase();
     if (unsubscribeDoc) unsubscribeDoc();
     if (unsubscribeRevocations) unsubscribeRevocations();

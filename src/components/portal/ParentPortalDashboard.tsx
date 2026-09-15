@@ -397,15 +397,20 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       fetchPortalData(targetBarcode, false);
     }
 
-    // Direct Supabase Realtime Channel with Strict Student-Level Realtime Filtering:
-    // In all Supabase Realtime event listeners (postgres_changes / supabase.channel), enforce a strict guard:
-    // Only update the React state if payload.new.barcode === activeStudent.barcode or payload.new.student_id === activeStudent.id
-    // Reject any broad, global, or un-filtered table event from modifying the active student's rendered view.
+    // Direct Supabase Realtime Channel with Strict Server-Filtered Realtime:
+    // Configure Supabase Realtime listeners (postgres_changes) to use SERVER-SIDE filtering exclusively:
+    // filter: 'barcode=eq.${activeStudent.barcode}'
+    // When a Realtime event arrives, mutate ONLY the target item in local React state memory (In-Memory Delta Update) - DO NOT refetch full database state.
     const realtimeChannel = supabase
       .channel(`portal-student-sync-${targetBarcode}-${Date.now()}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "students" },
+        {
+          event: "*",
+          schema: "public",
+          table: "students",
+          filter: `barcode=eq.${targetBarcode}`,
+        },
         (payload) => {
           if (!isSubscribed) return;
           const newRow = payload.new as any;
@@ -463,7 +468,12 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "attendance_logs" },
+        {
+          event: "*",
+          schema: "public",
+          table: "attendance_logs",
+          filter: `barcode=eq.${targetBarcode}`,
+        },
         (payload) => {
           if (!isSubscribed) return;
           const newRow = payload.new as any;
@@ -505,7 +515,12 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "payments" },
+        {
+          event: "*",
+          schema: "public",
+          table: "payments",
+          filter: activeStudentIdRef.current ? `student_id=eq.${activeStudentIdRef.current}` : undefined,
+        },
         (payload) => {
           if (!isSubscribed) return;
           const newRow = payload.new as any;
@@ -553,6 +568,37 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
                     [activeBarcode]: paymentRecord,
                   },
                 },
+              };
+            });
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "homework",
+          filter: `barcode=eq.${targetBarcode}`,
+        },
+        (payload) => {
+          if (!isSubscribed) return;
+          const newRow = payload.new as any;
+          if (newRow && newRow.date_key) {
+            setSupabasePortalData((prev) => {
+              if (!prev) return null;
+              const existingList = Array.isArray(prev.homeworkList) ? prev.homeworkList : [];
+              const index = existingList.findIndex((h: any) => h.date_key === newRow.date_key);
+              let updatedList = [];
+              if (index >= 0) {
+                updatedList = [...existingList];
+                updatedList[index] = { ...updatedList[index], ...newRow };
+              } else {
+                updatedList = [newRow, ...existingList];
+              }
+              return {
+                ...prev,
+                homeworkList: updatedList,
               };
             });
           }
