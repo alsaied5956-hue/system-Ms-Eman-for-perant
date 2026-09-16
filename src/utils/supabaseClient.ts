@@ -10,6 +10,7 @@ import { compressData, decompressData } from "./compression";
 import type { SystemData } from "./storage";
 import type { ParentAccount } from "../types/portal";
 import { withTimeout } from "./promiseTimeout";
+import { getSessionPortalData } from "./portalSessionStore";
 export { withTimeout };
 
 const SUPABASE_URL =
@@ -1812,42 +1813,58 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
   const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanInput);
 
   try {
-    // Primary Direct Cloud Fetch Engine with Standard Implicit Join & Sequential Table Fallback
+    // Primary Direct Cloud Fetch Engine with Standard Implicit Join & Resilient Table Fallback
     const fetchDirectAggregatedStudent = async () => {
       const parentBarcode = cleanInput;
       let studentRecord: any = null;
-      let usedRelationalJoin = false;
 
       // 1. Primary Attempt: Standard implicit relational join without explicit named foreign keys
-      // Removes explicit named foreign keys like attendance_logs_student_id_fkey to avoid HTTP 400
+      // Fast 2.5s guard to prevent hanging if relational joins or schema locks stall
       try {
-        const { data: relStudent, error: relErr } = await supabase
+        const relPromise = supabase
           .from("students")
           .select("*, attendance_logs(*), payments(*), homework(*), exam_grades(*), chat_messages(*)")
           .eq("barcode", parentBarcode)
           .maybeSingle();
 
+        const { data: relStudent, error: relErr } = await withTimeout(
+          relPromise,
+          2500,
+          "استعلام الربط العلائقي"
+        ).catch(() => ({ data: null, error: "timeout" }));
+
         if (!relErr && relStudent) {
           studentRecord = relStudent;
-          usedRelationalJoin = true;
           console.log("[Parent Fetch] Standard implicit relational query succeeded for barcode:", parentBarcode);
         } else if (relErr) {
           console.warn(
-            "[Parent Fetch] Standard relational join notice (foreign key ambiguity or schema constraint, executing sequential per-table fallback):",
-            relErr.message || relErr
+            "[Parent Fetch] Standard relational join notice (foreign key ambiguity or schema constraint, executing table fallback):",
+            typeof relErr === "object" ? relErr.message || relErr : relErr
           );
         }
       } catch (relEx) {
-        console.warn("[Parent Fetch] Relational join exception, executing sequential fallback:", relEx);
+        console.warn("[Parent Fetch] Relational join exception, executing table fallback:", relEx);
       }
 
-      // 2. Sequential Fallback: If relational join failed or returned null, execute explicit queries sequentially per table
+      // 2. Resilient Table Fallback: If relational join failed or timed out, resolve student and query tables
       if (!studentRecord) {
-        // Step A: Resolve student entity
+        // Step A: Fast student resolution
         let studentData: any = null;
         if (isUUID) {
-          const byId = await supabase.from("students").select("*").eq("id", cleanInput).maybeSingle();
-          studentData = byId.data;
+          const res = await supabase
+            .from("students")
+            .select("*")
+            .or(`id.eq.${cleanInput},barcode.eq.${cleanInput}`)
+            .maybeSingle();
+          studentData = res.data;
+        } else {
+          const uuidFallback = barcodeToUUID(cleanInput);
+          const res = await supabase
+            .from("students")
+            .select("*")
+            .or(`barcode.eq.${cleanInput},id.eq.${uuidFallback},id.eq.${cleanInput}`)
+            .maybeSingle();
+          studentData = res.data;
         }
 
         if (!studentData) {
@@ -1855,9 +1872,8 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
           studentData = byBarcode.data;
         }
 
-        if (!studentData && !isUUID) {
-          const uuidFallback = barcodeToUUID(cleanInput);
-          const byId = await supabase.from("students").select("*").eq("id", uuidFallback).maybeSingle();
+        if (!studentData && isUUID) {
+          const byId = await supabase.from("students").select("*").eq("id", cleanInput).maybeSingle();
           studentData = byId.data;
         }
 
@@ -1868,40 +1884,44 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
         const sId = String(studentData.id || "").trim();
         const bCode = String(studentData.barcode || cleanInput).trim();
 
-        // Helper for sequential dual-key queries per table
-        const queryTableSequentially = async (
+        // Helper for schema-aware table queries
+        const queryTableDirect = async (
           tableName: string,
           orderCol?: string,
           ascending = false
         ): Promise<any[]> => {
           try {
-            const primaryOr = `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`;
-            let q = supabase.from(tableName).select("*").or(primaryOr);
+            let q = supabase.from(tableName).select("*");
+            if (tableName === "homework" || tableName === "exam_grades" || tableName === "evaluations") {
+              const orFilter = bCode
+                ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`
+                : `student_id.eq.${sId}`;
+              q = q.or(orFilter);
+            } else if (tableName === "attendance_logs") {
+              const orFilter = bCode
+                ? `student_id.eq.${sId},barcode.eq.${bCode}`
+                : `student_id.eq.${sId}`;
+              q = q.or(orFilter);
+            } else {
+              // payments, chat_messages, messages
+              q = q.eq("student_id", sId);
+            }
+
             if (orderCol) {
               q = q.order(orderCol, { ascending });
             }
+
             const res = await q;
             if (!res.error && Array.isArray(res.data)) {
               return res.data;
             }
 
-            // Fallback if student_barcode column doesn't exist on this table
-            const fallbackOr = bCode
-              ? `student_id.eq.${sId},barcode.eq.${bCode}`
-              : `student_id.eq.${sId}`;
-            let q2 = supabase.from(tableName).select("*").or(fallbackOr);
-            if (orderCol) {
-              q2 = q2.order(orderCol, { ascending });
-            }
-            const res2 = await q2;
-            if (!res2.error && Array.isArray(res2.data)) {
-              return res2.data;
-            }
-
-            // Single column queries as final fallback
-            const idRes = await supabase.from(tableName).select("*").eq("student_id", sId);
-            if (!idRes.error && Array.isArray(idRes.data) && idRes.data.length > 0) {
-              return idRes.data;
+            // Schema-tolerant fallback
+            if (sId) {
+              const idRes = await supabase.from(tableName).select("*").eq("student_id", sId);
+              if (!idRes.error && Array.isArray(idRes.data) && idRes.data.length > 0) {
+                return idRes.data;
+              }
             }
             if (bCode) {
               const bcRes = await supabase.from(tableName).select("*").eq("barcode", bCode);
@@ -1911,25 +1931,29 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
             }
             return [];
           } catch (err) {
-            console.warn(`[Parent Fetch Sequential] Error querying ${tableName}:`, err);
+            console.warn(`[Parent Fetch] Error querying ${tableName}:`, err);
             return [];
           }
         };
 
-        // Sequential per-table execution to isolate any foreign key or schema ambiguities
-        const attendance = await queryTableSequentially("attendance_logs", "date_key", false);
-        const homework = await queryTableSequentially("homework", "date_key", false);
-        const payments = await queryTableSequentially("payments", "month_key", false);
-        
-        let grades = await queryTableSequentially("exam_grades", "created_at", false);
-        if (!grades || grades.length === 0) {
-          grades = await queryTableSequentially("evaluations", "created_at", false);
-        }
-
-        let chatMessages = await queryTableSequentially("chat_messages", "created_at", true);
-        if (!chatMessages || chatMessages.length === 0) {
-          chatMessages = await queryTableSequentially("messages", "created_at", true);
-        }
+        // Parallel per-table execution for sub-second responses
+        const [attendance, homework, payments, grades, chatMessages] = await Promise.all([
+          queryTableDirect("attendance_logs", "date_key", false),
+          queryTableDirect("homework", "date_key", false),
+          queryTableDirect("payments", "month_key", false),
+          queryTableDirect("exam_grades", "created_at", false).then(async (rows) => {
+            if (!rows || rows.length === 0) {
+              return await queryTableDirect("evaluations", "created_at", false);
+            }
+            return rows;
+          }),
+          queryTableDirect("chat_messages", "created_at", true).then(async (rows) => {
+            if (!rows || rows.length === 0) {
+              return await queryTableDirect("messages", "created_at", true);
+            }
+            return rows;
+          }),
+        ]);
 
         studentRecord = {
           ...studentData,
@@ -1959,11 +1983,11 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       };
     };
 
-    // Strict 5-Second Response Limit
+    // Generous 12-Second Response Limit
     const studentRow = await withTimeout(
       fetchDirectAggregatedStudent(),
-      5000,
-      "استعلام بيانات الطالب الموحدة من Supabase (مهلة 5 ثوانٍ)"
+      12000,
+      "استعلام بيانات الطالب الموحدة من Supabase"
     );
 
     if (!studentRow) {
@@ -2224,6 +2248,14 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
     };
   } catch (err: any) {
     console.error("[fetchUnifiedStudentPortalDataFromSupabase] Error:", err);
+    try {
+      const cached = getSessionPortalData(cleanInput);
+      if (cached && cached.success && cached.student) {
+        console.warn("[fetchUnifiedStudentPortalDataFromSupabase] Falling back to locally cached session data for:", cleanInput);
+        return cached;
+      }
+    } catch {}
+
     return {
       success: false,
       student: null,
