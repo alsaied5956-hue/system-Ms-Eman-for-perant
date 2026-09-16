@@ -2452,6 +2452,13 @@ export function savePortalSession(session: PortalSession | null): void {
         } else {
           // Long-lived Parent session: Persists across restarts, reboots, and browser closures
           session.role = "parent";
+          // Ensure barcode and token are clean and deterministic
+          if (!session.barcode && session.account?.studentBarcode) {
+            session.barcode = normalizeBarcode(session.account.studentBarcode);
+          }
+          if (session.barcode && (!session.token || !session.token.startsWith("sess-"))) {
+            session.token = `sess-${session.barcode}-${Date.now()}`;
+          }
           const serialized = JSON.stringify(session);
           localStorage.setItem(LS_PARENT_SESSION_TOKEN, serialized);
           localStorage.setItem(LS_PORTAL_SESSION, serialized);
@@ -2467,6 +2474,86 @@ export function savePortalSession(session: PortalSession | null): void {
   } catch (err) {
     console.warn("savePortalSession error:", err);
   }
+}
+
+/**
+ * Unified Barcode Extractor:
+ * Directly extracts the clean student barcode from the active session token,
+ * session payload, or persistent storage.
+ */
+export function extractCleanBarcodeFromSession(sessionOrToken?: any): string {
+  try {
+    // 1. Direct explicit token or session parameter
+    if (sessionOrToken) {
+      if (typeof sessionOrToken === "string") {
+        const str = sessionOrToken.trim();
+        if (str.startsWith("{")) {
+          try {
+            const parsed = JSON.parse(str);
+            const b = parsed.barcode || parsed.studentBarcode || parsed.account?.studentBarcode;
+            if (b) return normalizeBarcode(b);
+            if (parsed.token) return extractCleanBarcodeFromSession(parsed.token);
+          } catch {}
+        }
+        // Match token formatted as sess-<barcode>-<timestamp>
+        const sessMatch = str.match(/^sess-([0-9A-Za-z_-]+?)(?:-\d+)?$/);
+        if (sessMatch && sessMatch[1]) {
+          return normalizeBarcode(sessMatch[1]);
+        }
+        // If it's a numeric or clean barcode
+        if (/^[0-9]+$/.test(str) || str.length <= 15) {
+          return normalizeBarcode(str);
+        }
+      } else if (typeof sessionOrToken === "object") {
+        const b =
+          sessionOrToken.barcode ||
+          sessionOrToken.studentBarcode ||
+          sessionOrToken.account?.studentBarcode;
+        if (b) return normalizeBarcode(b);
+        if (sessionOrToken.token) {
+          const bFromTok = extractCleanBarcodeFromSession(sessionOrToken.token);
+          if (bFromTok) return bFromTok;
+        }
+      }
+    }
+
+    // 2. Active in-memory / storage session
+    const saved = getSavedPortalSession();
+    if (saved) {
+      if (saved.barcode) return normalizeBarcode(saved.barcode);
+      if (saved.account?.studentBarcode) return normalizeBarcode(saved.account.studentBarcode);
+      if (saved.token) {
+        const bFromToken = extractCleanBarcodeFromSession(saved.token);
+        if (bFromToken) return bFromToken;
+      }
+    }
+
+    // 3. Direct inspection of localStorage / sessionStorage tokens
+    if (typeof window !== "undefined") {
+      const rawParentToken =
+        localStorage.getItem(LS_PARENT_SESSION_TOKEN) ||
+        localStorage.getItem(LS_PORTAL_SESSION) ||
+        sessionStorage.getItem(LS_PORTAL_SESSION);
+
+      if (rawParentToken) {
+        try {
+          const parsed = JSON.parse(rawParentToken);
+          const b = parsed.barcode || parsed.studentBarcode || parsed.account?.studentBarcode;
+          if (b) return normalizeBarcode(b);
+          if (parsed.token) {
+            const bFromToken = extractCleanBarcodeFromSession(parsed.token);
+            if (bFromToken) return bFromToken;
+          }
+        } catch {
+          const bDirect = extractCleanBarcodeFromSession(rawParentToken);
+          if (bDirect) return bDirect;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("extractCleanBarcodeFromSession error:", err);
+  }
+  return "";
 }
 
 export function clearPortalSession(role?: "parent" | "admin"): void {

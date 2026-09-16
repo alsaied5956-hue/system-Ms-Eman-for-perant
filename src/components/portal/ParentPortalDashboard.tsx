@@ -17,6 +17,7 @@ import {
   subscribeToThreadChat,
   getAdminPortalSettings,
   normalizeBarcode,
+  getSavedPortalSession,
 } from "../../utils/portalStorage";
 import {
   supabase,
@@ -341,7 +342,11 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     setIsHydratingSupabase(true);
     setSupabaseError(null);
 
-    fetchUnifiedStudentPortalDataFromSupabase(targetBarcode)
+    // Pass session token or target barcode to direct unified fetch
+    const activeSess = getSavedPortalSession();
+    const tokenOrBarcode = activeSess?.token || targetBarcode;
+
+    fetchUnifiedStudentPortalDataFromSupabase(tokenOrBarcode)
       .then((data) => {
         if (!isSubscribed) return;
         if (data && data.success) {
@@ -1589,7 +1594,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
           <h2 className="text-xl font-bold text-white mb-1.5">خطأ في الاتصال بالشبكة</h2>
           <p className="text-xs text-rose-400 font-medium mb-3">Network connection error. Please retry</p>
           <p className="text-sm text-slate-400 leading-relaxed mb-6">
-            تعذر الاتصال بخوادم Supabase Cloud أو انتهت مهلة الاستجابة (10 ثوانٍ). يرجى التأكد من اتصال الإنترنت ثم إعادة المحاولة.
+            تعذر الاتصال بخوادم Supabase Cloud أو انتهت مهلة الاستجابة (5 ثوانٍ). يرجى التأكد من اتصال الإنترنت ثم إعادة المحاولة.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <button

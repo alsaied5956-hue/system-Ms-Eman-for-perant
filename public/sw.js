@@ -10,7 +10,7 @@ try {
   // Service worker continues normally without external CDN dependency
 }
 
-const CACHE_NAME = "math-center-v7.1-direct-bypass";
+const CACHE_NAME = "math-center-v9.0-network-only-supabase";
 const ASSETS_TO_CACHE = [
   "/",
   "/index.html",
@@ -49,6 +49,22 @@ self.addEventListener("activate", (event) => {
           )
         ),
     ]).then(() => {
+      // Proactively purge any residual Supabase or REST API cache entries
+      caches.open(CACHE_NAME).then((cache) => {
+        cache.keys().then((keys) => {
+          keys.forEach((req) => {
+            const reqUrl = req.url || "";
+            if (
+              reqUrl.includes("supabase.co") ||
+              reqUrl.includes("/rest/v1") ||
+              reqUrl.includes("/auth/v1") ||
+              reqUrl.includes("/api/")
+            ) {
+              cache.delete(req);
+            }
+          });
+        });
+      });
       return self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
         clients.forEach((client) => {
           client.postMessage({
@@ -139,21 +155,23 @@ function getNotificationActions(type, tag) {
   ];
 }
 
-// 4. Fetch Event: Direct live fetch bypass for Supabase & APIs, Network-First for HTML/Assets
+// 4. Fetch Event: Strict Network-Only bypass for Supabase & APIs, Network-First for HTML/Assets
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = request.url;
 
-  // 🚀 DIRECT BYPASS (Zero SW Queueing):
-  // Completely bypass the Service Worker for all *.supabase.co REST and WebSocket requests,
-  // backend API routes, Firebase/Auth, and non-GET requests.
-  // The fetch handler directly returns fetch(event.request) without queueing.
-  if (
+  // 🚀 MANDATORY NETWORK-ONLY POLICY FOR SUPABASE & DYNAMIC APIS:
+  // ALL requests matching *.supabase.co, /rest/v1/, auth, realtime, backend APIs, Firebase, or non-GET requests
+  // strictly bypass the Service Worker cache completely.
+  // Returning immediately without calling event.respondWith() triggers the browser's native direct network fetch.
+  // This guarantees the PWA shell never serves stale, cached, or fallback mock/local data for Supabase dynamic queries.
+  const isSupabaseOrApiRequest =
     url.includes("supabase.co") ||
-    url.includes("lzdvmzumwuqycwdecaan") ||
+    url.includes("/rest/v1/") ||
     url.includes("/rest/v1") ||
     url.includes("/auth/v1") ||
     url.includes("/realtime/v1") ||
+    url.includes("lzdvmzumwuqycwdecaan") ||
     url.includes("/api/") ||
     url.includes("/api/portal") ||
     url.includes("/api/notifications") ||
@@ -165,9 +183,10 @@ self.addEventListener("fetch", (event) => {
     url.includes("identitytoolkit.googleapis.com") ||
     url.includes("securetoken.googleapis.com") ||
     url.includes("fcm.googleapis.com") ||
-    url.includes("chrome-extension")
-  ) {
-    event.respondWith(fetch(event.request));
+    url.includes("chrome-extension");
+
+  if (isSupabaseOrApiRequest) {
+    // Network-Only: Allow direct browser networking with zero SW interception or caching
     return;
   }
 
@@ -193,7 +212,14 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     fetch(request)
       .then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
+        if (
+          networkResponse &&
+          networkResponse.status === 200 &&
+          request.method === "GET" &&
+          !url.includes("supabase.co") &&
+          !url.includes("/rest/v1") &&
+          !url.includes("/api/")
+        ) {
           const copy = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
         }

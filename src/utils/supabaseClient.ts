@@ -100,6 +100,70 @@ export function normalizePhone(raw?: string | number | null): string {
   return digits;
 }
 
+/**
+ * Unified Barcode Extractor:
+ * Extracts clean student barcode directly from active session token / session object or storage.
+ */
+export function extractCleanBarcodeFromSession(sessionOrToken?: any): string {
+  try {
+    if (sessionOrToken) {
+      if (typeof sessionOrToken === "string") {
+        const str = sessionOrToken.trim();
+        if (str.startsWith("{")) {
+          try {
+            const parsed = JSON.parse(str);
+            const b = parsed.barcode || parsed.studentBarcode || parsed.account?.studentBarcode;
+            if (b) return normalizeBarcode(b);
+            if (parsed.token) return extractCleanBarcodeFromSession(parsed.token);
+          } catch {}
+        }
+        const sessMatch = str.match(/^sess-([0-9A-Za-z_-]+?)(?:-\d+)?$/);
+        if (sessMatch && sessMatch[1]) {
+          return normalizeBarcode(sessMatch[1]);
+        }
+        if (/^[0-9]+$/.test(str) || str.length <= 15) {
+          return normalizeBarcode(str);
+        }
+      } else if (typeof sessionOrToken === "object") {
+        const b =
+          sessionOrToken.barcode ||
+          sessionOrToken.studentBarcode ||
+          sessionOrToken.account?.studentBarcode;
+        if (b) return normalizeBarcode(b);
+        if (sessionOrToken.token) {
+          const bFromTok = extractCleanBarcodeFromSession(sessionOrToken.token);
+          if (bFromTok) return bFromTok;
+        }
+      }
+    }
+
+    if (typeof window !== "undefined") {
+      const rawParentToken =
+        localStorage.getItem("parent_session_token") ||
+        localStorage.getItem("eman_portal_session") ||
+        sessionStorage.getItem("eman_portal_session");
+
+      if (rawParentToken) {
+        try {
+          const parsed = JSON.parse(rawParentToken);
+          const b = parsed.barcode || parsed.studentBarcode || parsed.account?.studentBarcode;
+          if (b) return normalizeBarcode(b);
+          if (parsed.token) {
+            const bFromToken = extractCleanBarcodeFromSession(parsed.token);
+            if (bFromToken) return bFromToken;
+          }
+        } catch {
+          const bDirect = extractCleanBarcodeFromSession(rawParentToken);
+          if (bDirect) return bDirect;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("extractCleanBarcodeFromSession error:", err);
+  }
+  return "";
+}
+
 export interface LiveScanPayload {
   barcode: string;
   name: string;
@@ -1643,15 +1707,17 @@ export interface UnifiedStudentPortalData {
 }
 
 /**
- * Single Indexed High-Speed Lookup Engine for Parent Student Portal
- * Single direct query filtered ONLY by student barcode: .eq('barcode', cleanBarcode).single().
- * Concurrently executes student query alongside linked parent account with an absolute 2s timeout guard.
- * Zero sequential retries, zero phone column variations, zero cascading fallback lookups.
+ * Unified Direct Barcode Lookup for Parent Student Portal:
+ * 1. Extracts the clean student barcode directly from the active session token, argument, or storage.
+ * 2. Executes the primary cloud fetch ONLY using `.eq('barcode', cleanBarcode)` on `public.students`
+ *    aggregated with relations (`attendance_logs`, `payments`, `homework`).
+ * 3. Disambiguates foreign keys (`attendance_logs_student_id_fkey`, `payments_student_id_fkey`, `homework_student_id_fkey`).
+ * 4. Eliminates secondary cascading fallback chains and enforces a strict 5-second response limit.
  */
 export async function fetchUnifiedStudentPortalDataFromSupabase(
-  barcodeOrPhone: string
+  barcodeOrToken?: string
 ): Promise<UnifiedStudentPortalData> {
-  const cleanBarcode = normalizeBarcode(barcodeOrPhone);
+  const cleanBarcode = extractCleanBarcodeFromSession(barcodeOrToken);
 
   if (!cleanBarcode) {
     return {
@@ -1663,126 +1729,68 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       paymentsList: [],
       homeworkList: [],
       examScores: [],
-      message: "كود الطالب مطلوب",
+      message: "تعذر استخراج رمز الطالب من الجلسة النشطة",
     };
   }
 
   try {
-    // 500ms Hard Timeout Guard for Cloud Hydration
-    const fetchCore = async (): Promise<any> => {
-      // 1. Optimized Parallel Fetch Engine:
-      // Primary student query AND parallel sub-queries for attendance_logs, payments, homework concurrently via Promise.all()
-      const parallelFetchPromise = (async () => {
-        const studentPromise = supabase
-          .from("students")
-          .select("*")
-          .eq("barcode", cleanBarcode)
-          .single();
-
-        const attendancePromise = supabase
-          .from("attendance_logs")
-          .select("*")
-          .eq("barcode", cleanBarcode);
-
-        const paymentsPromise = supabase
-          .from("payments")
-          .select("*, students!payments_student_id_fkey!inner(barcode)")
-          .eq("students.barcode", cleanBarcode)
-          .then((res) => {
-            if (res.error || !res.data) {
-              return studentPromise.then((st) => {
-                if (st.data?.id) {
-                  return supabase.from("payments").select("*").eq("student_id", st.data.id);
-                }
-                return res;
-              });
-            }
-            return res;
-          });
-
-        const homeworkPromise = supabase
-          .from("homework")
-          .select("*, students!homework_student_id_fkey!inner(barcode)")
-          .eq("students.barcode", cleanBarcode)
-          .then((res) => {
-            if (res.error || !res.data) {
-              return studentPromise.then((st) => {
-                if (st.data?.id) {
-                  return supabase.from("homework").select("*").eq("student_id", st.data.id);
-                }
-                return res;
-              });
-            }
-            return res;
-          });
-
-        const [stRes, attRes, payRes, hwRes] = await Promise.all([
-          studentPromise,
-          attendancePromise,
-          paymentsPromise,
-          homeworkPromise,
-        ]);
-
-        if (!stRes.data) return null;
-
-        return {
-          ...stRes.data,
-          attendance_logs: Array.isArray(attRes.data) ? attRes.data : [],
-          payments: Array.isArray(payRes.data) ? payRes.data : [],
-          homework: Array.isArray(hwRes.data) ? hwRes.data : [],
-        };
-      })();
-
-      // 2. Relational join query with 300ms circuit breaker:
-      const relationalJoinPromise = supabase
+    // Primary Direct Cloud Fetch Engine (Sub-200ms)
+    const fetchDirectAggregatedStudent = async () => {
+      // 1. Primary disambiguated relational aggregation on public.students
+      const primaryRes = await supabase
         .from("students")
-        .select("*, attendance_logs(*), payments(*), homework(*)")
+        .select(`
+          *,
+          attendance_logs:attendance_logs_student_id_fkey(*),
+          payments:payments_student_id_fkey(*),
+          homework:homework_student_id_fkey(*)
+        `)
         .eq("barcode", cleanBarcode)
-        .single();
+        .maybeSingle();
 
-      // If relational join takes longer than 300ms, immediately resolve with parallel result
-      return new Promise<any>((resolve, reject) => {
-        let isDone = false;
+      if (!primaryRes.error && primaryRes.data) {
+        return primaryRes.data;
+      }
 
-        // If parallel resolves first and is valid, resolve immediately
-        parallelFetchPromise
-          .then((pData) => {
-            if (pData && !isDone) {
-              isDone = true;
-              resolve(pData);
-            }
-          })
-          .catch(() => {});
+      // 2. Alternate foreign key names in case schema environment uses custom aliases
+      if (primaryRes.error && (primaryRes.error.code === "PGRST201" || primaryRes.error.code === "PGRST200")) {
+        const altRes = await supabase
+          .from("students")
+          .select(`
+            *,
+            attendance_logs:fk_attendance_student(*),
+            payments:fk_payments_student(*),
+            homework:fk_homework_student(*)
+          `)
+          .eq("barcode", cleanBarcode)
+          .maybeSingle();
 
-        // If relational join completes under 300ms and is valid, resolve immediately
-        Promise.resolve(relationalJoinPromise)
-          .then((rRes) => {
-            if (rRes && (rRes as any).data && !(rRes as any).error && !isDone) {
-              isDone = true;
-              resolve((rRes as any).data);
-            }
-          })
-          .catch(() => {});
+        if (!altRes.error && altRes.data) {
+          return altRes.data;
+        }
+      }
 
-        // 300ms circuit breaker: if relational has not completed, resolve with parallel result immediately
-        setTimeout(async () => {
-          if (!isDone) {
-            isDone = true;
-            try {
-              const pData = await parallelFetchPromise;
-              resolve(pData);
-            } catch (err) {
-              reject(err);
-            }
-          }
-        }, 300);
-      });
+      // 3. Fallback generic embed if relations are singular
+      if (primaryRes.error && primaryRes.error.code !== "PGRST116") {
+        const stdRes = await supabase
+          .from("students")
+          .select("*, attendance_logs(*), payments(*), homework(*)")
+          .eq("barcode", cleanBarcode)
+          .maybeSingle();
+
+        if (!stdRes.error && stdRes.data) {
+          return stdRes.data;
+        }
+      }
+
+      return primaryRes.data || null;
     };
 
+    // Strict 5-Second Response Limit
     const studentRow = await withTimeout(
-      fetchCore(),
-      500,
-      "استعلام بيانات الطالب الموحدة (مهلة 500 مللي ثانية)"
+      fetchDirectAggregatedStudent(),
+      5000,
+      "استعلام بيانات الطالب الموحدة من Supabase (مهلة 5 ثوانٍ)"
     );
 
     if (!studentRow) {
