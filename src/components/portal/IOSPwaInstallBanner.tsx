@@ -12,20 +12,28 @@ export const IOSPwaInstallBanner: React.FC<IOSPwaInstallBannerProps> = ({ onDism
   useEffect(() => {
     if (typeof window === "undefined" || typeof navigator === "undefined") return;
 
-    // 1. Check if device is iOS (iPhone, iPad, iPod)
+    // 1. Explicitly check if the app is already running in standalone mode (Installed PWA)
+    const isStandalone =
+      (window.navigator as any).standalone ||
+      (typeof window.matchMedia === "function" &&
+        window.matchMedia("(display-mode: standalone)").matches);
+
+    // Automatically suppress and hide the banner if isStandalone is true so installed PWA users never see the prompt
+    if (isStandalone) {
+      setShowBanner(false);
+      return;
+    }
+
+    // 2. Check if device is iOS (iPhone, iPad, iPod)
     const ua = navigator.userAgent || "";
     const isIOSDevice =
       /iphone|ipad|ipod/i.test(ua) ||
       (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
-    if (!isIOSDevice) return;
-
-    // 2. Check if already running as installed Standalone PWA
-    const isStandalone =
-      (window.navigator as any).standalone === true ||
-      window.matchMedia("(display-mode: standalone)").matches;
-
-    if (isStandalone) return;
+    if (!isIOSDevice) {
+      setShowBanner(false);
+      return;
+    }
 
     // 3. Check if user already dismissed the prompt recently (e.g. within 5 days)
     try {
@@ -40,10 +48,44 @@ export const IOSPwaInstallBanner: React.FC<IOSPwaInstallBannerProps> = ({ onDism
 
     // Show banner after a gentle 1.5s delay to avoid layout shift during page load
     const timer = setTimeout(() => {
-      setShowBanner(true);
+      // Re-verify standalone state before showing to prevent race conditions
+      const currentIsStandalone =
+        (window.navigator as any).standalone ||
+        (typeof window.matchMedia === "function" &&
+          window.matchMedia("(display-mode: standalone)").matches);
+
+      if (!currentIsStandalone) {
+        setShowBanner(true);
+      }
     }, 1500);
 
-    return () => clearTimeout(timer);
+    // Listen to display-mode changes (e.g., if launched into standalone mode)
+    let mql: MediaQueryList | null = null;
+    let handleMqlChange: ((e: MediaQueryListEvent) => void) | null = null;
+    if (typeof window.matchMedia === "function") {
+      mql = window.matchMedia("(display-mode: standalone)");
+      handleMqlChange = (e: MediaQueryListEvent) => {
+        if (e.matches) {
+          setShowBanner(false);
+        }
+      };
+      if (mql.addEventListener) {
+        mql.addEventListener("change", handleMqlChange);
+      } else if ((mql as any).addListener) {
+        (mql as any).addListener(handleMqlChange);
+      }
+    }
+
+    return () => {
+      clearTimeout(timer);
+      if (mql && handleMqlChange) {
+        if (mql.removeEventListener) {
+          mql.removeEventListener("change", handleMqlChange);
+        } else if ((mql as any).removeListener) {
+          (mql as any).removeListener(handleMqlChange);
+        }
+      }
+    };
   }, []);
 
   const handleDismiss = () => {

@@ -58,27 +58,22 @@ export async function fetchChildTableWithDualKey(
   ascending: boolean = false
 ): Promise<any[]> {
   try {
+    const sId = String(studentId || "").trim();
+    const bCode = String(studentBarcode || "").trim();
+    const dualKeyFilter = bCode && sId
+      ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`
+      : sId
+      ? `student_id.eq.${sId}`
+      : `student_barcode.eq.${bCode},barcode.eq.${bCode}`;
+
     let q = supabase.from(tableName).select("*");
-    if (tableName === "homework" || tableName === "exam_grades" || tableName === "evaluations") {
-      const orFilter = studentBarcode
-        ? `student_id.eq.${studentId},student_barcode.eq.${studentBarcode},barcode.eq.${studentBarcode}`
-        : `student_id.eq.${studentId}`;
-      q = q.or(orFilter);
-    } else if (tableName === "attendance_logs") {
-      const orFilter = studentBarcode
-        ? `student_id.eq.${studentId},student_barcode.eq.${studentBarcode},barcode.eq.${studentBarcode}`
-        : `student_id.eq.${studentId}`;
-      q = q.or(orFilter);
-    } else if (tableName === "payments") {
-      const orFilter = studentBarcode
-        ? `student_id.eq.${studentId},student_barcode.eq.${studentBarcode},barcode.eq.${studentBarcode}`
-        : `student_id.eq.${studentId}`;
-      q = q.or(orFilter);
+    if (tableName === "chat_messages" || tableName === "messages") {
+      const chatFilter = bCode && sId
+        ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode},chat_id.eq.${bCode}`
+        : dualKeyFilter;
+      q = q.or(chatFilter);
     } else {
-      const orFilter = studentBarcode
-        ? `student_id.eq.${studentId},student_barcode.eq.${studentBarcode},barcode.eq.${studentBarcode},chat_id.eq.${studentBarcode}`
-        : `student_id.eq.${studentId}`;
-      q = q.or(orFilter);
+      q = q.or(dualKeyFilter);
     }
 
     if (orderCol) {
@@ -89,18 +84,11 @@ export async function fetchChildTableWithDualKey(
       return res.data;
     }
 
-    // Schema-tolerant fallback
-    if (studentId) {
-      const idRes = await supabase.from(tableName).select("*").eq("student_id", studentId);
-      if (!idRes.error && Array.isArray(idRes.data) && idRes.data.length > 0) {
-        return idRes.data;
-      }
-    }
-
-    if (studentBarcode) {
-      const bcRes = await supabase.from(tableName).select("*").eq("barcode", studentBarcode);
-      if (!bcRes.error && Array.isArray(bcRes.data) && bcRes.data.length > 0) {
-        return bcRes.data;
+    // Direct fallback without order column in case column is not indexed
+    if (res.error && orderCol) {
+      const fallbackRes = await supabase.from(tableName).select("*").or(dualKeyFilter);
+      if (!fallbackRes.error && Array.isArray(fallbackRes.data)) {
+        return fallbackRes.data;
       }
     }
 
@@ -113,9 +101,10 @@ export async function fetchChildTableWithDualKey(
 
 /**
  * Primary Parent Portal Data Hook:
- * - Direct execution of fetchUnifiedStudentPortalDataFromSupabase
- * - Explicit Console Audit Logging: console.log('Parent Fetch Raw Response:', { attendance, homework, grades, payments });
- * - Dynamic payload normalization for grade/score/degree, subject/title/name, created_at/date/timestamp
+ * - Strict Network-First Strategy: Directly fetches live Supabase records on every mount, child switch, and foreground return
+ * - Dual-Key Matching: queries sub-tables with .or(`student_id.eq.${student.id},student_barcode.eq.${student.barcode},barcode.eq.${student.barcode}`)
+ * - Immediate (<200ms) REST revalidation on document.visibilitychange decoupled from websocket cooldown
+ * - Renders raw authentic Supabase response immediately with zero stale cache fallback
  */
 export function useParentPortalData(targetBarcodeOrToken?: string): UseParentPortalDataReturn {
   const [data, setData] = useState<UnifiedStudentPortalData | null>(() => {
@@ -138,10 +127,11 @@ export function useParentPortalData(targetBarcodeOrToken?: string): UseParentPor
     return Boolean(clean && getSessionPortalData(clean)?.success);
   });
 
-  const currentHydratedBarcodeRef = useRef<string>("");
+  // Track active in-flight request to prevent race conditions during rapid revalidations
+  const inFlightPromiseRef = useRef<{ barcode: string; promise: Promise<UnifiedStudentPortalData | null> } | null>(null);
 
   const executeFetch = useCallback(
-    async (barcodeParam?: string, force: boolean = false): Promise<UnifiedStudentPortalData | null> => {
+    async (barcodeParam?: string, _force: boolean = true): Promise<UnifiedStudentPortalData | null> => {
       let cleanInput = String(barcodeParam || targetBarcodeOrToken || "").trim();
       if (cleanInput.startsWith("sess-") || cleanInput.includes("eman_portal_")) {
         const ext = extractCleanBarcodeFromSession(cleanInput);
@@ -155,53 +145,90 @@ export function useParentPortalData(targetBarcodeOrToken?: string): UseParentPor
 
       if (!cleanInput) return null;
 
-      if (!force && currentHydratedBarcodeRef.current === cleanInput && data?.success) {
-        return data;
+      // If exact same barcode fetch is already in flight, reuse its promise
+      if (inFlightPromiseRef.current && inFlightPromiseRef.current.barcode === cleanInput) {
+        return inFlightPromiseRef.current.promise;
       }
 
       setIsLoading(true);
       setError(null);
 
-      try {
-        const unifiedData = await fetchUnifiedStudentPortalDataFromSupabase(cleanInput);
+      const fetchPromise = (async () => {
+        try {
+          // Strict Network-First: Fetch live authentic records directly from Supabase Cloud
+          const unifiedData = await fetchUnifiedStudentPortalDataFromSupabase(cleanInput);
 
-        if (unifiedData && unifiedData.success) {
-          setSessionPortalData(cleanInput, unifiedData);
+          if (unifiedData && unifiedData.success) {
+            setSessionPortalData(cleanInput, unifiedData);
+            setData(unifiedData);
+            setIsHydrated(true);
+            return unifiedData;
+          }
+
           setData(unifiedData);
-          setIsHydrated(true);
-          currentHydratedBarcodeRef.current = cleanInput;
+          if (!unifiedData?.success) {
+            setError(unifiedData?.message || "تعذر مزامنة بيانات الطالب");
+          }
           return unifiedData;
+        } catch (err: any) {
+          console.error("[useParentPortalData] Network fetch error:", err);
+          setError(err.message || "حدث خطأ أثناء جلب البيانات");
+          return null;
+        } finally {
+          setIsLoading(false);
+          inFlightPromiseRef.current = null;
         }
+      })();
 
-        setData(unifiedData);
-        if (!unifiedData?.success) {
-          setError(unifiedData?.message || "تعذر مزامنة بيانات الطالب");
-        }
-        return unifiedData;
-      } catch (err: any) {
-        console.error("[useParentPortalData] Fetch error:", err);
-        setError(err.message || "حدث خطأ أثناء جلب البيانات");
-        return null;
-      } finally {
-        setIsLoading(false);
-      }
+      inFlightPromiseRef.current = { barcode: cleanInput, promise: fetchPromise };
+      return fetchPromise;
     },
-    [targetBarcodeOrToken, data]
+    [targetBarcodeOrToken]
   );
 
+  // Network-First initial load & target barcode change
   useEffect(() => {
     let clean = String(targetBarcodeOrToken || "").trim();
     if (clean.startsWith("sess-") || clean.includes("eman_portal_")) {
       const ext = extractCleanBarcodeFromSession(clean);
       if (ext) clean = ext;
     }
+    if (!clean) {
+      const sess = getSavedPortalSession();
+      clean = String(sess?.account?.studentBarcode || sess?.barcode || "").trim();
+    }
     if (!clean) return;
 
-    if (currentHydratedBarcodeRef.current === clean && data?.success) {
-      return;
-    }
+    // Trigger immediate direct network fetch
+    executeFetch(clean, true);
+  }, [targetBarcodeOrToken, executeFetch]);
 
-    executeFetch(clean, false);
+  // Immediate REST Revalidation: Listen to un-throttled visibility change & focus events (<200ms)
+  useEffect(() => {
+    const handleRevalidate = () => {
+      let clean = String(targetBarcodeOrToken || "").trim();
+      if (clean.startsWith("sess-") || clean.includes("eman_portal_")) {
+        const ext = extractCleanBarcodeFromSession(clean);
+        if (ext) clean = ext;
+      }
+      if (!clean) {
+        const sess = getSavedPortalSession();
+        clean = String(sess?.account?.studentBarcode || sess?.barcode || "").trim();
+      }
+      if (clean) {
+        console.log("[useParentPortalData] Immediate REST revalidation executing for:", clean);
+        executeFetch(clean, true);
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("eman_portal_force_revalidate", handleRevalidate);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("eman_portal_force_revalidate", handleRevalidate);
+      }
+    };
   }, [targetBarcodeOrToken, executeFetch]);
 
   return {

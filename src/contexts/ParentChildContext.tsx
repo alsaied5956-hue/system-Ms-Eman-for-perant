@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import { Student, PaymentRecord } from "../types";
 import { ParentAccount } from "../types/portal";
-import { supabase } from "../utils/supabaseClient";
+import { supabase, getSecureChannelTopic } from "../utils/supabaseClient";
 import { subscribeToStudentLiveBarcode, executeInstantRemoteLogout } from "../utils/studentLiveSync";
 import { withTimeout } from "../utils/promiseTimeout";
 
@@ -229,9 +229,14 @@ export const ParentChildProvider: React.FC<ParentChildProviderProps> = ({
     // Memory Leak Prevention: Explicitly invoke supabase.removeChannel() when switching between siblings/students
     try {
       const channels = supabase.getChannels();
-      const prevChannelPrefix = `parent-student-engine-${activeBarcode}`;
+      const prevChannelTopic = getSecureChannelTopic("parent-student-engine", activeBarcode);
+      const sanitizedBarcode = activeBarcode.replace(/[^a-zA-Z0-9_-]/g, "_");
       channels.forEach((ch) => {
-        if (ch.topic.includes(prevChannelPrefix)) {
+        if (
+          ch.topic.includes(prevChannelTopic) ||
+          ch.topic.includes(`parent-student-engine-${sanitizedBarcode}`) ||
+          ch.topic.includes(`parent-student-engine-${activeBarcode}`)
+        ) {
           console.log(`[ParentChildContext] Removing stale student channel on child switch: ${ch.topic}`);
           supabase.removeChannel(ch);
         }

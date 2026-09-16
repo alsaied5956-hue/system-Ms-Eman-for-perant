@@ -1,6 +1,12 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { supabase, barcodeToUUID, normalizeBarcode } from "../utils/supabaseClient";
+import {
+  supabase,
+  barcodeToUUID,
+  normalizeBarcode,
+  getSecureChannelTopic,
+  throttledRealtimeConnect,
+} from "../utils/supabaseClient";
 import { ParentAccount } from "../types/portal";
 import { getLocalParentAccounts, saveLocalParentAccounts, getSavedPortalSession } from "../utils/portalStorage";
 import {
@@ -465,28 +471,51 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
     options?.onAnyChange,
   ]);
 
-  // Background Reconnection & Visibility Change (Item 5):
-  // Force-reconnect the Supabase Realtime socket when the app returns from background
+  // Background Reconnection & Visibility Change (Item 5, 2, 3):
+  // 1. Immediate un-throttled REST data revalidation when user opens/returns to the app (<200ms)
+  // 2. Throttled reconnect of Supabase Realtime WebSocket socket (4s cooldown) to prevent reconnect storms and HTTP 429
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (typeof document !== "undefined" && document.visibilityState === "visible") {
-        console.log("[Realtime Sync] App returned to foreground. Re-establishing Supabase socket connection...");
-        try {
-          supabase.realtime.connect();
-        } catch (connErr) {
-          console.warn("[Realtime Sync] Socket reconnect notice:", connErr);
-        }
-        // Dispatch revalidate event so portals refresh local cache if needed
+        // Immediate un-throttled REST data revalidation
         if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("eman_portal_force_revalidate", { detail: { timestamp: Date.now() } }));
+          window.dispatchEvent(
+            new CustomEvent("eman_portal_force_revalidate", {
+              detail: { timestamp: Date.now(), source: "document-visibilitychange" },
+            })
+          );
         }
+        // Throttled WebSocket reconnect
+        throttledRealtimeConnect("document-visibilitychange");
       }
     };
 
     const handleWindowFocus = () => {
-      try {
-        supabase.realtime.connect();
-      } catch {}
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        // Immediate un-throttled REST data revalidation
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("eman_portal_force_revalidate", {
+              detail: { timestamp: Date.now(), source: "window-focus" },
+            })
+          );
+        }
+        // Throttled WebSocket reconnect
+        throttledRealtimeConnect("window-focus");
+      }
+    };
+
+    const handleOnline = () => {
+      // Immediate un-throttled REST data revalidation on network recovery
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("eman_portal_force_revalidate", {
+            detail: { timestamp: Date.now(), source: "network-online" },
+          })
+        );
+      }
+      // Throttled WebSocket reconnect
+      throttledRealtimeConnect("network-online");
     };
 
     if (typeof document !== "undefined") {
@@ -494,7 +523,7 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
     }
     if (typeof window !== "undefined") {
       window.addEventListener("focus", handleWindowFocus);
-      window.addEventListener("online", handleWindowFocus);
+      window.addEventListener("online", handleOnline);
     }
 
     return () => {
@@ -503,7 +532,7 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
       }
       if (typeof window !== "undefined") {
         window.removeEventListener("focus", handleWindowFocus);
-        window.removeEventListener("online", handleWindowFocus);
+        window.removeEventListener("online", handleOnline);
       }
     };
   }, []);
@@ -553,7 +582,7 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
 
     const channelTopic = isGlobalAdmin
       ? "admin-global-realtime-engine"
-      : `parent-student-engine-${cleanBarcode}`;
+      : getSecureChannelTopic("parent-student-engine", cleanBarcode);
 
     // Clean up any stale channel with this topic first
     try {

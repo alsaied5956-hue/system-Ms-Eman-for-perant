@@ -123,6 +123,58 @@ export function normalizePhone(raw?: string | number | null): string {
 }
 
 /**
+ * Sanitizes and securely encodes a Realtime channel identifier.
+ * Replaces any non-alphanumeric characters (except underscores and hyphens) with underscores.
+ * Does NOT use encodeURIComponent or percent-encoding as '%' causes silent CHANNEL_ERROR socket crashes in Supabase Realtime.
+ */
+export function getSecureChannelTopic(prefix: string, identifier: string): string {
+  if (!identifier) return prefix;
+  const cleanPrefix = String(prefix).trim().replace(/[^a-zA-Z0-9_-]/g, "_");
+  const sanitized = String(identifier).trim().replace(/[^a-zA-Z0-9_-]/g, "_");
+  return `${cleanPrefix}-${sanitized}`;
+}
+
+let lastRealtimeReconnectTimestamp = 0;
+let reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
+const RECONNECT_COOLDOWN_MS = 4000; // 4 second cooldown window strictly for WebSocket reconnection
+
+/**
+ * Throttled Supabase Realtime Reconnection.
+ * Prevents reconnect storms and HTTP 429 (Too Many Requests) errors strictly on the WebSocket layer.
+ * NOTE: REST data revalidation is decoupled and handled immediately/un-throttled.
+ */
+export function throttledRealtimeConnect(source: string = "foreground"): void {
+  const now = Date.now();
+  const elapsed = now - lastRealtimeReconnectTimestamp;
+
+  if (elapsed < RECONNECT_COOLDOWN_MS) {
+    // Schedule trailing execution if not already scheduled
+    if (!reconnectTimeoutId) {
+      reconnectTimeoutId = setTimeout(() => {
+        reconnectTimeoutId = null;
+        throttledRealtimeConnect(`${source}-trailing`);
+      }, RECONNECT_COOLDOWN_MS - elapsed);
+    }
+    return;
+  }
+
+  lastRealtimeReconnectTimestamp = now;
+  if (reconnectTimeoutId) {
+    clearTimeout(reconnectTimeoutId);
+    reconnectTimeoutId = null;
+  }
+
+  console.log(`[Realtime Sync] Re-establishing Supabase Realtime socket connection (source: ${source})...`);
+  try {
+    if (supabase && supabase.realtime) {
+      supabase.realtime.connect();
+    }
+  } catch (err) {
+    console.warn("[Realtime Sync] Socket reconnect warning:", err);
+  }
+}
+
+/**
  * Unified Barcode Extractor:
  * Extracts clean student barcode directly from active session token / session object or storage.
  */
@@ -2037,178 +2089,110 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
   const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanInput);
 
   try {
-    // Primary Direct Cloud Fetch Engine with Standard Implicit Join & Resilient Table Fallback
+    // Direct Supabase Cloud Fetch Engine with Dual-Key matching across all sub-tables:
+    // .or(`student_id.eq.${student.id},student_barcode.eq.${student.barcode},barcode.eq.${student.barcode}`)
     const fetchDirectAggregatedStudent = async () => {
-      const parentBarcode = cleanInput;
-      let studentRecord: any = null;
-
-      // 1. Primary Attempt: Standard implicit relational join without explicit named foreign keys
-      // Fast 2.5s guard to prevent hanging if relational joins or schema locks stall
-      try {
-        const relPromise = supabase
+      // Step A: Fast direct student resolution from students table
+      let studentData: any = null;
+      if (isUUID) {
+        const res = await supabase
           .from("students")
-          .select("*, attendance_logs(*), payments(*), homework(*), exam_grades(*), chat_messages(*)")
-          .eq("barcode", parentBarcode)
+          .select("*")
+          .or(`id.eq.${cleanInput},barcode.eq.${cleanInput}`)
           .maybeSingle();
-
-        const { data: relStudent, error: relErr } = await withTimeout(
-          relPromise,
-          2500,
-          "استعلام الربط العلائقي"
-        ).catch(() => ({ data: null, error: "timeout" }));
-
-        if (!relErr && relStudent) {
-          studentRecord = relStudent;
-          console.log("[Parent Fetch] Standard implicit relational query succeeded for barcode:", parentBarcode);
-        } else if (relErr) {
-          console.warn(
-            "[Parent Fetch] Standard relational join notice (foreign key ambiguity or schema constraint, executing table fallback):",
-            typeof relErr === "object" ? relErr.message || relErr : relErr
-          );
-        }
-      } catch (relEx) {
-        console.warn("[Parent Fetch] Relational join exception, executing table fallback:", relEx);
+        studentData = res.data;
+      } else {
+        const uuidFallback = barcodeToUUID(cleanInput);
+        const res = await supabase
+          .from("students")
+          .select("*")
+          .or(`barcode.eq.${cleanInput},id.eq.${uuidFallback},id.eq.${cleanInput}`)
+          .maybeSingle();
+        studentData = res.data;
       }
 
-      // 2. Resilient Table Fallback: If relational join failed or timed out, resolve student and query tables
-      if (!studentRecord) {
-        // Step A: Fast student resolution
-        let studentData: any = null;
-        if (isUUID) {
-          const res = await supabase
-            .from("students")
-            .select("*")
-            .or(`id.eq.${cleanInput},barcode.eq.${cleanInput}`)
-            .maybeSingle();
-          studentData = res.data;
-        } else {
-          const uuidFallback = barcodeToUUID(cleanInput);
-          const res = await supabase
-            .from("students")
-            .select("*")
-            .or(`barcode.eq.${cleanInput},id.eq.${uuidFallback},id.eq.${cleanInput}`)
-            .maybeSingle();
-          studentData = res.data;
-        }
+      if (!studentData) {
+        const byBarcode = await supabase.from("students").select("*").eq("barcode", cleanInput).maybeSingle();
+        studentData = byBarcode.data;
+      }
 
-        if (!studentData) {
-          const byBarcode = await supabase.from("students").select("*").eq("barcode", cleanInput).maybeSingle();
-          studentData = byBarcode.data;
-        }
+      if (!studentData && isUUID) {
+        const byId = await supabase.from("students").select("*").eq("id", cleanInput).maybeSingle();
+        studentData = byId.data;
+      }
 
-        if (!studentData && isUUID) {
-          const byId = await supabase.from("students").select("*").eq("id", cleanInput).maybeSingle();
-          studentData = byId.data;
-        }
+      if (!studentData) {
+        return null;
+      }
 
-        if (!studentData) {
-          return null;
-        }
+      const sId = String(studentData.id || "").trim();
+      const bCode = String(studentData.barcode || cleanInput).trim();
 
-        const sId = String(studentData.id || "").trim();
-        const bCode = String(studentData.barcode || cleanInput).trim();
+      // Step B: Dual-Key matching filter across all sub-tables
+      const dualKeyFilter = bCode && sId
+        ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`
+        : sId
+        ? `student_id.eq.${sId}`
+        : `student_barcode.eq.${bCode},barcode.eq.${bCode}`;
 
-        // Helper for schema-aware table queries
-        const queryTableDirect = async (
-          tableName: string,
-          orderCol?: string,
-          ascending = false
-        ): Promise<any[]> => {
-          try {
-            let q = supabase.from(tableName).select("*");
-            if (tableName === "homework" || tableName === "exam_grades" || tableName === "evaluations") {
-              const orFilter = bCode
-                ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`
-                : `student_id.eq.${sId}`;
-              q = q.or(orFilter);
-            } else if (tableName === "attendance_logs") {
-              const orFilter = bCode
-                ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`
-                : `student_id.eq.${sId}`;
-              q = q.or(orFilter);
-            } else if (tableName === "payments") {
-              const orFilter = bCode
-                ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`
-                : `student_id.eq.${sId}`;
-              q = q.or(orFilter);
-            } else {
-              // chat_messages, messages
-              const orFilter = bCode
-                ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode},chat_id.eq.${bCode}`
-                : `student_id.eq.${sId}`;
-              q = q.or(orFilter);
-            }
+      const chatDualKeyFilter = bCode && sId
+        ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode},chat_id.eq.${bCode}`
+        : dualKeyFilter;
 
-            if (orderCol) {
-              q = q.order(orderCol, { ascending });
-            }
-
-            const res = await q;
-            if (!res.error && Array.isArray(res.data)) {
-              return res.data;
-            }
-
-            // Schema-tolerant fallback
-            if (sId) {
-              const idRes = await supabase.from(tableName).select("*").eq("student_id", sId);
-              if (!idRes.error && Array.isArray(idRes.data) && idRes.data.length > 0) {
-                return idRes.data;
-              }
-            }
-            if (bCode) {
-              const bcRes = await supabase.from(tableName).select("*").eq("barcode", bCode);
-              if (!bcRes.error && Array.isArray(bcRes.data) && bcRes.data.length > 0) {
-                return bcRes.data;
-              }
-            }
-            return [];
-          } catch (err) {
-            console.warn(`[Parent Fetch] Error querying ${tableName}:`, err);
-            return [];
+      // Helper for direct sub-table queries using Dual-Key filter
+      const querySubTableDirect = async (
+        tableName: string,
+        filter: string,
+        orderCol?: string,
+        ascending = false
+      ): Promise<any[]> => {
+        try {
+          let q = supabase.from(tableName).select("*").or(filter);
+          if (orderCol) {
+            q = q.order(orderCol, { ascending });
           }
-        };
-
-        // Parallel per-table execution for sub-second responses
-        const [attendance, homework, payments, grades, chatMessages] = await Promise.all([
-          queryTableDirect("attendance_logs", "date_key", false),
-          queryTableDirect("homework", "date_key", false),
-          queryTableDirect("payments", "month_key", false),
-          queryTableDirect("exam_grades", "created_at", false).then(async (rows) => {
-            if (!rows || rows.length === 0) {
-              return await queryTableDirect("evaluations", "created_at", false);
+          const res = await q;
+          if (!res.error && Array.isArray(res.data)) {
+            return res.data;
+          }
+          if (res.error && orderCol) {
+            // Retry without order column if schema does not support orderCol
+            const retryRes = await supabase.from(tableName).select("*").or(filter);
+            if (!retryRes.error && Array.isArray(retryRes.data)) {
+              return retryRes.data;
             }
-            return rows;
-          }),
-          queryTableDirect("chat_messages", "created_at", true).then(async (rows) => {
-            if (!rows || rows.length === 0) {
-              return await queryTableDirect("messages", "created_at", true);
-            }
-            return rows;
-          }),
-        ]);
+          }
+          return [];
+        } catch (err) {
+          console.warn(`[Parent Fetch] Error querying ${tableName}:`, err);
+          return [];
+        }
+      };
 
-        studentRecord = {
-          ...studentData,
-          attendance_logs: attendance,
-          homework,
-          payments,
-          exam_grades: grades,
-          chat_messages: chatMessages,
-        };
-      }
+      // Parallel direct queries to all 5 sub-tables for authentic sub-second responses
+      const [attendance, homework, payments, grades, chatMessages] = await Promise.all([
+        querySubTableDirect("attendance_logs", dualKeyFilter, "date_key", false),
+        querySubTableDirect("homework", dualKeyFilter, "date_key", false),
+        querySubTableDirect("payments", dualKeyFilter, "month_key", false),
+        querySubTableDirect("exam_grades", dualKeyFilter, "created_at", false).then(async (rows) => {
+          if (!rows || rows.length === 0) {
+            return await querySubTableDirect("evaluations", dualKeyFilter, "created_at", false);
+          }
+          return rows;
+        }),
+        querySubTableDirect("chat_messages", chatDualKeyFilter, "created_at", true).then(async (rows) => {
+          if (!rows || rows.length === 0) {
+            return await querySubTableDirect("messages", chatDualKeyFilter, "created_at", true);
+          }
+          return rows;
+        }),
+      ]);
 
-      const attendance = Array.isArray(studentRecord?.attendance_logs) ? studentRecord.attendance_logs : [];
-      const homework = Array.isArray(studentRecord?.homework) ? studentRecord.homework : [];
-      const grades = Array.isArray(studentRecord?.exam_grades) ? studentRecord.exam_grades : [];
-      const payments = Array.isArray(studentRecord?.payments) ? studentRecord.payments : [];
-
-      const chatMessages = Array.isArray(studentRecord?.chat_messages) ? studentRecord.chat_messages : [];
-
-      // 3. Explicit Console Audit Logging: exact payload inspection
+      // Console audit log: exact payload inspection directly from Supabase
       console.log("Parent Fetch Raw Response:", { attendance, homework, grades, payments, chatMessages });
 
       return {
-        ...studentRecord,
+        ...studentData,
         attendance_logs: attendance,
         homework,
         payments,
@@ -2436,28 +2420,6 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       } catch {}
     }
 
-    // Fallback: If examGradesList is empty but student row has totalExamScores or lastExamScore
-    if (examGradesList.length === 0 && (parsedScores.length > 0 || studentRow.last_exam_score)) {
-      if (studentRow.last_exam_title || studentRow.last_exam_score) {
-        const scoreNum = parseFloat(studentRow.last_exam_score || "0") || 0;
-        examGradesList.push({
-          id: "synth-latest",
-          studentId: studentRow.id,
-          barcode: bCode,
-          examTitle: studentRow.last_exam_title || "آخر اختبار مرصود",
-          title: studentRow.last_exam_title || "آخر اختبار مرصود",
-          score: scoreNum,
-          maxScore: 10,
-          percentage: Math.min(100, Math.round((scoreNum / 10) * 100)),
-          teacherNotes: "تم الرصد من سجل درجات المنظومة المعتمد",
-          notes: "تم الرصد من سجل درجات المنظومة المعتمد",
-          examDate: studentRow.updated_at ? studentRow.updated_at.slice(0, 10) : "",
-          createdAt: studentRow.updated_at || new Date().toISOString(),
-          scoreFormatted: studentRow.last_exam_score || `${scoreNum} / 10`,
-        });
-      }
-    }
-
     // Derive numeric scores list (percentages for performance indicators)
     const finalScores: number[] =
       examGradesList.length > 0
@@ -2535,14 +2497,6 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
     };
   } catch (err: any) {
     console.error("[fetchUnifiedStudentPortalDataFromSupabase] Error:", err);
-    try {
-      const cached = getSessionPortalData(cleanInput);
-      if (cached && cached.success && cached.student) {
-        console.warn("[fetchUnifiedStudentPortalDataFromSupabase] Falling back to locally cached session data for:", cleanInput);
-        return cached;
-      }
-    } catch {}
-
     return {
       success: false,
       student: null,
