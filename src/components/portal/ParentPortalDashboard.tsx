@@ -27,6 +27,7 @@ import {
   subscribeToAttendanceStatusChanges,
   subscribeToPaymentChanges,
 } from "../../utils/supabaseClient";
+import { useParentPortalData } from "../../hooks/useParentPortalData";
 import { useGlobalRealtimeSync } from "../../hooks/useGlobalRealtimeSync";
 import {
   getSessionPortalData,
@@ -293,131 +294,24 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     return s || null;
   }, [students, selectedStudentBarcode, account]);
 
-  // Live Unified Portal Data from Supabase directly (pre-populated from in-memory session cache)
-  const initialTargetBarcode = String(selectedStudentBarcode || account.studentBarcode).trim();
-  const [supabasePortalData, setSupabasePortalData] = useState<UnifiedStudentPortalData | null>(() => {
-    return initialTargetBarcode ? getSessionPortalData(initialTargetBarcode) : null;
-  });
-  const [isCloudHydrated, setIsCloudHydrated] = useState<boolean>(() => {
-    return Boolean(initialTargetBarcode && getSessionPortalData(initialTargetBarcode)?.success);
-  });
-  const isCloudHydratedRef = useRef<boolean>(
-    Boolean(initialTargetBarcode && getSessionPortalData(initialTargetBarcode)?.success)
-  );
-  const currentHydratedBarcodeRef = useRef<string>(
-    initialTargetBarcode && getSessionPortalData(initialTargetBarcode)?.success ? initialTargetBarcode : ""
-  );
-  const activeStudentIdRef = useRef<string>(
-    initialTargetBarcode ? getSessionPortalData(initialTargetBarcode)?.student?.id || "" : ""
-  );
-  const [isHydratingSupabase, setIsHydratingSupabase] = useState<boolean>(false);
-  const [supabaseError, setSupabaseError] = useState<string | null>(null);
-
   const targetBarcode = String(selectedStudentBarcode || account.studentBarcode).trim();
 
-  // 1. Clean Hydration Effect: Trigger fetchUnifiedStudentPortalDataFromSupabase ONCE inside a clean useEffect with zero dependency loops
+  // Primary Parent Portal Data Hook (Dual-Key Querying + Payload Normalization + Raw Response Console Audit)
+  const {
+    data: supabasePortalData,
+    isLoading: isHydratingSupabase,
+    error: supabaseError,
+    isHydrated: isCloudHydrated,
+    refetch: fetchPortalData,
+    setData: setSupabasePortalData,
+  } = useParentPortalData(targetBarcode);
+
+  const activeStudentIdRef = useRef<string>(supabasePortalData?.student?.id || "");
   useEffect(() => {
-    if (!targetBarcode) return;
-
-    // Single source hydration lock: skip duplicate network fetch if already hydrated for this barcode
-    if (isCloudHydratedRef.current && currentHydratedBarcodeRef.current === targetBarcode) {
-      return;
+    if (supabasePortalData?.student?.id) {
+      activeStudentIdRef.current = supabasePortalData.student.id;
     }
-
-    // Fast in-memory session cache check
-    const cached = getSessionPortalData(targetBarcode);
-    if (cached && cached.success) {
-      setSupabasePortalData(cached);
-      setSupabaseError(null);
-      setIsHydratingSupabase(false);
-      isCloudHydratedRef.current = true;
-      currentHydratedBarcodeRef.current = targetBarcode;
-      if (cached.student?.id) {
-        activeStudentIdRef.current = cached.student.id;
-      }
-      setIsCloudHydrated(true);
-      return;
-    }
-
-    let isSubscribed = true;
-    setIsHydratingSupabase(true);
-    setSupabaseError(null);
-
-    // Pass session token or target barcode to direct unified fetch
-    const activeSess = getSavedPortalSession();
-    const tokenOrBarcode = activeSess?.token || targetBarcode;
-
-    fetchUnifiedStudentPortalDataFromSupabase(tokenOrBarcode)
-      .then((data) => {
-        if (!isSubscribed) return;
-        if (data && data.success) {
-          setSessionPortalData(targetBarcode, data);
-          setSupabasePortalData(data);
-          setSupabaseError(null);
-          isCloudHydratedRef.current = true;
-          currentHydratedBarcodeRef.current = targetBarcode;
-          if (data.student?.id) {
-            activeStudentIdRef.current = data.student.id;
-          }
-          setIsCloudHydrated(true);
-        } else if (!isCloudHydratedRef.current) {
-          setSupabaseError(data?.message || "Network connection error. Please retry");
-        }
-      })
-      .catch((err) => {
-        if (!isSubscribed) return;
-        console.warn("[ParentPortalDashboard] Cloud hydration error:", err);
-        if (!isCloudHydratedRef.current) {
-          setSupabaseError("Network connection error. Please retry");
-        }
-      })
-      .finally(() => {
-        if (isSubscribed) {
-          setIsHydratingSupabase(false);
-        }
-      });
-
-    return () => {
-      isSubscribed = false;
-    };
-  }, [targetBarcode]);
-
-  // Clean manual refresh handler (pull-to-refresh, retry button, or child switch)
-  const fetchPortalData = useCallback(async (bCode: string, force: boolean = false) => {
-    const cleanBarcode = String(bCode).trim();
-    if (!cleanBarcode) return;
-
-    if (!force && isCloudHydratedRef.current && currentHydratedBarcodeRef.current === cleanBarcode) {
-      return;
-    }
-
-    setIsHydratingSupabase(true);
-    setSupabaseError(null);
-
-    try {
-      const data = await fetchUnifiedStudentPortalDataFromSupabase(cleanBarcode);
-      if (data && data.success) {
-        setSessionPortalData(cleanBarcode, data);
-        setSupabasePortalData(data);
-        setSupabaseError(null);
-        isCloudHydratedRef.current = true;
-        currentHydratedBarcodeRef.current = cleanBarcode;
-        if (data.student?.id) {
-          activeStudentIdRef.current = data.student.id;
-        }
-        setIsCloudHydrated(true);
-      } else if (!isCloudHydratedRef.current) {
-        setSupabaseError(data?.message || "Network connection error. Please retry");
-      }
-    } catch (err: any) {
-      console.warn("[ParentPortalDashboard] Direct fetch notice:", err);
-      if (!isCloudHydratedRef.current) {
-        setSupabaseError("Network connection error. Please retry");
-      }
-    } finally {
-      setIsHydratingSupabase(false);
-    }
-  }, []);
+  }, [supabasePortalData?.student?.id]);
 
   // 2. Unified Realtime Listener Engine for Student Tables (Attendance, Absences, Late, Grades, Payments, Homework, Chat):
   useGlobalRealtimeSync({
@@ -558,17 +452,34 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
             homeworkList: existingList.filter((h: any) => h.id !== delId && h.date_key !== delId),
           };
         });
-      } else if (newRow && newRow.date_key) {
+      } else if (newRow) {
+        const hwDate = newRow.created_at || newRow.date || newRow.timestamp || newRow.date_key || "";
+        const hwDateStr = typeof hwDate === "string" ? (hwDate.length >= 10 ? hwDate.slice(0, 10) : hwDate) : "";
+        const hwGrade = newRow.grade !== undefined ? newRow.grade : newRow.score !== undefined ? newRow.score : newRow.degree;
+        const hwTitle = newRow.subject || newRow.title || newRow.name || `واجب درس ${hwDateStr}`;
+        const normalizedHw = {
+          ...newRow,
+          id: newRow.id || `hw-${Date.now()}`,
+          title: hwTitle,
+          subject: hwTitle,
+          name: hwTitle,
+          date_key: newRow.date_key || hwDateStr,
+          date: hwDateStr,
+          created_at: newRow.created_at || hwDateStr,
+          grade: hwGrade,
+          score: Number(hwGrade) || 0,
+          degree: newRow.degree,
+        };
         setSupabasePortalData((prev) => {
           if (!prev) return null;
           const existingList = Array.isArray(prev.homeworkList) ? prev.homeworkList : [];
-          const index = existingList.findIndex((h: any) => h.date_key === newRow.date_key || (newRow.id && h.id === newRow.id));
+          const index = existingList.findIndex((h: any) => (normalizedHw.id && h.id === normalizedHw.id) || h.date_key === normalizedHw.date_key);
           let updatedList = [];
           if (index >= 0) {
             updatedList = [...existingList];
-            updatedList[index] = { ...updatedList[index], ...newRow };
+            updatedList[index] = { ...updatedList[index], ...normalizedHw };
           } else {
-            updatedList = [newRow, ...existingList];
+            updatedList = [normalizedHw, ...existingList];
           }
           return {
             ...prev,
@@ -607,10 +518,11 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
           };
         });
       } else if (newRow) {
-        const itemTitle = newRow.exam_title || newRow.title || "اختبار دوري";
-        const score = Number(newRow.score) || 0;
+        const rawGrade = newRow.grade !== undefined ? newRow.grade : newRow.score !== undefined ? newRow.score : newRow.degree;
+        const itemTitle = newRow.subject || newRow.title || newRow.name || newRow.exam_title || "اختبار دوري";
+        const score = Number(rawGrade) || 0;
         const maxScore = Number(newRow.max_score !== undefined ? newRow.max_score : (newRow.maxScore !== undefined ? newRow.maxScore : 10)) || 10;
-        const examDateVal = newRow.date || newRow.exam_date || (newRow.created_at ? newRow.created_at.slice(0, 10) : "");
+        const examDateVal = newRow.created_at || newRow.date || newRow.timestamp || newRow.exam_date || "";
         const normalized = {
           id: newRow.id || `exam-${Date.now()}`,
           studentId: newRow.student_id || targetBarcode,
@@ -1292,23 +1204,62 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     return activeStudent?.barcode ? monthMap[activeStudent.barcode] : undefined;
   }, [effectivePayments, currentMonthKey, activeStudent?.barcode]);
 
-  // 3. Payment History (All recorded payments for this student)
+  // 3. Payment History (All recorded payments for this student with dynamic payload key normalization)
   const paymentHistoryList = useMemo(() => {
     const list: PaymentRecord[] = [];
     if (!activeStudent?.barcode) return list;
+    const seenMonths = new Set<string>();
+
+    // 1. From supabasePortalData.paymentsList (Dual-Key Supabase Fetch)
+    if (supabasePortalData?.paymentsList && Array.isArray(supabasePortalData.paymentsList)) {
+      supabasePortalData.paymentsList.forEach((p: any) => {
+        const pDate = p.created_at || p.date || p.timestamp || p.payment_date || "";
+        const pDateStr = typeof pDate === "string" ? pDate.slice(0, 10) : "";
+        const mKey = p.month_key || p.month || p.monthKey || (pDateStr ? pDateStr.slice(0, 7) : "");
+        const pTitle = p.subject || p.title || p.name || (mKey ? `مصروفات شهر ${mKey}` : "سداد اشتراك");
+        const pAmount = Number(p.amount_paid ?? p.amount ?? p.paidAmount ?? 0);
+        if (mKey) {
+          seenMonths.add(mKey);
+          list.push({
+            id: p.id,
+            barcode: activeStudent.barcode,
+            monthKey: mKey,
+            month: mKey,
+            amount: pAmount,
+            paidAmount: pAmount,
+            requiredAmount: Number(p.required_amount || 0),
+            discount: Number(p.discount || 0),
+            status: p.status || "paid",
+            date: pDateStr,
+            time: typeof pDate === "string" && pDate.length >= 16 ? pDate.slice(11, 16) : "",
+            subject: pTitle,
+            title: pTitle,
+            name: pTitle,
+            note: p.notes || p.note || pTitle,
+            notes: p.notes || p.note || pTitle,
+            recordedBy: p.received_by || "الإشراف",
+            timestamp: p.created_at ? new Date(p.created_at).getTime() : Date.now(),
+          } as any);
+        }
+      });
+    }
+
+    // 2. From effectivePayments state map
     Object.keys(effectivePayments || {}).forEach((mKey) => {
       const rec = effectivePayments[mKey]?.[activeStudent.barcode];
-      if (rec) {
+      if (rec && !seenMonths.has(mKey)) {
+        seenMonths.add(mKey);
         list.push(rec);
       }
     });
+
     // Sort descending by date or monthKey
     return list.sort((a, b) => {
       const dateA = a.date || a.monthKey || a.month || "";
       const dateB = b.date || b.monthKey || b.month || "";
       return dateB.localeCompare(dateA);
     });
-  }, [effectivePayments, activeStudent?.barcode]);
+  }, [effectivePayments, activeStudent?.barcode, supabasePortalData?.paymentsList]);
 
   // 4. Academic Months (Full 12-Month Academic Ledger: August -> July)
   const academicMonths = useMemo(() => {
@@ -1393,6 +1344,17 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
         recordedDatesMap[dateStr] = st;
       }
     });
+
+    // Also populate with supabasePortalData.attendanceLogs with payload key normalization:
+    if (supabasePortalData?.attendanceLogs && Array.isArray(supabasePortalData.attendanceLogs)) {
+      supabasePortalData.attendanceLogs.forEach((att: any) => {
+        const attDate = att.created_at || att.date || att.timestamp || att.date_key;
+        const dKey = att.date_key || (typeof attDate === "string" ? attDate.slice(0, 10) : "");
+        if (dKey) {
+          recordedDatesMap[dKey] = att.status || "حضور";
+        }
+      });
+    }
 
     // Also include today's live scan if active
     if (activeStudent.barcode && attendanceToday[activeStudent.barcode]) {
@@ -1497,8 +1459,33 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       }
     });
 
+    // Also include any recorded dates from Supabase/history that were outside the standard schedule as substitute sessions:
+    Object.keys(recordedDatesMap).forEach((dateStr) => {
+      if (!allDatesSet.has(dateStr)) {
+        const rawStatus = recordedDatesMap[dateStr];
+        let finalStatus: "حضور" | "تأخير" | "غائب" | "إذن" = "حضور";
+        if (rawStatus === "حاضر" || rawStatus === "حضور") finalStatus = "حضور";
+        else if (rawStatus === "تأخير") finalStatus = "تأخير";
+        else if (rawStatus === "غائب" || rawStatus === "غياب") finalStatus = "غائب";
+        else if (rawStatus === "إذن") finalStatus = "إذن";
+
+        logs.push({
+          date: dateStr,
+          dayName: getArabicDayName(dateStr),
+          status: finalStatus,
+          isOfficialScheduledDay: false,
+          isSubstituteDay: true,
+          isAutoGenerated: false,
+          note: "حصة إضافية / تعويضية مسجلة بالمنظومة",
+        });
+      }
+    });
+
+    // Sort all logs descending by date
+    logs.sort((a, b) => b.date.localeCompare(a.date));
+
     return logs;
-  }, [activeStudent, effectiveAttendanceHistory, attendanceToday, scanLogTimes]);
+  }, [activeStudent, effectiveAttendanceHistory, attendanceToday, scanLogTimes, supabasePortalData?.attendanceLogs]);
 
   // Filtered attendance logs based on tab selection
   const filteredAttendanceLogs = useMemo(() => {
@@ -1530,15 +1517,22 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     return 100 - attendanceRate;
   }, [attendanceRate]);
 
-  // 5. Exams and Evaluation Scores (Dynamic Relational Exam List with Rich Schema)
+  // 5. Exams and Evaluation Scores (Dynamic Relational Exam List with Key Variation Normalization)
   const examHistoryList = useMemo(() => {
     const list: {
       id?: string;
       title: string;
+      subject?: string;
+      name?: string;
       scoreStr: string;
+      grade?: any;
+      score?: number;
+      degree?: any;
       pct: number;
       isLatest?: boolean;
       date?: string;
+      created_at?: string;
+      timestamp?: any;
       notes?: string;
     }[] = [];
     if (!activeStudent) return list;
@@ -1546,13 +1540,28 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     // 1. If supabasePortalData has rich examGradesList, prioritize it
     if (supabasePortalData?.examGradesList && supabasePortalData.examGradesList.length > 0) {
       supabasePortalData.examGradesList.forEach((g: any, idx: number) => {
+        const rawGrade = g.grade !== undefined ? g.grade : g.score !== undefined ? g.score : g.degree;
+        const numScore = Number(rawGrade) || 0;
+        const maxScore = Number(g.maxScore || g.max_score || 10);
+        const examTitle = g.subject || g.title || g.name || g.examTitle || "اختبار دوري";
+        const examDate = g.created_at || g.date || g.timestamp || g.examDate || "";
+        const cleanExamDate = typeof examDate === "string" ? (examDate.length >= 10 ? examDate.slice(0, 10) : examDate) : undefined;
+        const pct = g.percentage !== undefined ? g.percentage : Math.round((numScore / maxScore) * 100);
+
         list.push({
           id: g.id || `grade-${idx}`,
-          title: g.examTitle || g.title || "اختبار دوري",
-          scoreStr: g.scoreFormatted || `${g.score || 0} / ${g.maxScore || 10}`,
-          pct: g.percentage !== undefined ? g.percentage : Math.round(((g.score || 0) / (g.maxScore || 10)) * 100),
+          title: examTitle,
+          subject: g.subject || examTitle,
+          name: g.name || examTitle,
+          grade: rawGrade,
+          score: numScore,
+          degree: g.degree,
+          scoreStr: g.scoreFormatted || `${rawGrade !== undefined ? rawGrade : numScore} / ${maxScore}`,
+          pct,
           isLatest: idx === 0,
-          date: g.examDate || (g.createdAt ? g.createdAt.slice(0, 10) : undefined),
+          date: cleanExamDate,
+          created_at: g.created_at || cleanExamDate,
+          timestamp: g.timestamp,
           notes: g.teacherNotes || g.notes || "",
         });
       });
@@ -1566,6 +1575,8 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       const pct = match ? parseInt(match[1], 10) : 100;
       list.push({
         title: activeStudent.lastExamTitle,
+        subject: activeStudent.lastExamTitle,
+        name: activeStudent.lastExamTitle,
         scoreStr: activeStudent.lastExamScore,
         pct,
         isLatest: true,
@@ -1578,6 +1589,8 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
         if (list.length === 0 || idx < (activeStudent.totalExamScores?.length || 0) - 1) {
           list.push({
             title: `تقييم دوري #${idx + 1}`,
+            subject: `تقييم دوري #${idx + 1}`,
+            name: `تقييم دوري #${idx + 1}`,
             scoreStr: `${pct}%`,
             pct,
             isLatest: false,
@@ -3032,7 +3045,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-white font-fancy">
-                          {exam.title}
+                          {exam.subject || exam.title || exam.name || "اختبار دوري"}
                         </span>
                         {exam.isLatest && (
                           <span className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[10px] font-bold">
@@ -3043,7 +3056,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
 
                       <div className="flex items-baseline justify-between pt-2">
                         <div className="text-3xl font-extrabold text-sky-400 font-mono">
-                          {exam.scoreStr}
+                          {exam.scoreStr || (exam.grade !== undefined || exam.score !== undefined || exam.degree !== undefined ? `${exam.grade ?? exam.score ?? exam.degree} / 10` : "0 / 10")}
                         </div>
                         <span
                           className={`text-xs px-2.5 py-1 rounded-xl font-bold ${
@@ -3073,10 +3086,12 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
                           <span>{exam.notes}</span>
                         </div>
                       )}
-                      {exam.date && (
+                      {(exam.created_at || exam.date || exam.timestamp) && (
                         <div className="text-[11px] text-slate-400 flex items-center justify-between pt-1">
                           <span>تاريخ الاختبار:</span>
-                          <span className="font-mono text-slate-300">{exam.date}</span>
+                          <span className="font-mono text-slate-300">
+                            {String(exam.created_at || exam.date || exam.timestamp).slice(0, 10)}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -3132,10 +3147,14 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
                       const isDone = hw.status === "done";
                       const isIncomplete = hw.status === "incomplete";
                       const isNotDone = hw.status === "not_done";
+                      const hwTitle = hw.subject || hw.title || hw.name || `واجب درس ${hw.date_key || hw.date || ""}`;
+                      const hwDate = hw.created_at || hw.date || hw.timestamp || hw.date_key || "";
+                      const hwDateStr = typeof hwDate === "string" ? (hwDate.length >= 10 ? hwDate.slice(0, 10) : hwDate) : "";
+                      const hwGrade = hw.grade !== undefined ? hw.grade : hw.score !== undefined ? hw.score : hw.degree;
                       return (
                         <div key={hw.id || idx} className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-2">
                           <div className="flex items-center justify-between text-xs">
-                            <span className="font-bold text-white">{hw.title || `واجب درس ${hw.date_key || ""}`}</span>
+                            <span className="font-bold text-white">{hwTitle}</span>
                             <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold flex items-center gap-1 ${
                               isDone
                                 ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-400"
@@ -3150,10 +3169,10 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
                             </span>
                           </div>
                           <div className="flex items-center justify-between text-xs text-slate-400">
-                            <span>التاريخ: {hw.date_key || hw.created_at?.slice(0, 10)}</span>
-                            {hw.score !== undefined && hw.score !== null && (
+                            <span>التاريخ: {hwDateStr}</span>
+                            {hwGrade !== undefined && hwGrade !== null && (
                               <span className="font-mono font-bold text-amber-300">
-                                الدرجة: {hw.score} {hw.max_score ? `/ ${hw.max_score}` : ""}
+                                الدرجة: {hwGrade} {hw.max_score || hw.maxScore ? `/ ${hw.max_score || hw.maxScore}` : ""}
                               </span>
                             )}
                           </div>

@@ -11,10 +11,13 @@ import { markEventProcessed } from "../utils/notificationTracker";
 import { getMessaging, getToken, isSupported, onMessage } from "firebase/messaging";
 import { playPortalAudioChime } from "../utils/portalNotifications";
 
-// Standard VAPID Public Key matching the backend server
+// Standard VAPID Public Key matching the backend server and Firebase Web Push Certificates
 export const VAPID_PUBLIC_KEY =
+  (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_FIREBASE_VAPID_KEY) ||
   (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_VAPID_PUBLIC_KEY) ||
   "BE0N1wV5fSDpg0YAO8uoPXzWpBYJznOLFcF05uh8P-Du7NMgWpbcafllzDXaeDp8FPAXkS6p50KE0v9SfDHNZXQ";
+
+export const FIREBASE_VAPID_PUBLIC_KEY = VAPID_PUBLIC_KEY;
 
 /**
  * Converts a base64 string to a Uint8Array for pushManager.subscribe applicationServerKey
@@ -176,29 +179,42 @@ export async function savePushSubscription(
   const cleanAliases = Array.isArray(aliases) ? aliases.map(String).filter(Boolean) : [];
 
   // Extract FCM token if endpoint belongs to Google FCM / Chrome Web Push or passed explicitly
-  let fcmToken = explicitFcmToken || "";
-  if (!fcmToken && endpoint.includes("/fcm/send/")) {
-    fcmToken = endpoint.split("/fcm/send/")[1] || "";
+  let fcmToken: string | null =
+    typeof explicitFcmToken === "string" &&
+    explicitFcmToken.trim() !== "" &&
+    explicitFcmToken !== "undefined" &&
+    explicitFcmToken !== "null"
+      ? explicitFcmToken.trim()
+      : null;
+
+  if (!fcmToken && endpoint && endpoint.includes("/fcm/send/")) {
+    const extracted = endpoint.split("/fcm/send/")[1]?.trim() || "";
+    if (extracted && extracted !== "undefined" && extracted !== "null") {
+      fcmToken = extracted;
+    }
   }
 
   // 1. Primary Backend Express API (for instant web-push sending and FCM dispatch)
   try {
+    const payload: Record<string, any> = {
+      userId,
+      userRole,
+      aliases: cleanAliases,
+      subscription: sub,
+    };
+    if (fcmToken) {
+      payload.fcmToken = fcmToken;
+    }
     await fetch("/api/push-subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId,
-        userRole,
-        aliases: cleanAliases,
-        subscription: sub,
-        fcmToken: fcmToken || undefined,
-      }),
+      body: JSON.stringify(payload),
     });
   } catch (err) {
     console.warn("Could not register push to Express backend:", err);
   }
 
-  // 2. Direct Supabase parent_accounts synchronization to retain active fcm_token
+  // 2. Direct Supabase parent_accounts synchronization to retain active fcm_token (only valid strings)
   if (fcmToken && userRole === "parent" && userId && userId !== "guest") {
     try {
       const allBarcodes = [userId, ...cleanAliases];
@@ -219,22 +235,26 @@ export async function savePushSubscription(
   }
 
   // 3. Firestore push_subscriptions collection (secondary cloud backup)
+  // Safely write only valid token strings, never undefined
   if (db) {
     try {
       const cleanDocId = encodeURIComponent(endpoint).slice(-80);
+      const firestoreDoc: Record<string, any> = {
+        userId,
+        userRole,
+        aliases: cleanAliases,
+        endpoint,
+        p256dh,
+        auth,
+        userAgent,
+        updatedAt: serverTimestamp(),
+      };
+      if (fcmToken) {
+        firestoreDoc.fcmToken = fcmToken;
+      }
       await setDoc(
         doc(collection(db, "push_subscriptions"), cleanDocId),
-        {
-          userId,
-          userRole,
-          aliases: cleanAliases,
-          endpoint,
-          p256dh,
-          auth,
-          fcmToken: fcmToken || undefined,
-          userAgent,
-          updatedAt: serverTimestamp(),
-        },
+        firestoreDoc,
         { merge: true }
       );
     } catch (err: any) {
@@ -395,7 +415,7 @@ export async function autoRequestPermissionAndSyncFCMToken(
   }
 
   // 3. Resolve active VAPID key
-  let activeVapidKey = VAPID_PUBLIC_KEY;
+  let activeVapidKey = FIREBASE_VAPID_PUBLIC_KEY;
   try {
     const res = await fetch("/api/push-public-key");
     if (res.ok) {
@@ -406,45 +426,61 @@ export async function autoRequestPermissionAndSyncFCMToken(
 
   let fcmToken: string | null = null;
 
-  // 4. Upon approval, call getToken(messaging, { vapidKey: "YOUR_VAPID_KEY" })
+  // 4. Upon approval, call getToken(messaging, { vapidKey: "YOUR_VALID_PUBLIC_VAPID_KEY" })
   try {
-    const messagingSupported = await isSupported();
+    const messagingSupported = await isSupported().catch(() => false);
     if (messagingSupported) {
       const messaging = getMessaging(app);
-      const token = await getToken(messaging, {
-        vapidKey: activeVapidKey,
-        serviceWorkerRegistration: swReg,
-      });
+      const vapidKeyToUse =
+        (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_FIREBASE_VAPID_KEY) ||
+        (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_VAPID_PUBLIC_KEY) ||
+        activeVapidKey ||
+        FIREBASE_VAPID_PUBLIC_KEY;
 
-      if (token) {
-        fcmToken = token;
-        console.info(`[FCM Pipeline] Active FCM token generated: ${token.slice(0, 15)}... for user ${userId}`);
+      try {
+        const token = await getToken(messaging, {
+          vapidKey: vapidKeyToUse,
+          serviceWorkerRegistration: swReg,
+        });
 
-        // Handle foreground notifications with acoustic chime & vibration
-        try {
-          onMessage(messaging, (payload) => {
-            console.log("[FCM Pipeline] Foreground message received:", payload);
-            const title = payload.notification?.title || payload.data?.title || "منظومة الأستاذة إيمان الدمشيتي";
-            const body = payload.notification?.body || payload.data?.body || "إشعار جديد في المنظومة";
-            const type = (payload.data?.type || "alert") as any;
+        if (token && typeof token === "string" && token.trim() !== "" && token !== "undefined" && token !== "null") {
+          fcmToken = token.trim();
+          console.info(`[FCM Pipeline] Active FCM token generated: ${fcmToken.slice(0, 15)}... for user ${userId}`);
 
-            playPortalAudioChime(type);
+          // Handle foreground notifications with acoustic chime & vibration
+          try {
+            onMessage(messaging, (payload) => {
+              console.log("[FCM Pipeline] Foreground message received:", payload);
+              const title = payload.notification?.title || payload.data?.title || "منظومة الأستاذة إيمان الدمشيتي";
+              const body = payload.notification?.body || payload.data?.body || "إشعار جديد في المنظومة";
+              const type = (payload.data?.type || "alert") as any;
 
-            if (typeof window !== "undefined") {
-              window.dispatchEvent(
-                new CustomEvent("eman_fcm_foreground_message", {
-                  detail: { payload, title, body, type },
-                })
-              );
-            }
-          });
-        } catch (onMsgErr) {
-          console.info("[FCM Pipeline] onMessage setup notice:", onMsgErr);
+              playPortalAudioChime(type);
+
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(
+                  new CustomEvent("eman_fcm_foreground_message", {
+                    detail: { payload, title, body, type },
+                  })
+                );
+              }
+            });
+          } catch (onMsgErr) {
+            console.info("[FCM Pipeline] onMessage setup notice:", onMsgErr);
+          }
         }
+      } catch (tokenErr: any) {
+        const errMsg = tokenErr?.message || String(tokenErr);
+        console.warn(
+          `[FCM Pipeline] Firebase getToken setup error (HTTP 401 / VAPID key verification): ${errMsg}. ` +
+          `Verify that the public VAPID key matches Firebase Console -> Project Settings -> Cloud Messaging -> Web Push Certificates.`
+        );
+        fcmToken = null;
       }
     }
   } catch (fcmErr) {
-    console.warn("[FCM Pipeline] Firebase getToken notice:", fcmErr);
+    console.warn("[FCM Pipeline] Firebase messaging check notice:", fcmErr);
+    fcmToken = null;
   }
 
   // Complement with WebPush subscription
@@ -452,86 +488,97 @@ export async function autoRequestPermissionAndSyncFCMToken(
   try {
     webPushSub = await registerPushSubscription(userId, userRole, aliases);
     if (!fcmToken && webPushSub?.endpoint?.includes("/fcm/send/")) {
-      fcmToken = webPushSub.endpoint.split("/fcm/send/")[1] || null;
+      const extracted = webPushSub.endpoint.split("/fcm/send/")[1]?.trim();
+      if (extracted && extracted !== "undefined" && extracted !== "null") {
+        fcmToken = extracted;
+      }
     }
   } catch (wpErr) {
     console.warn("[FCM Pipeline] WebPush registration fallback notice:", wpErr);
   }
 
-  // 5. CRITICAL: Immediately update the authenticated user's record in parent_accounts / profiles
-  // with the generated fcm_token via direct Supabase query (await supabase.from('parent_accounts').update({ fcm_token: token }).eq('id', userId))
-  if (fcmToken) {
-    try {
-      console.log(`[FCM Pipeline] CRITICAL: Updating parent_accounts with fcm_token for id: ${userId}`);
+  // Before calling setDoc or sending a fetch request to /api/push-subscribe, validate that fcmToken is non-null and not undefined:
+  if (!fcmToken || typeof fcmToken !== "string" || fcmToken.trim() === "" || fcmToken === "undefined" || fcmToken === "null") {
+    console.log("[FCM Pipeline] No valid FCM token string generated. Safely skipping token persistence.");
+    return { success: false, token: null, permission };
+  }
 
-      // Direct required query:
-      const { error: directErr } = await supabase
-        .from("parent_accounts")
-        .update({ fcm_token: fcmToken, updated_at: new Date().toISOString() })
-        .eq("id", userId);
+  const validFcmToken = fcmToken.trim();
 
-      if (directErr) {
-        console.warn("[FCM Pipeline] Direct eq('id', userId) update note:", directErr.message);
-      }
+  // 5. CRITICAL: Safely update only valid token strings in parent_accounts / profiles
+  try {
+    console.log(`[FCM Pipeline] CRITICAL: Updating parent_accounts with valid fcm_token for id: ${userId}`);
 
-      // Also ensure updates match when id is stored as student barcode, UUID, or phone
-      const cleanBarcode = normalizeBarcode(userId);
-      const uuid = barcodeToUUID(cleanBarcode || userId);
-      const allTargets = Array.from(new Set([userId, cleanBarcode, uuid, ...aliases])).filter(Boolean);
+    // Direct required query:
+    const { error: directErr } = await supabase
+      .from("parent_accounts")
+      .update({ fcm_token: validFcmToken, updated_at: new Date().toISOString() })
+      .eq("id", userId);
 
-      for (const target of allTargets) {
-        const targetUuid = barcodeToUUID(target);
-        await supabase
-          .from("parent_accounts")
-          .update({ fcm_token: fcmToken, updated_at: new Date().toISOString() })
-          .or(`id.eq.${targetUuid},id.eq.${target},parent_phone.eq.${target}`);
-      }
-
-      // Also update profiles table if present in Supabase
-      try {
-        await supabase
-          .from("profiles")
-          .update({ fcm_token: fcmToken, updated_at: new Date().toISOString() })
-          .eq("id", userId);
-      } catch {}
-
-      // Update local storage accounts cache
-      try {
-        const raw = localStorage.getItem("eman_parent_accounts");
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed[userId]) {
-            parsed[userId].fcmToken = fcmToken;
-          }
-          if (cleanBarcode && parsed[cleanBarcode]) {
-            parsed[cleanBarcode].fcmToken = fcmToken;
-          }
-          localStorage.setItem("eman_parent_accounts", JSON.stringify(parsed));
-        }
-      } catch {}
-
-      // Secondary sync to backend server & Firestore
-      if (webPushSub) {
-        await savePushSubscription(userId, userRole, webPushSub, aliases, fcmToken);
-      } else {
-        fetch("/api/push-subscribe", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId,
-            userRole,
-            aliases,
-            fcmToken,
-          }),
-        }).catch(() => {});
-      }
-
-      console.info(`[FCM Pipeline] Successfully updated parent_accounts record with active fcm_token for ${userId}`);
-      return { success: true, token: fcmToken, permission: "granted" };
-    } catch (updateErr) {
-      console.error("[FCM Pipeline] Failed to update parent_accounts with fcm_token:", updateErr);
-      return { success: false, token: fcmToken, permission: "granted" };
+    if (directErr) {
+      console.warn("[FCM Pipeline] Direct eq('id', userId) update note:", directErr.message);
     }
+
+    // Also ensure updates match when id is stored as student barcode, UUID, or phone
+    const cleanBarcode = normalizeBarcode(userId);
+    const uuid = barcodeToUUID(cleanBarcode || userId);
+    const allTargets = Array.from(new Set([userId, cleanBarcode, uuid, ...aliases])).filter(Boolean);
+
+    for (const target of allTargets) {
+      const targetUuid = barcodeToUUID(target);
+      await supabase
+        .from("parent_accounts")
+        .update({ fcm_token: validFcmToken, updated_at: new Date().toISOString() })
+        .or(`id.eq.${targetUuid},id.eq.${target},parent_phone.eq.${target}`);
+    }
+
+    // Also update profiles table if present in Supabase
+    try {
+      await supabase
+        .from("profiles")
+        .update({ fcm_token: validFcmToken, updated_at: new Date().toISOString() })
+        .eq("id", userId);
+    } catch {}
+
+    // Update local storage accounts cache
+    try {
+      const raw = localStorage.getItem("eman_parent_accounts");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed[userId]) {
+          parsed[userId].fcmToken = validFcmToken;
+        }
+        if (cleanBarcode && parsed[cleanBarcode]) {
+          parsed[cleanBarcode].fcmToken = validFcmToken;
+        }
+        localStorage.setItem("eman_parent_accounts", JSON.stringify(parsed));
+      }
+    } catch {}
+
+    // Secondary sync to backend server & Firestore
+    if (webPushSub) {
+      await savePushSubscription(userId, userRole, webPushSub, aliases, validFcmToken);
+    } else {
+      // Validate fcmToken before sending fetch request to /api/push-subscribe
+      await fetch("/api/push-subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          userRole,
+          aliases,
+          fcmToken: validFcmToken,
+        }),
+      }).catch((fetchErr) => {
+        console.warn("[FCM Pipeline] /api/push-subscribe fetch notice:", fetchErr);
+      });
+    }
+
+    console.info(`[FCM Pipeline] Successfully updated parent_accounts record with active fcm_token for ${userId}`);
+    return { success: true, token: validFcmToken, permission: "granted" };
+  } catch (updateErr) {
+    console.error("[FCM Pipeline] Failed to update parent_accounts with fcm_token:", updateErr);
+    return { success: false, token: validFcmToken, permission: "granted" };
   }
 
   return { success: false, token: null, permission };

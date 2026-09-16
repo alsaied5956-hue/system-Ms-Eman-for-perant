@@ -959,11 +959,44 @@ app.get("/api/push-public-key", (_req, res) => {
 });
 
 // 3. Register or Update Web Push Subscription
+app.options("/api/push-subscribe", (_req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.sendStatus(200);
+});
+
 app.post("/api/push-subscribe", async (req, res) => {
   try {
     const { userId, userRole, aliases, subscription, fcmToken } = req.body;
-    if (!subscription || !subscription.endpoint || !subscription.keys) {
-      return res.status(400).json({ error: "Invalid subscription payload" });
+
+    // Validate fcmToken: ensure it is a valid non-null, non-undefined string
+    let resolvedFcmToken: string | null =
+      typeof fcmToken === "string" &&
+      fcmToken.trim() !== "" &&
+      fcmToken !== "undefined" &&
+      fcmToken !== "null"
+        ? fcmToken.trim()
+        : null;
+
+    const hasValidSubscription = Boolean(
+      subscription &&
+      subscription.endpoint &&
+      subscription.keys &&
+      subscription.keys.p256dh &&
+      subscription.keys.auth
+    );
+
+    // If subscription endpoint contains FCM token, extract if not yet resolved
+    if (!resolvedFcmToken && subscription?.endpoint && String(subscription.endpoint).includes("/fcm/send/")) {
+      const extracted = String(subscription.endpoint).split("/fcm/send/")[1]?.trim();
+      if (extracted && extracted !== "undefined" && extracted !== "null") {
+        resolvedFcmToken = extracted;
+      }
+    }
+
+    if (!hasValidSubscription && !resolvedFcmToken) {
+      return res.status(400).json({ error: "Valid Web Push subscription or fcmToken is required" });
     }
 
     const cleanUserId = String(userId || "guest").trim();
@@ -971,34 +1004,29 @@ app.post("/api/push-subscribe", async (req, res) => {
       ? aliases.map((a: any) => String(a).trim()).filter(Boolean)
       : [];
 
-    const stored: StoredSubscription = {
-      userId: cleanUserId,
-      aliases: cleanAliases,
-      userRole: userRole || "parent",
-      endpoint: subscription.endpoint,
-      keys: {
-        p256dh: subscription.keys.p256dh,
-        auth: subscription.keys.auth,
-      },
-      userAgent: req.headers["user-agent"] || "",
-      updatedAt: Date.now(),
-    };
+    if (hasValidSubscription) {
+      const stored: StoredSubscription = {
+        userId: cleanUserId,
+        aliases: cleanAliases,
+        userRole: userRole || "parent",
+        endpoint: subscription.endpoint,
+        keys: {
+          p256dh: subscription.keys.p256dh,
+          auth: subscription.keys.auth,
+        },
+        userAgent: req.headers["user-agent"] || "",
+        updatedAt: Date.now(),
+      };
 
-    subscriptionsCache.set(subscription.endpoint, stored);
-    persistStoredSubscriptions();
-
-    // Extract or resolve active FCM token
-    const endpointStr = String(subscription.endpoint || "");
-    let resolvedFcmToken = String(fcmToken || "").trim();
-    if (!resolvedFcmToken && endpointStr.includes("/fcm/send/")) {
-      resolvedFcmToken = endpointStr.split("/fcm/send/")[1] || "";
+      subscriptionsCache.set(subscription.endpoint, stored);
+      persistStoredSubscriptions();
     }
 
     // Retain active fcm_token in Supabase parent_accounts and in-memory cache
     if (resolvedFcmToken && cleanUserId !== "guest") {
       const targets = [cleanUserId, ...cleanAliases];
       Promise.allSettled(
-        targets.map((t) => updateAccountFCMTokenInStoreAndDb(t, resolvedFcmToken))
+        targets.map((t) => updateAccountFCMTokenInStoreAndDb(t, resolvedFcmToken!))
       ).then(() => {
         console.log(`[Push] Synchronized active FCM token to Supabase parent_accounts for: ${targets.join(", ")}`);
       }).catch((err) => {
@@ -1007,20 +1035,31 @@ app.post("/api/push-subscribe", async (req, res) => {
     }
 
     // Persist to Firestore collection push_subscriptions (fire-and-forget, skip if quota limit reached)
-    if (!isFirestoreQuotaExceededServer) {
+    if (!isFirestoreQuotaExceededServer && (hasValidSubscription || resolvedFcmToken)) {
       try {
-        const cleanDocId = encodeURIComponent(subscription.endpoint).slice(-80);
-        setDoc(doc(db, "push_subscriptions", cleanDocId), {
-          userId: stored.userId,
-          aliases: stored.aliases,
-          userRole: stored.userRole,
-          endpoint: stored.endpoint,
-          p256dh: stored.keys.p256dh,
-          auth: stored.keys.auth,
-          fcmToken: resolvedFcmToken || undefined,
-          userAgent: stored.userAgent,
+        const cleanDocId = hasValidSubscription
+          ? encodeURIComponent(subscription.endpoint).slice(-80)
+          : `fcm_${encodeURIComponent(cleanUserId).slice(-40)}_${(resolvedFcmToken || "").slice(-30)}`;
+
+        const docData: Record<string, any> = {
+          userId: cleanUserId,
+          aliases: cleanAliases,
+          userRole: userRole || "parent",
+          userAgent: req.headers["user-agent"] || "",
           updatedAt: new Date(),
-        }, { merge: true }).catch((err) => {
+        };
+
+        if (hasValidSubscription) {
+          docData.endpoint = subscription.endpoint;
+          docData.p256dh = subscription.keys.p256dh;
+          docData.auth = subscription.keys.auth;
+        }
+
+        if (resolvedFcmToken) {
+          docData.fcmToken = resolvedFcmToken;
+        }
+
+        setDoc(doc(db, "push_subscriptions", cleanDocId), docData, { merge: true }).catch((err) => {
           handleFirestoreQuotaWarning("setDoc push_subscriptions", err);
         });
       } catch (err) {
@@ -1028,12 +1067,22 @@ app.post("/api/push-subscribe", async (req, res) => {
       }
     }
 
-    console.log(`[Push] Registered subscription for user ${cleanUserId} (aliases: ${cleanAliases.length}). Total: ${subscriptionsCache.size}`);
-    return res.json({ success: true, count: subscriptionsCache.size, fcmTokenRetained: !!resolvedFcmToken });
+    console.log(`[Push] Registered subscription/token for user ${cleanUserId} (aliases: ${cleanAliases.length}). Total: ${subscriptionsCache.size}`);
+    return res.json({
+      success: true,
+      count: subscriptionsCache.size,
+      fcmTokenRetained: Boolean(resolvedFcmToken),
+      hasWebPush: hasValidSubscription,
+    });
   } catch (err: any) {
     console.error("push-subscribe error:", err);
     return res.status(500).json({ error: err.message || "Failed to save subscription" });
   }
+});
+
+// Explicitly handle all non-POST methods to /api/push-subscribe with 405 Method Not Allowed
+app.all("/api/push-subscribe", (_req, res) => {
+  res.status(405).json({ error: "Method Not Allowed. /api/push-subscribe explicitly handles POST requests." });
 });
 
 // 4. Record account revocation and broadcast to connected phones immediately (Sub-50ms latency)

@@ -1812,135 +1812,150 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
   const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanInput);
 
   try {
-    // Primary Direct Cloud Fetch Engine (Sub-200ms Single Relational Master Query)
+    // Primary Direct Cloud Fetch Engine with Standard Implicit Join & Sequential Table Fallback
     const fetchDirectAggregatedStudent = async () => {
-      // 1. Primary disambiguated relational aggregation on public.students
-      const primaryRes = await supabase
-        .from("students")
-        .select(`
-          *,
-          attendance_logs:attendance_logs_student_id_fkey(*),
-          payments:payments_student_id_fkey(*),
-          homework:homework_student_id_fkey(*),
-          exam_grades:exam_grades_student_id_fkey(*),
-          chat_messages:chat_messages_student_id_fkey(*)
-        `)
-        .filter(isUUID ? "id" : "barcode", "eq", cleanInput)
-        .maybeSingle();
+      const parentBarcode = cleanInput;
+      let studentRecord: any = null;
+      let usedRelationalJoin = false;
 
-      if (!primaryRes.error && primaryRes.data) {
-        return primaryRes.data;
-      }
-
-      // 2. Generic embedding without explicit constraint names
-      if (
-        primaryRes.error &&
-        (primaryRes.error.code === "PGRST201" ||
-          primaryRes.error.code === "PGRST200" ||
-          primaryRes.error.code === "PGRST205")
-      ) {
-        const stdRes = await supabase
+      // 1. Primary Attempt: Standard implicit relational join without explicit named foreign keys
+      // Removes explicit named foreign keys like attendance_logs_student_id_fkey to avoid HTTP 400
+      try {
+        const { data: relStudent, error: relErr } = await supabase
           .from("students")
-          .select(`
-            *,
-            attendance_logs(*),
-            payments(*),
-            homework(*),
-            exam_grades(*),
-            chat_messages(*)
-          `)
-          .filter(isUUID ? "id" : "barcode", "eq", cleanInput)
+          .select("*, attendance_logs(*), payments(*), homework(*), exam_grades(*), chat_messages(*)")
+          .eq("barcode", parentBarcode)
           .maybeSingle();
 
-        if (!stdRes.error && stdRes.data) {
-          return stdRes.data;
+        if (!relErr && relStudent) {
+          studentRecord = relStudent;
+          usedRelationalJoin = true;
+          console.log("[Parent Fetch] Standard implicit relational query succeeded for barcode:", parentBarcode);
+        } else if (relErr) {
+          console.warn(
+            "[Parent Fetch] Standard relational join notice (foreign key ambiguity or schema constraint, executing sequential per-table fallback):",
+            relErr.message || relErr
+          );
         }
+      } catch (relEx) {
+        console.warn("[Parent Fetch] Relational join exception, executing sequential fallback:", relEx);
       }
 
-      // 3. Fallback: core relations with parallel child queries for standalone/unlinked tables
-      let studentBasicRes = await supabase
-        .from("students")
-        .select(`
-          *,
-          attendance_logs:attendance_logs_student_id_fkey(*),
-          payments:payments_student_id_fkey(*),
-          homework:homework_student_id_fkey(*)
-        `)
-        .filter(isUUID ? "id" : "barcode", "eq", cleanInput)
-        .maybeSingle();
+      // 2. Sequential Fallback: If relational join failed or returned null, execute explicit queries sequentially per table
+      if (!studentRecord) {
+        // Step A: Resolve student entity
+        let studentData: any = null;
+        if (isUUID) {
+          const byId = await supabase.from("students").select("*").eq("id", cleanInput).maybeSingle();
+          studentData = byId.data;
+        }
 
-      let studentData = studentBasicRes.data;
-      if (!studentData) {
-        const plainRes = await supabase
-          .from("students")
-          .select("*")
-          .filter(isUUID ? "id" : "barcode", "eq", cleanInput)
-          .maybeSingle();
-        studentData = plainRes.data;
+        if (!studentData) {
+          const byBarcode = await supabase.from("students").select("*").eq("barcode", cleanInput).maybeSingle();
+          studentData = byBarcode.data;
+        }
+
+        if (!studentData && !isUUID) {
+          const uuidFallback = barcodeToUUID(cleanInput);
+          const byId = await supabase.from("students").select("*").eq("id", uuidFallback).maybeSingle();
+          studentData = byId.data;
+        }
+
+        if (!studentData) {
+          return null;
+        }
+
+        const sId = String(studentData.id || "").trim();
+        const bCode = String(studentData.barcode || cleanInput).trim();
+
+        // Helper for sequential dual-key queries per table
+        const queryTableSequentially = async (
+          tableName: string,
+          orderCol?: string,
+          ascending = false
+        ): Promise<any[]> => {
+          try {
+            const primaryOr = `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`;
+            let q = supabase.from(tableName).select("*").or(primaryOr);
+            if (orderCol) {
+              q = q.order(orderCol, { ascending });
+            }
+            const res = await q;
+            if (!res.error && Array.isArray(res.data)) {
+              return res.data;
+            }
+
+            // Fallback if student_barcode column doesn't exist on this table
+            const fallbackOr = bCode
+              ? `student_id.eq.${sId},barcode.eq.${bCode}`
+              : `student_id.eq.${sId}`;
+            let q2 = supabase.from(tableName).select("*").or(fallbackOr);
+            if (orderCol) {
+              q2 = q2.order(orderCol, { ascending });
+            }
+            const res2 = await q2;
+            if (!res2.error && Array.isArray(res2.data)) {
+              return res2.data;
+            }
+
+            // Single column queries as final fallback
+            const idRes = await supabase.from(tableName).select("*").eq("student_id", sId);
+            if (!idRes.error && Array.isArray(idRes.data) && idRes.data.length > 0) {
+              return idRes.data;
+            }
+            if (bCode) {
+              const bcRes = await supabase.from(tableName).select("*").eq("barcode", bCode);
+              if (!bcRes.error && Array.isArray(bcRes.data) && bcRes.data.length > 0) {
+                return bcRes.data;
+              }
+            }
+            return [];
+          } catch (err) {
+            console.warn(`[Parent Fetch Sequential] Error querying ${tableName}:`, err);
+            return [];
+          }
+        };
+
+        // Sequential per-table execution to isolate any foreign key or schema ambiguities
+        const attendance = await queryTableSequentially("attendance_logs", "date_key", false);
+        const homework = await queryTableSequentially("homework", "date_key", false);
+        const payments = await queryTableSequentially("payments", "month_key", false);
+        
+        let grades = await queryTableSequentially("exam_grades", "created_at", false);
+        if (!grades || grades.length === 0) {
+          grades = await queryTableSequentially("evaluations", "created_at", false);
+        }
+
+        let chatMessages = await queryTableSequentially("chat_messages", "created_at", true);
+        if (!chatMessages || chatMessages.length === 0) {
+          chatMessages = await queryTableSequentially("messages", "created_at", true);
+        }
+
+        studentRecord = {
+          ...studentData,
+          attendance_logs: attendance,
+          homework,
+          payments,
+          exam_grades: grades,
+          chat_messages: chatMessages,
+        };
       }
 
-      if (!studentData) return null;
+      const attendance = Array.isArray(studentRecord?.attendance_logs) ? studentRecord.attendance_logs : [];
+      const homework = Array.isArray(studentRecord?.homework) ? studentRecord.homework : [];
+      const grades = Array.isArray(studentRecord?.exam_grades) ? studentRecord.exam_grades : [];
+      const payments = Array.isArray(studentRecord?.payments) ? studentRecord.payments : [];
 
-      const sId = studentData.id;
-      const bCode = studentData.barcode;
-
-      // Parallel fetch for any missing child relations
-      const [attRes, payRes, hwRes, gradesRes, msgRes] = await Promise.all([
-        !studentData.attendance_logs
-          ? supabase
-              .from("attendance_logs")
-              .select("*")
-              .or(`student_id.eq.${sId},barcode.eq.${bCode}`)
-              .order("date_key", { ascending: false })
-          : Promise.resolve({ data: studentData.attendance_logs }),
-        !studentData.payments
-          ? supabase
-              .from("payments")
-              .select("*")
-              .eq("student_id", sId)
-              .order("month_key", { ascending: false })
-          : Promise.resolve({ data: studentData.payments }),
-        !studentData.homework
-          ? supabase
-              .from("homework")
-              .select("*")
-              .eq("student_id", sId)
-              .order("date_key", { ascending: false })
-          : Promise.resolve({ data: studentData.homework }),
-        !studentData.exam_grades
-          ? supabase
-              .from("exam_grades")
-              .select("*")
-              .or(`student_id.eq.${sId},barcode.eq.${bCode}`)
-              .order("created_at", { ascending: false })
-              .then((res) => {
-                if (res.error) {
-                  // Try evaluations view if exam_grades not found
-                  return supabase
-                    .from("evaluations")
-                    .select("*")
-                    .or(`student_id.eq.${sId},barcode.eq.${bCode}`)
-                    .order("created_at", { ascending: false });
-                }
-                return res;
-              })
-          : Promise.resolve({ data: studentData.exam_grades }),
-        !studentData.chat_messages
-          ? supabase
-              .from("chat_messages")
-              .select("*")
-              .eq("student_id", sId)
-              .order("created_at", { ascending: true })
-          : Promise.resolve({ data: studentData.chat_messages }),
-      ]);
+      // 3. Explicit Console Audit Logging: exact payload inspection
+      console.log("Parent Fetch Raw Response:", { attendance, homework, grades, payments });
 
       return {
-        ...studentData,
-        attendance_logs: attRes.data || studentData.attendance_logs || [],
-        payments: payRes.data || studentData.payments || [],
-        homework: hwRes.data || studentData.homework || [],
-        exam_grades: gradesRes.data || [],
-        chat_messages: msgRes.data || [],
+        ...studentRecord,
+        attendance_logs: attendance,
+        homework,
+        payments,
+        exam_grades: grades,
+        chat_messages: Array.isArray(studentRecord?.chat_messages) ? studentRecord.chat_messages : [],
       };
     };
 
@@ -1969,41 +1984,53 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
 
     const bCode = String(studentRow.barcode || "").trim();
 
-    // 1. Parse Attendance Records (Null-Safe)
+    // 1. Parse Attendance Records (Null-Safe with key variations)
     const rawAttendance = Array.isArray(studentRow.attendance_logs) ? studentRow.attendance_logs : [];
     const attendanceLogs = [...rawAttendance].sort((a: any, b: any) =>
-      String(b.date_key || "").localeCompare(String(a.date_key || ""))
+      String(b.date_key || b.date || b.created_at || "").localeCompare(String(a.date_key || a.date || a.created_at || ""))
     );
     const attendanceHistory: Record<string, string> = {};
     attendanceLogs.forEach((att: any) => {
-      if (att.date_key) {
-        attendanceHistory[att.date_key] = att.status || "حضور";
+      const attDate = att.created_at || att.date || att.timestamp || att.date_key;
+      const dKey = att.date_key || (typeof attDate === "string" ? attDate.slice(0, 10) : "");
+      if (dKey) {
+        attendanceHistory[dKey] = att.status || "حضور";
       }
     });
 
-    // 2. Parse Payments & Receipts (Null-Safe)
+    // 2. Parse Payments & Receipts (Null-Safe with key variations)
     const rawPayments = Array.isArray(studentRow.payments) ? studentRow.payments : [];
     const paymentsList = [...rawPayments].sort((a: any, b: any) =>
-      String(b.month_key || "").localeCompare(String(a.month_key || ""))
+      String(b.month_key || b.month || b.date || b.created_at || "").localeCompare(
+        String(a.month_key || a.month || a.date || a.created_at || "")
+      )
     );
     const paymentsMap: Record<string, any> = {};
     paymentsList.forEach((p: any) => {
-      const mKey = p.month_key;
+      const pDate = p.created_at || p.date || p.timestamp || p.payment_date || "";
+      const pDateStr = typeof pDate === "string" ? pDate.slice(0, 10) : "";
+      const mKey = p.month_key || p.month || (pDateStr ? pDateStr.slice(0, 7) : "");
+      const pTitle = p.subject || p.title || p.name || (mKey ? `مصروفات شهر ${mKey}` : "سداد اشتراك");
+      const pAmount = Number(p.amount_paid ?? p.amount ?? p.paidAmount ?? 0);
       if (mKey) {
         const paymentRecord = {
           barcode: bCode,
           monthKey: mKey,
-          amount: Number(p.amount_paid || p.amount || 0),
-          paidAmount: Number(p.amount_paid || p.amount || 0),
+          amount: pAmount,
+          paidAmount: pAmount,
           requiredAmount: Number(p.required_amount || 0),
           discount: Number(p.discount || 0),
           status: p.status || "paid",
-          date: p.payment_date ? p.payment_date.slice(0, 10) : "",
-          time: p.payment_date ? p.payment_date.slice(11, 16) : "",
+          date: pDateStr,
+          time: typeof pDate === "string" && pDate.length >= 16 ? pDate.slice(11, 16) : "",
+          subject: pTitle,
+          title: pTitle,
+          name: pTitle,
           note: p.notes || "",
           notes: p.notes || "",
           recordedBy: p.received_by || "الإشراف",
           timestamp: p.created_at ? new Date(p.created_at).getTime() : Date.now(),
+          created_at: p.created_at,
         };
         paymentsMap[mKey] = {
           ...paymentRecord,
@@ -2012,42 +2039,80 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       }
     });
 
-    // 3. Parse Homework Logs (Null-Safe)
+    // 3. Parse Homework Logs (Null-Safe with key variations)
     const rawHomework = Array.isArray(studentRow.homework) ? studentRow.homework : [];
-    const homeworkList = [...rawHomework].sort((a: any, b: any) =>
-      String(b.date_key || "").localeCompare(String(a.date_key || ""))
-    );
+    const homeworkList = [...rawHomework]
+      .map((hw: any, idx: number) => {
+        const hwTitle = hw.subject || hw.title || hw.name || `واجب درس ${hw.date_key || hw.date || ""}`;
+        const hwDate = hw.created_at || hw.date || hw.timestamp || hw.date_key || "";
+        const hwDateStr = typeof hwDate === "string" ? (hwDate.length >= 10 ? hwDate.slice(0, 10) : hwDate) : "";
+        const hwGrade = hw.grade || hw.score || hw.degree;
+        const hwScore = Number(hwGrade) || 0;
+        const maxScore = Number(hw.max_score || hw.maxScore || 10);
+        return {
+          ...hw,
+          id: hw.id || `hw-${idx}`,
+          title: hwTitle,
+          subject: hw.subject || hwTitle,
+          name: hw.name || hwTitle,
+          date_key: hw.date_key || hwDateStr,
+          date: hwDateStr,
+          created_at: hw.created_at || hwDateStr,
+          timestamp: hw.timestamp,
+          grade: hwGrade,
+          score: hwScore,
+          degree: hw.degree,
+          max_score: maxScore,
+          maxScore,
+          status: hw.status || "done",
+          notes: hw.notes || hw.teacher_notes || "",
+        };
+      })
+      .sort((a: any, b: any) =>
+        String(b.date_key || b.date || b.created_at || "").localeCompare(String(a.date_key || a.date || a.created_at || ""))
+      );
 
-    // 4. Parse Exam Grades & Evaluations (Null-Safe)
+    // 4. Parse Exam Grades & Evaluations (Null-Safe with key variations)
     const rawExamGrades = Array.isArray(studentRow.exam_grades) ? studentRow.exam_grades : [];
     let examGradesList = rawExamGrades.map((g: any, idx: number) => {
-      const score = Number(g.score) || 0;
-      const maxScore = Number(g.max_score) || 10;
+      const rawGrade = g.grade || g.score || g.degree;
+      const score = Number(rawGrade) || 0;
+      const maxScore = Number(g.max_score || g.maxScore || 10);
       const pct =
         g.percentage !== undefined
           ? Number(g.percentage)
           : Math.round((score / maxScore) * 100);
+      const examTitle = g.subject || g.title || g.name || g.exam_title || g.examTitle || "اختبار دوري";
+      const examDate = g.created_at || g.date || g.timestamp || g.exam_date || "";
+      const cleanExamDate = typeof examDate === "string" ? (examDate.length >= 10 ? examDate.slice(0, 10) : examDate) : "";
 
       return {
         id: g.id || `exam-${idx}`,
         studentId: g.student_id || studentRow.id,
         barcode: bCode,
-        examTitle: g.exam_title || g.title || "اختبار دوري",
-        title: g.exam_title || g.title || "اختبار دوري",
+        examTitle,
+        title: examTitle,
+        subject: g.subject || examTitle,
+        name: g.name || examTitle,
+        grade: rawGrade,
         score,
+        degree: g.degree,
         maxScore,
+        max_score: maxScore,
         percentage: pct,
         teacherNotes: g.teacher_notes || g.notes || "",
         notes: g.teacher_notes || g.notes || "",
-        examDate: g.exam_date || (g.created_at ? g.created_at.slice(0, 10) : ""),
-        createdAt: g.created_at || new Date().toISOString(),
-        scoreFormatted: `${score} / ${maxScore}`,
+        examDate: cleanExamDate,
+        date: cleanExamDate,
+        created_at: g.created_at || cleanExamDate,
+        timestamp: g.timestamp,
+        scoreFormatted: `${rawGrade !== undefined ? rawGrade : score} / ${maxScore}`,
       };
     });
 
     // Sort exam grades descending by date/creation
     examGradesList.sort((a: any, b: any) =>
-      String(b.examDate || b.createdAt || "").localeCompare(String(a.examDate || a.createdAt || ""))
+      String(b.examDate || b.createdAt || b.date || "").localeCompare(String(a.examDate || a.createdAt || a.date || ""))
     );
 
     // Parse exam scores if stored in student row
