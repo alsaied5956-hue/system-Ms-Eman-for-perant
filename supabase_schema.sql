@@ -95,12 +95,36 @@ create index if not exists idx_homework_student_id on public.homework(student_id
 create index if not exists idx_homework_date_key on public.homework(date_key);
 
 -- ------------------------------------------------------------------------
--- 5. CHAT MESSAGES (Isolated Parent <-> Admin Portal)
+-- 5. EXAM GRADES & EVALUATIONS TABLE
+-- ------------------------------------------------------------------------
+create table if not exists public.exam_grades (
+    id uuid primary key default uuid_generate_v4(),
+    student_id uuid references public.students(id) on delete cascade,
+    barcode text not null,
+    exam_title text not null,
+    score numeric(5, 2) not null default 0,
+    max_score numeric(5, 2) not null default 10,
+    percentage numeric(5, 2),
+    teacher_notes text,
+    exam_date date not null default current_date,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_exam_grades_student_id on public.exam_grades(student_id);
+create index if not exists idx_exam_grades_barcode on public.exam_grades(barcode);
+create index if not exists idx_exam_grades_created on public.exam_grades(created_at desc);
+
+-- View/alias for evaluations
+create or replace view public.evaluations as select * from public.exam_grades;
+
+-- ------------------------------------------------------------------------
+-- 6. CHAT MESSAGES (Isolated Parent <-> Admin Portal)
 -- ------------------------------------------------------------------------
 create table if not exists public.chat_messages (
     id uuid primary key default uuid_generate_v4(),
     student_id uuid references public.students(id) on delete cascade,
-    sender_role text not null check (sender_role in ('admin', 'assistant', 'parent')),
+    sender_role text not null check (sender_role in ('admin', 'assistant', 'parent', 'supervisor')),
     sender_name text not null,
     message text not null,
     is_read boolean not null default false,
@@ -109,22 +133,27 @@ create table if not exists public.chat_messages (
 
 create index if not exists idx_chat_student_created on public.chat_messages(student_id, created_at asc);
 
+-- View/alias for messages
+create or replace view public.messages as select * from public.chat_messages;
+
 -- ------------------------------------------------------------------------
--- 6. ENABLE SUPABASE REALTIME REPLICATION (Instant WebSocket Updates)
+-- 7. ENABLE SUPABASE REALTIME REPLICATION (Instant WebSocket Updates)
 -- ------------------------------------------------------------------------
 alter publication supabase_realtime add table public.students;
 alter publication supabase_realtime add table public.attendance_logs;
 alter publication supabase_realtime add table public.payments;
 alter publication supabase_realtime add table public.homework;
+alter publication supabase_realtime add table public.exam_grades;
 alter publication supabase_realtime add table public.chat_messages;
 
 -- ------------------------------------------------------------------------
--- 7. ROW LEVEL SECURITY (RLS) POLICIES
+-- 8. ROW LEVEL SECURITY (RLS) POLICIES
 -- ------------------------------------------------------------------------
 alter table public.students enable row level security;
 alter table public.attendance_logs enable row level security;
 alter table public.payments enable row level security;
 alter table public.homework enable row level security;
+alter table public.exam_grades enable row level security;
 alter table public.chat_messages enable row level security;
 
 -- Admin / Staff full access policy (using anon or service key for local/codespace development)

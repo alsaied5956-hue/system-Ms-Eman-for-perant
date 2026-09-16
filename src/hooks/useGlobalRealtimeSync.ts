@@ -8,6 +8,12 @@ import {
   updateSessionPortalPayment,
   updateSessionPortalStudent,
   updateSessionPortalHomework,
+  updateSessionPortalExamGrade,
+  deleteSessionPortalExamGrade,
+  deleteSessionPortalAttendance,
+  deleteSessionPortalPayment,
+  deleteSessionPortalHomework,
+  updateSessionPortalMessage,
 } from "../utils/portalSessionStore";
 import {
   playPortalAudioChime,
@@ -21,6 +27,8 @@ export type RealtimeTable =
   | "homework"
   | "payments"
   | "students"
+  | "exam_grades"
+  | "evaluations"
   | "messages"
   | "chat_messages"
   | "parent_accounts";
@@ -49,6 +57,8 @@ export interface UseGlobalRealtimeSyncOptions {
   onPaymentChange?: (change: RealtimeTableChange<any>) => void;
   /** Callback fired when student record changes */
   onStudentChange?: (change: RealtimeTableChange<any>) => void;
+  /** Callback fired when exam grades or evaluations change */
+  onGradeChange?: (change: RealtimeTableChange<any>) => void;
   /** Callback fired when chat/messages change */
   onMessageChange?: (change: RealtimeTableChange<any>) => void;
   /** Generic callback fired on any table change */
@@ -429,6 +439,7 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
   const onHomeworkRef = useRef(options?.onHomeworkChange);
   const onPaymentRef = useRef(options?.onPaymentChange);
   const onStudentRef = useRef(options?.onStudentChange);
+  const onGradeRef = useRef(options?.onGradeChange);
   const onMessageRef = useRef(options?.onMessageChange);
   const onAnyRef = useRef(options?.onAnyChange);
   const enableSoundAlerts = options?.enableSoundAlerts !== false;
@@ -438,6 +449,7 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
     onHomeworkRef.current = options?.onHomeworkChange;
     onPaymentRef.current = options?.onPaymentChange;
     onStudentRef.current = options?.onStudentChange;
+    onGradeRef.current = options?.onGradeChange;
     onMessageRef.current = options?.onMessageChange;
     onAnyRef.current = options?.onAnyChange;
   }, [
@@ -445,6 +457,7 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
     options?.onHomeworkChange,
     options?.onPaymentChange,
     options?.onStudentChange,
+    options?.onGradeChange,
     options?.onMessageChange,
     options?.onAnyChange,
   ]);
@@ -481,7 +494,7 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
 
     const channel = supabase.channel(channelTopic);
 
-    // 1. Attendance Logs Subscription
+    // 1. Attendance Logs Subscription (INSERT, UPDATE, DELETE)
     channel
       .on(
         "postgres_changes",
@@ -489,7 +502,6 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           event: "*",
           schema: "public",
           table: "attendance_logs",
-          filter: `barcode=eq.${cleanBarcode}`,
         },
         (payload: any) => {
           const newRow = payload?.new;
@@ -505,7 +517,14 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
             old: oldRow,
           };
 
-          if (newRow && newRow.date_key) {
+          if (payload.eventType === "DELETE") {
+            deleteSessionPortalAttendance(cleanBarcode, oldRow?.id || oldRow?.date_key);
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(
+                new CustomEvent("eman_realtime_data_update", { detail: change })
+              );
+            }
+          } else if (newRow && newRow.date_key) {
             const status = String(newRow.status || "حضور").trim();
             updateSessionPortalAttendance(cleanBarcode, newRow.date_key, status);
 
@@ -544,14 +563,13 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           onAnyRef.current?.(change);
         }
       )
-      // 2. Homework Logs Subscription
+      // 2. Homework Logs Subscription (INSERT, UPDATE, DELETE)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "homework",
-          filter: cleanStudentId ? `student_id=eq.${cleanStudentId}` : undefined,
         },
         (payload: any) => {
           const newRow = payload?.new;
@@ -567,7 +585,14 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
             old: oldRow,
           };
 
-          if (newRow) {
+          if (payload.eventType === "DELETE") {
+            deleteSessionPortalHomework(cleanBarcode, oldRow?.id || oldRow?.date_key);
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(
+                new CustomEvent("eman_realtime_data_update", { detail: change })
+              );
+            }
+          } else if (newRow) {
             updateSessionPortalHomework(cleanBarcode, newRow);
             const title = newRow.title || "الواجب المدرسي";
             triggerAlertFeedback(
@@ -595,14 +620,13 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           onAnyRef.current?.(change);
         }
       )
-      // 3. Payments Subscription
+      // 3. Payments Subscription (INSERT, UPDATE, DELETE)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "payments",
-          filter: cleanStudentId ? `student_id=eq.${cleanStudentId}` : undefined,
         },
         (payload: any) => {
           const newRow = payload?.new;
@@ -618,8 +642,15 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
             old: oldRow,
           };
 
-          if (newRow && newRow.month_key) {
-            const mKey = newRow.month_key;
+          if (payload.eventType === "DELETE") {
+            deleteSessionPortalPayment(cleanBarcode, oldRow?.id || oldRow?.month_key);
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(
+                new CustomEvent("eman_realtime_data_update", { detail: change })
+              );
+            }
+          } else if (newRow && (newRow.month_key || newRow.monthKey)) {
+            const mKey = newRow.month_key || newRow.monthKey;
             const paymentRecord = {
               barcode: cleanBarcode,
               monthKey: mKey,
@@ -657,14 +688,13 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           onAnyRef.current?.(change);
         }
       )
-      // 4. Students Subscription
+      // 4. Students Subscription (INSERT, UPDATE, DELETE)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "students",
-          filter: `barcode=eq.${cleanBarcode}`,
         },
         (payload: any) => {
           const newRow = payload?.new;
@@ -699,6 +729,12 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
                 `حصل الطالب على درجة ${newRow.last_exam_score} في ${newRow.last_exam_title || "الامتحان"}`,
                 `grade-${newRow.id || Date.now()}`
               );
+              onGradeRef.current?.({
+                table: "students",
+                eventType: "UPDATE",
+                new: newRow,
+                old: oldRow,
+              });
             } else {
               triggerAlertFeedback(
                 "edit",
@@ -726,105 +762,206 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           onAnyRef.current?.(change);
         }
       )
-      // 5. Messages & Chat Messages Subscription
+      // 5. Exam Grades Subscription (INSERT, UPDATE, DELETE)
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
-          table: "chat_messages",
-          filter: `barcode=eq.${cleanBarcode}`,
+          table: "exam_grades",
         },
         (payload: any) => {
           const newRow = payload?.new;
-          if (!newRow) return;
+          const oldRow = payload?.old;
+          const targetRow = newRow || oldRow;
 
-          if (!isRowForStudent(newRow, cleanBarcode, cleanStudentId, linkedList)) return;
+          if (!isRowForStudent(targetRow, cleanBarcode, cleanStudentId, linkedList)) return;
+
+          const change: RealtimeTableChange = {
+            table: "exam_grades",
+            eventType: payload.eventType,
+            new: newRow,
+            old: oldRow,
+          };
+
+          if (payload.eventType === "DELETE") {
+            deleteSessionPortalExamGrade(cleanBarcode, oldRow?.id || oldRow?.exam_title);
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(
+                new CustomEvent("eman_realtime_data_update", { detail: change })
+              );
+            }
+          } else if (newRow) {
+            updateSessionPortalExamGrade(cleanBarcode, newRow);
+            const title = newRow.exam_title || newRow.title || "اختبار جديد";
+            const scoreStr = `${newRow.score || 0} / ${newRow.max_score || 10}`;
+            triggerAlertFeedback(
+              "grade",
+              "رصد درجات امتحان جديدة",
+              `حصل الطالب على درجة ${scoreStr} في ${title}`,
+              `grade-${newRow.id || Date.now()}`
+            );
+
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(
+                new CustomEvent("eman_grade_sync", {
+                  detail: { ...newRow, barcode: cleanBarcode },
+                })
+              );
+              window.dispatchEvent(
+                new CustomEvent("eman_realtime_data_update", {
+                  detail: change,
+                })
+              );
+            }
+          }
+
+          onGradeRef.current?.(change);
+          onAnyRef.current?.(change);
+        }
+      )
+      // 6. Evaluations View/Table Fallback Subscription
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "evaluations",
+        },
+        (payload: any) => {
+          const newRow = payload?.new;
+          const oldRow = payload?.old;
+          const targetRow = newRow || oldRow;
+
+          if (!isRowForStudent(targetRow, cleanBarcode, cleanStudentId, linkedList)) return;
+
+          const change: RealtimeTableChange = {
+            table: "evaluations",
+            eventType: payload.eventType,
+            new: newRow,
+            old: oldRow,
+          };
+
+          if (payload.eventType === "DELETE") {
+            deleteSessionPortalExamGrade(cleanBarcode, oldRow?.id || oldRow?.exam_title);
+          } else if (newRow) {
+            updateSessionPortalExamGrade(cleanBarcode, newRow);
+          }
+
+          onGradeRef.current?.(change);
+          onAnyRef.current?.(change);
+        }
+      )
+      // 7. Messages & Chat Messages Subscription (INSERT, UPDATE, DELETE)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "chat_messages",
+        },
+        (payload: any) => {
+          const newRow = payload?.new;
+          const oldRow = payload?.old;
+          const targetRow = newRow || oldRow;
+
+          if (!isRowForStudent(targetRow, cleanBarcode, cleanStudentId, linkedList)) return;
 
           const change: RealtimeTableChange = {
             table: "chat_messages",
-            eventType: "INSERT",
+            eventType: payload.eventType,
             new: newRow,
-            old: null,
+            old: oldRow,
           };
 
-          const isFromSupervisor =
-            newRow.sender === "admin" ||
-            newRow.sender_role === "supervisor" ||
-            (newRow.sender && newRow.sender !== "parent");
+          if (newRow) {
+            updateSessionPortalMessage(cleanBarcode, newRow);
+            const isFromSupervisor =
+              newRow.sender === "admin" ||
+              newRow.sender_role === "supervisor" ||
+              newRow.sender_role === "admin" ||
+              newRow.sender_role === "assistant" ||
+              (newRow.sender && newRow.sender !== "parent");
 
-          if (isFromSupervisor) {
-            triggerAlertFeedback(
-              "chat",
-              "رسالة جديدة من إدارة المنظومة",
-              newRow.message || newRow.text || "رسالة واردة جديدة بخصوص الطالب",
-              `msg-${newRow.id || Date.now()}`
-            );
-          }
+            if (isFromSupervisor && payload.eventType === "INSERT") {
+              triggerAlertFeedback(
+                "chat",
+                "رسالة جديدة من إدارة المنظومة",
+                newRow.message || newRow.text || "رسالة واردة جديدة بخصوص الطالب",
+                `msg-${newRow.id || Date.now()}`
+              );
+            }
 
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(
-              new CustomEvent("eman_message_sync", {
-                detail: { message: newRow, barcode: cleanBarcode },
-              })
-            );
-            window.dispatchEvent(
-              new CustomEvent("eman_realtime_data_update", {
-                detail: change,
-              })
-            );
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(
+                new CustomEvent("eman_message_sync", {
+                  detail: { message: newRow, barcode: cleanBarcode },
+                })
+              );
+              window.dispatchEvent(
+                new CustomEvent("eman_realtime_data_update", {
+                  detail: change,
+                })
+              );
+            }
           }
 
           onMessageRef.current?.(change);
           onAnyRef.current?.(change);
         }
       )
-      // Also fallback-listen to messages table if used
+      // 8. Fallback Messages Subscription
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "messages",
         },
         (payload: any) => {
           const newRow = payload?.new;
-          if (!newRow) return;
+          const oldRow = payload?.old;
+          const targetRow = newRow || oldRow;
 
-          if (!isRowForStudent(newRow, cleanBarcode, cleanStudentId, linkedList)) return;
+          if (!isRowForStudent(targetRow, cleanBarcode, cleanStudentId, linkedList)) return;
 
           const change: RealtimeTableChange = {
             table: "messages",
-            eventType: "INSERT",
+            eventType: payload.eventType,
             new: newRow,
-            old: null,
+            old: oldRow,
           };
 
-          const isFromSupervisor =
-            newRow.sender === "admin" ||
-            newRow.sender_role === "supervisor" ||
-            (newRow.sender && newRow.sender !== "parent");
+          if (newRow) {
+            updateSessionPortalMessage(cleanBarcode, newRow);
+            const isFromSupervisor =
+              newRow.sender === "admin" ||
+              newRow.sender_role === "supervisor" ||
+              newRow.sender_role === "admin" ||
+              newRow.sender_role === "assistant" ||
+              (newRow.sender && newRow.sender !== "parent");
 
-          if (isFromSupervisor) {
-            triggerAlertFeedback(
-              "chat",
-              "رسالة جديدة من إدارة المنظومة",
-              newRow.message || newRow.text || "رسالة واردة جديدة بخصوص الطالب",
-              `msg-${newRow.id || Date.now()}`
-            );
-          }
+            if (isFromSupervisor && payload.eventType === "INSERT") {
+              triggerAlertFeedback(
+                "chat",
+                "رسالة جديدة من إدارة المنظومة",
+                newRow.message || newRow.text || "رسالة واردة جديدة بخصوص الطالب",
+                `msg-${newRow.id || Date.now()}`
+              );
+            }
 
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(
-              new CustomEvent("eman_message_sync", {
-                detail: { message: newRow, barcode: cleanBarcode },
-              })
-            );
-            window.dispatchEvent(
-              new CustomEvent("eman_realtime_data_update", {
-                detail: change,
-              })
-            );
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(
+                new CustomEvent("eman_message_sync", {
+                  detail: { message: newRow, barcode: cleanBarcode },
+                })
+              );
+              window.dispatchEvent(
+                new CustomEvent("eman_realtime_data_update", {
+                  detail: change,
+                })
+              );
+            }
           }
 
           onMessageRef.current?.(change);

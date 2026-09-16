@@ -458,15 +458,29 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     },
     onAttendanceChange: (change) => {
       const newRow = change.new;
-      if (newRow && newRow.date_key) {
-        const dateKey = newRow.date_key;
+      const oldRow = change.old;
+      if (change.eventType === "DELETE") {
+        const delDateKey = oldRow?.date_key || oldRow?.date;
+        if (delDateKey) {
+          setSupabasePortalData((prev) => {
+            if (!prev) return null;
+            const updatedHistory = { ...(prev.attendanceHistory || {}) };
+            delete updatedHistory[delDateKey];
+            return {
+              ...prev,
+              attendanceHistory: updatedHistory,
+            };
+          });
+        }
+      } else if (newRow && (newRow.date_key || newRow.date)) {
+        const dateKey = newRow.date_key || newRow.date;
         const status = newRow.status || "حضور";
         setSupabasePortalData((prev) => {
           if (!prev) return null;
           return {
             ...prev,
             attendanceHistory: {
-              ...prev.attendanceHistory,
+              ...(prev.attendanceHistory || {}),
               [dateKey]: status,
             },
           };
@@ -475,8 +489,26 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     },
     onPaymentChange: (change) => {
       const newRow = change.new;
-      if (newRow && newRow.month_key) {
-        const mKey = newRow.month_key;
+      const oldRow = change.old;
+      if (change.eventType === "DELETE") {
+        const delMonthKey = oldRow?.month_key || oldRow?.month;
+        if (delMonthKey) {
+          setSupabasePortalData((prev) => {
+            if (!prev) return null;
+            const updatedPayments = { ...(prev.payments || {}) };
+            delete updatedPayments[delMonthKey];
+            const updatedList = (prev.paymentsList || []).filter(
+              (p: any) => p.monthKey !== delMonthKey && p.month_key !== delMonthKey && p.id !== oldRow?.id
+            );
+            return {
+              ...prev,
+              payments: updatedPayments,
+              paymentsList: updatedList,
+            };
+          });
+        }
+      } else if (newRow && (newRow.month_key || newRow.month)) {
+        const mKey = newRow.month_key || newRow.month;
         const paymentRecord = {
           barcode: targetBarcode,
           monthKey: mKey,
@@ -489,27 +521,48 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
         };
         setSupabasePortalData((prev) => {
           if (!prev) return null;
+          const currentList = Array.isArray(prev.paymentsList) ? prev.paymentsList : [];
+          const idx = currentList.findIndex((p: any) => p.monthKey === mKey || p.month_key === mKey);
+          let updatedList = [];
+          if (idx >= 0) {
+            updatedList = [...currentList];
+            updatedList[idx] = { ...updatedList[idx], ...paymentRecord };
+          } else {
+            updatedList = [paymentRecord, ...currentList];
+          }
           return {
             ...prev,
             payments: {
-              ...prev.payments,
+              ...(prev.payments || {}),
               [mKey]: {
-                ...(prev.payments[mKey] || {}),
+                ...((prev.payments || {})[mKey] || {}),
                 ...paymentRecord,
                 [targetBarcode]: paymentRecord,
               },
             },
+            paymentsList: updatedList,
           };
         });
       }
     },
     onHomeworkChange: (change) => {
       const newRow = change.new;
-      if (newRow && newRow.date_key) {
+      const oldRow = change.old;
+      if (change.eventType === "DELETE") {
+        const delId = oldRow?.id || oldRow?.date_key;
         setSupabasePortalData((prev) => {
           if (!prev) return null;
           const existingList = Array.isArray(prev.homeworkList) ? prev.homeworkList : [];
-          const index = existingList.findIndex((h: any) => h.date_key === newRow.date_key);
+          return {
+            ...prev,
+            homeworkList: existingList.filter((h: any) => h.id !== delId && h.date_key !== delId),
+          };
+        });
+      } else if (newRow && newRow.date_key) {
+        setSupabasePortalData((prev) => {
+          if (!prev) return null;
+          const existingList = Array.isArray(prev.homeworkList) ? prev.homeworkList : [];
+          const index = existingList.findIndex((h: any) => h.date_key === newRow.date_key || (newRow.id && h.id === newRow.id));
           let updatedList = [];
           if (index >= 0) {
             updatedList = [...existingList];
@@ -520,6 +573,92 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
           return {
             ...prev,
             homeworkList: updatedList,
+          };
+        });
+      }
+    },
+    onGradeChange: (change) => {
+      const newRow = change.new;
+      const oldRow = change.old;
+      if (change.eventType === "DELETE") {
+        const delId = oldRow?.id || oldRow?.exam_title || oldRow?.title;
+        setSupabasePortalData((prev) => {
+          if (!prev) return null;
+          const currentList = Array.isArray(prev.examGradesList) ? prev.examGradesList : [];
+          const updatedList = currentList.filter(
+            (g: any) => g.id !== delId && g.examTitle !== delId && g.title !== delId
+          );
+          const updatedScores = updatedList.map((g: any) => g.score);
+          const latest = updatedList[0];
+          return {
+            ...prev,
+            examGradesList: updatedList,
+            examScores: updatedScores,
+            lastExamTitle: latest?.examTitle || "",
+            lastExamScore: latest?.scoreFormatted || "",
+            student: prev.student
+              ? {
+                  ...prev.student,
+                  totalExamScores: updatedScores,
+                  lastExamTitle: latest?.examTitle || "",
+                  lastExamScore: latest?.scoreFormatted || "",
+                }
+              : null,
+          };
+        });
+      } else if (newRow) {
+        const itemTitle = newRow.exam_title || newRow.title || "اختبار دوري";
+        const score = Number(newRow.score) || 0;
+        const maxScore = Number(newRow.max_score) || 10;
+        const normalized = {
+          id: newRow.id || `exam-${Date.now()}`,
+          studentId: newRow.student_id || targetBarcode,
+          barcode: targetBarcode,
+          examTitle: itemTitle,
+          title: itemTitle,
+          score,
+          maxScore,
+          percentage:
+            newRow.percentage !== undefined
+              ? Number(newRow.percentage)
+              : Math.round((score / maxScore) * 100),
+          teacherNotes: newRow.teacher_notes || newRow.notes || "",
+          notes: newRow.teacher_notes || newRow.notes || "",
+          examDate: newRow.exam_date || (newRow.created_at ? newRow.created_at.slice(0, 10) : ""),
+          createdAt: newRow.created_at || new Date().toISOString(),
+          scoreFormatted: `${score} / ${maxScore}`,
+        };
+
+        setSupabasePortalData((prev) => {
+          if (!prev) return null;
+          const currentList = Array.isArray(prev.examGradesList) ? prev.examGradesList : [];
+          const idx = currentList.findIndex(
+            (g: any) => (normalized.id && g.id === normalized.id) || g.examTitle === normalized.examTitle
+          );
+          let updatedList = [];
+          if (idx >= 0) {
+            updatedList = [...currentList];
+            updatedList[idx] = { ...updatedList[idx], ...normalized };
+          } else {
+            updatedList = [normalized, ...currentList];
+          }
+          const updatedScores = updatedList.map((g: any) => g.score);
+          const latest = updatedList[0];
+          return {
+            ...prev,
+            examGradesList: updatedList,
+            examScores: updatedScores,
+            lastExamTitle: latest?.examTitle || prev.lastExamTitle,
+            lastExamScore: latest?.scoreFormatted || prev.lastExamScore,
+            student: prev.student
+              ? {
+                  ...prev.student,
+                  totalExamScores: updatedScores,
+                  lastExamTitle: latest?.examTitle || prev.student.lastExamTitle,
+                  lastExamScore: latest?.scoreFormatted || prev.student.lastExamScore,
+                  points: newRow.points !== undefined ? newRow.points : prev.student.points,
+                }
+              : null,
           };
         });
       }
@@ -684,30 +823,30 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
   // Live Authoritative Payments Map (Single Source Hydration Lock)
   const effectivePayments = useMemo(() => {
     const targetBarcode = String(activeStudent?.barcode || selectedStudentBarcode || account.studentBarcode).trim();
-    if (!targetBarcode) return payments;
+    if (!targetBarcode) return payments || {};
 
-    if (supabasePortalData?.payments && Object.keys(supabasePortalData.payments).length > 0) {
-      return supabasePortalData.payments;
+    if (supabasePortalData && supabasePortalData.payments !== undefined) {
+      return supabasePortalData.payments || {};
     }
-    return payments;
-  }, [payments, supabasePortalData?.payments, activeStudent?.barcode, selectedStudentBarcode, account.studentBarcode]);
+    return payments || {};
+  }, [payments, supabasePortalData, activeStudent?.barcode, selectedStudentBarcode, account.studentBarcode]);
 
   // Live Authoritative Attendance History Map (Single Source Hydration Lock)
   const effectiveAttendanceHistory = useMemo(() => {
     const targetBarcode = String(activeStudent?.barcode || selectedStudentBarcode || account.studentBarcode).trim();
-    if (!targetBarcode) return attendanceHistory;
+    if (!targetBarcode) return attendanceHistory || {};
 
-    if (supabasePortalData?.attendanceHistory && Object.keys(supabasePortalData.attendanceHistory).length > 0) {
+    if (supabasePortalData && supabasePortalData.attendanceHistory !== undefined) {
       const result: Record<string, Record<string, string>> = {};
-      for (const [dKey, status] of Object.entries(supabasePortalData.attendanceHistory)) {
+      for (const [dKey, status] of Object.entries(supabasePortalData.attendanceHistory || {})) {
         result[dKey] = {
           [targetBarcode]: String(status || ""),
         };
       }
       return result;
     }
-    return attendanceHistory;
-  }, [attendanceHistory, supabasePortalData?.attendanceHistory, activeStudent?.barcode, selectedStudentBarcode, account.studentBarcode]);
+    return attendanceHistory || {};
+  }, [attendanceHistory, supabasePortalData, activeStudent?.barcode, selectedStudentBarcode, account.studentBarcode]);
 
   // Real-time chat subscription for the active student's thread
   useEffect(() => {
@@ -1380,11 +1519,36 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     return 100 - attendanceRate;
   }, [attendanceRate]);
 
-  // 5. Exams and Evaluation Scores
+  // 5. Exams and Evaluation Scores (Dynamic Relational Exam List with Rich Schema)
   const examHistoryList = useMemo(() => {
-    const list: { title: string; scoreStr: string; pct: number; isLatest?: boolean }[] = [];
+    const list: {
+      id?: string;
+      title: string;
+      scoreStr: string;
+      pct: number;
+      isLatest?: boolean;
+      date?: string;
+      notes?: string;
+    }[] = [];
     if (!activeStudent) return list;
 
+    // 1. If supabasePortalData has rich examGradesList, prioritize it
+    if (supabasePortalData?.examGradesList && supabasePortalData.examGradesList.length > 0) {
+      supabasePortalData.examGradesList.forEach((g: any, idx: number) => {
+        list.push({
+          id: g.id || `grade-${idx}`,
+          title: g.examTitle || g.title || "اختبار دوري",
+          scoreStr: g.scoreFormatted || `${g.score || 0} / ${g.maxScore || 10}`,
+          pct: g.percentage !== undefined ? g.percentage : Math.round(((g.score || 0) / (g.maxScore || 10)) * 100),
+          isLatest: idx === 0,
+          date: g.examDate || (g.createdAt ? g.createdAt.slice(0, 10) : undefined),
+          notes: g.teacherNotes || g.notes || "",
+        });
+      });
+      return list;
+    }
+
+    // 2. Fallback to activeStudent fields
     if (activeStudent.lastExamTitle && activeStudent.lastExamScore) {
       // Parse percentage if possible
       const match = activeStudent.lastExamScore.match(/\((\d+)%\)/);
@@ -1412,7 +1576,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     }
 
     return list;
-  }, [activeStudent]);
+  }, [activeStudent, supabasePortalData?.examGradesList]);
 
   // 6. Handle Linking another child
   const handleLinkChildSubmit = async (e: React.FormEvent) => {
@@ -2890,6 +3054,20 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
                           style={{ width: `${exam.pct}%` }}
                         />
                       </div>
+
+                      {/* Notes and Date */}
+                      {exam.notes && (
+                        <div className="text-xs text-slate-300 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
+                          <span className="text-sky-400 font-bold">ملاحظات المعلمة: </span>
+                          <span>{exam.notes}</span>
+                        </div>
+                      )}
+                      {exam.date && (
+                        <div className="text-[11px] text-slate-400 flex items-center justify-between pt-1">
+                          <span>تاريخ الاختبار:</span>
+                          <span className="font-mono text-slate-300">{exam.date}</span>
+                        </div>
+                      )}
                     </div>
                   );
                 })

@@ -887,6 +887,67 @@ export async function saveHomeworkToSupabase(records: Array<{
   }
 }
 
+/** Save exam grade record to Supabase exam_grades table */
+export async function saveExamGradeToSupabase(record: {
+  barcode: string;
+  studentId?: string;
+  examTitle: string;
+  score: number;
+  maxScore: number;
+  percentage?: number;
+  teacherNotes?: string;
+  examDate?: string;
+}): Promise<void> {
+  if (!record || !record.barcode) return;
+  try {
+    const studentId = record.studentId || (await getStudentIdByBarcode(record.barcode));
+    const pct =
+      record.percentage !== undefined
+        ? record.percentage
+        : Math.round((Number(record.score) / (Number(record.maxScore) || 10)) * 100);
+
+    const payload: any = {
+      barcode: String(record.barcode).trim(),
+      exam_title: record.examTitle || "اختبار دوري",
+      score: Number(record.score) || 0,
+      max_score: Number(record.maxScore) || 10,
+      percentage: pct,
+      teacher_notes: record.teacherNotes || "",
+      exam_date: record.examDate || new Date().toISOString().slice(0, 10),
+    };
+    if (studentId) {
+      payload.student_id = studentId;
+    }
+
+    const { error } = await supabase.from("exam_grades").insert(payload);
+    if (error) {
+      // If exam_grades table or column differs in remote instance, warn gracefully
+      console.warn("saveExamGradeToSupabase notice:", error.message);
+    }
+  } catch (err) {
+    console.warn("saveExamGradeToSupabase error:", err);
+  }
+}
+
+/** Delete exam grade record from Supabase */
+export async function deleteExamGradeFromSupabase(barcode: string, examTitle?: string): Promise<void> {
+  try {
+    const studentId = await getStudentIdByBarcode(barcode);
+    let q = supabase.from("exam_grades").delete();
+    if (studentId) {
+      q = q.eq("student_id", studentId);
+    } else {
+      q = q.eq("barcode", barcode);
+    }
+    if (examTitle) {
+      q = q.eq("exam_title", examTitle);
+    }
+    await q;
+  } catch (err) {
+    console.warn("deleteExamGradeFromSupabase error:", err);
+  }
+}
+
 /** Save student to Supabase */
 export async function saveStudentToSupabase(s: any): Promise<void> {
   if (!s || !s.barcode) return;
@@ -1700,6 +1761,8 @@ export interface UnifiedStudentPortalData {
   paymentsList: any[];
   homeworkList: any[];
   examScores: number[];
+  examGradesList: any[];
+  messagesList: any[];
   lastExamTitle?: string;
   lastExamScore?: string;
   account?: any | null;
@@ -1707,19 +1770,30 @@ export interface UnifiedStudentPortalData {
 }
 
 /**
- * Unified Direct Barcode Lookup for Parent Student Portal:
- * 1. Extracts the clean student barcode directly from the active session token, argument, or storage.
- * 2. Executes the primary cloud fetch ONLY using `.eq('barcode', cleanBarcode)` on `public.students`
- *    aggregated with relations (`attendance_logs`, `payments`, `homework`).
- * 3. Disambiguates foreign keys (`attendance_logs_student_id_fkey`, `payments_student_id_fkey`, `homework_student_id_fkey`).
- * 4. Eliminates secondary cascading fallback chains and enforces a strict 5-second response limit.
+ * Unified Relational Master Query for Parent Student Portal:
+ * 1. Resolves student by either Barcode OR UUID Student ID or Active Session Token.
+ * 2. Fetches the complete relational graph in a single query:
+ *    - `students` (Demographics, Group, Fees, Status, Points)
+ *    - `attendance_logs` (Present, Absent, Late records with timestamps & notes)
+ *    - `homework` (Assigned, Completed, Pending status, grades & feedback)
+ *    - `payments` (Subscription amounts, dates, receipt numbers & balances)
+ *    - `exam_grades` / `evaluations` (Scores, tests, teacher comments)
+ *    - `chat_messages` / `messages` (Conversation history with supervisors)
+ * 3. Graceful fallback for custom foreign key alias naming and standalone child tables.
+ * 4. Strictly null-safe object parsing: empty arrays & default maps guarantee no UI crashes.
  */
 export async function fetchUnifiedStudentPortalDataFromSupabase(
   barcodeOrToken?: string
 ): Promise<UnifiedStudentPortalData> {
-  const cleanBarcode = extractCleanBarcodeFromSession(barcodeOrToken);
+  let cleanInput = String(barcodeOrToken || "").trim();
 
-  if (!cleanBarcode) {
+  // Extract barcode if input is an active session token
+  if (cleanInput.startsWith("sess-") || cleanInput.includes("eman_portal_")) {
+    const extracted = extractCleanBarcodeFromSession(cleanInput);
+    if (extracted) cleanInput = extracted;
+  }
+
+  if (!cleanInput) {
     return {
       success: false,
       student: null,
@@ -1729,12 +1803,16 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       paymentsList: [],
       homeworkList: [],
       examScores: [],
-      message: "تعذر استخراج رمز الطالب من الجلسة النشطة",
+      examGradesList: [],
+      messagesList: [],
+      message: "تعذر استخراج رمز أو معرف الطالب من الجلسة النشطة",
     };
   }
 
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanInput);
+
   try {
-    // Primary Direct Cloud Fetch Engine (Sub-200ms)
+    // Primary Direct Cloud Fetch Engine (Sub-200ms Single Relational Master Query)
     const fetchDirectAggregatedStudent = async () => {
       // 1. Primary disambiguated relational aggregation on public.students
       const primaryRes = await supabase
@@ -1743,39 +1821,35 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
           *,
           attendance_logs:attendance_logs_student_id_fkey(*),
           payments:payments_student_id_fkey(*),
-          homework:homework_student_id_fkey(*)
+          homework:homework_student_id_fkey(*),
+          exam_grades:exam_grades_student_id_fkey(*),
+          chat_messages:chat_messages_student_id_fkey(*)
         `)
-        .eq("barcode", cleanBarcode)
+        .filter(isUUID ? "id" : "barcode", "eq", cleanInput)
         .maybeSingle();
 
       if (!primaryRes.error && primaryRes.data) {
         return primaryRes.data;
       }
 
-      // 2. Alternate foreign key names in case schema environment uses custom aliases
-      if (primaryRes.error && (primaryRes.error.code === "PGRST201" || primaryRes.error.code === "PGRST200")) {
-        const altRes = await supabase
+      // 2. Generic embedding without explicit constraint names
+      if (
+        primaryRes.error &&
+        (primaryRes.error.code === "PGRST201" ||
+          primaryRes.error.code === "PGRST200" ||
+          primaryRes.error.code === "PGRST205")
+      ) {
+        const stdRes = await supabase
           .from("students")
           .select(`
             *,
-            attendance_logs:fk_attendance_student(*),
-            payments:fk_payments_student(*),
-            homework:fk_homework_student(*)
+            attendance_logs(*),
+            payments(*),
+            homework(*),
+            exam_grades(*),
+            chat_messages(*)
           `)
-          .eq("barcode", cleanBarcode)
-          .maybeSingle();
-
-        if (!altRes.error && altRes.data) {
-          return altRes.data;
-        }
-      }
-
-      // 3. Fallback generic embed if relations are singular
-      if (primaryRes.error && primaryRes.error.code !== "PGRST116") {
-        const stdRes = await supabase
-          .from("students")
-          .select("*, attendance_logs(*), payments(*), homework(*)")
-          .eq("barcode", cleanBarcode)
+          .filter(isUUID ? "id" : "barcode", "eq", cleanInput)
           .maybeSingle();
 
         if (!stdRes.error && stdRes.data) {
@@ -1783,7 +1857,91 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
         }
       }
 
-      return primaryRes.data || null;
+      // 3. Fallback: core relations with parallel child queries for standalone/unlinked tables
+      let studentBasicRes = await supabase
+        .from("students")
+        .select(`
+          *,
+          attendance_logs:attendance_logs_student_id_fkey(*),
+          payments:payments_student_id_fkey(*),
+          homework:homework_student_id_fkey(*)
+        `)
+        .filter(isUUID ? "id" : "barcode", "eq", cleanInput)
+        .maybeSingle();
+
+      let studentData = studentBasicRes.data;
+      if (!studentData) {
+        const plainRes = await supabase
+          .from("students")
+          .select("*")
+          .filter(isUUID ? "id" : "barcode", "eq", cleanInput)
+          .maybeSingle();
+        studentData = plainRes.data;
+      }
+
+      if (!studentData) return null;
+
+      const sId = studentData.id;
+      const bCode = studentData.barcode;
+
+      // Parallel fetch for any missing child relations
+      const [attRes, payRes, hwRes, gradesRes, msgRes] = await Promise.all([
+        !studentData.attendance_logs
+          ? supabase
+              .from("attendance_logs")
+              .select("*")
+              .or(`student_id.eq.${sId},barcode.eq.${bCode}`)
+              .order("date_key", { ascending: false })
+          : Promise.resolve({ data: studentData.attendance_logs }),
+        !studentData.payments
+          ? supabase
+              .from("payments")
+              .select("*")
+              .eq("student_id", sId)
+              .order("month_key", { ascending: false })
+          : Promise.resolve({ data: studentData.payments }),
+        !studentData.homework
+          ? supabase
+              .from("homework")
+              .select("*")
+              .eq("student_id", sId)
+              .order("date_key", { ascending: false })
+          : Promise.resolve({ data: studentData.homework }),
+        !studentData.exam_grades
+          ? supabase
+              .from("exam_grades")
+              .select("*")
+              .or(`student_id.eq.${sId},barcode.eq.${bCode}`)
+              .order("created_at", { ascending: false })
+              .then((res) => {
+                if (res.error) {
+                  // Try evaluations view if exam_grades not found
+                  return supabase
+                    .from("evaluations")
+                    .select("*")
+                    .or(`student_id.eq.${sId},barcode.eq.${bCode}`)
+                    .order("created_at", { ascending: false });
+                }
+                return res;
+              })
+          : Promise.resolve({ data: studentData.exam_grades }),
+        !studentData.chat_messages
+          ? supabase
+              .from("chat_messages")
+              .select("*")
+              .eq("student_id", sId)
+              .order("created_at", { ascending: true })
+          : Promise.resolve({ data: studentData.chat_messages }),
+      ]);
+
+      return {
+        ...studentData,
+        attendance_logs: attRes.data || studentData.attendance_logs || [],
+        payments: payRes.data || studentData.payments || [],
+        homework: hwRes.data || studentData.homework || [],
+        exam_grades: gradesRes.data || [],
+        chat_messages: msgRes.data || [],
+      };
     };
 
     // Strict 5-Second Response Limit
@@ -1803,13 +1961,15 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
         paymentsList: [],
         homeworkList: [],
         examScores: [],
-        message: "لم يتم العثور على طالب بهذا الكود في قاعدة البيانات الموحدة",
+        examGradesList: [],
+        messagesList: [],
+        message: "لم يتم العثور على طالب بهذا الكود أو المعرف في قاعدة البيانات الموحدة",
       };
     }
 
-    const bCode = String(studentRow.barcode).trim();
+    const bCode = String(studentRow.barcode || "").trim();
 
-    // In-memory instant sorting & aggregation (<0.1ms overhead)
+    // 1. Parse Attendance Records (Null-Safe)
     const rawAttendance = Array.isArray(studentRow.attendance_logs) ? studentRow.attendance_logs : [];
     const attendanceLogs = [...rawAttendance].sort((a: any, b: any) =>
       String(b.date_key || "").localeCompare(String(a.date_key || ""))
@@ -1821,6 +1981,7 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       }
     });
 
+    // 2. Parse Payments & Receipts (Null-Safe)
     const rawPayments = Array.isArray(studentRow.payments) ? studentRow.payments : [];
     const paymentsList = [...rawPayments].sort((a: any, b: any) =>
       String(b.month_key || "").localeCompare(String(a.month_key || ""))
@@ -1832,9 +1993,11 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
         const paymentRecord = {
           barcode: bCode,
           monthKey: mKey,
-          amount: Number(p.amount_paid || 0),
-          paidAmount: Number(p.amount_paid || 0),
+          amount: Number(p.amount_paid || p.amount || 0),
+          paidAmount: Number(p.amount_paid || p.amount || 0),
           requiredAmount: Number(p.required_amount || 0),
+          discount: Number(p.discount || 0),
+          status: p.status || "paid",
           date: p.payment_date ? p.payment_date.slice(0, 10) : "",
           time: p.payment_date ? p.payment_date.slice(11, 16) : "",
           note: p.notes || "",
@@ -1849,9 +2012,42 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       }
     });
 
+    // 3. Parse Homework Logs (Null-Safe)
     const rawHomework = Array.isArray(studentRow.homework) ? studentRow.homework : [];
     const homeworkList = [...rawHomework].sort((a: any, b: any) =>
       String(b.date_key || "").localeCompare(String(a.date_key || ""))
+    );
+
+    // 4. Parse Exam Grades & Evaluations (Null-Safe)
+    const rawExamGrades = Array.isArray(studentRow.exam_grades) ? studentRow.exam_grades : [];
+    let examGradesList = rawExamGrades.map((g: any, idx: number) => {
+      const score = Number(g.score) || 0;
+      const maxScore = Number(g.max_score) || 10;
+      const pct =
+        g.percentage !== undefined
+          ? Number(g.percentage)
+          : Math.round((score / maxScore) * 100);
+
+      return {
+        id: g.id || `exam-${idx}`,
+        studentId: g.student_id || studentRow.id,
+        barcode: bCode,
+        examTitle: g.exam_title || g.title || "اختبار دوري",
+        title: g.exam_title || g.title || "اختبار دوري",
+        score,
+        maxScore,
+        percentage: pct,
+        teacherNotes: g.teacher_notes || g.notes || "",
+        notes: g.teacher_notes || g.notes || "",
+        examDate: g.exam_date || (g.created_at ? g.created_at.slice(0, 10) : ""),
+        createdAt: g.created_at || new Date().toISOString(),
+        scoreFormatted: `${score} / ${maxScore}`,
+      };
+    });
+
+    // Sort exam grades descending by date/creation
+    examGradesList.sort((a: any, b: any) =>
+      String(b.examDate || b.createdAt || "").localeCompare(String(a.examDate || a.createdAt || ""))
     );
 
     // Parse exam scores if stored in student row
@@ -1864,6 +2060,57 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       } catch {}
     }
 
+    // Fallback: If examGradesList is empty but student row has totalExamScores or lastExamScore
+    if (examGradesList.length === 0 && (parsedScores.length > 0 || studentRow.last_exam_score)) {
+      if (studentRow.last_exam_title || studentRow.last_exam_score) {
+        const scoreNum = parseFloat(studentRow.last_exam_score || "0") || 0;
+        examGradesList.push({
+          id: "synth-latest",
+          studentId: studentRow.id,
+          barcode: bCode,
+          examTitle: studentRow.last_exam_title || "آخر اختبار مرصود",
+          title: studentRow.last_exam_title || "آخر اختبار مرصود",
+          score: scoreNum,
+          maxScore: 10,
+          percentage: Math.min(100, Math.round((scoreNum / 10) * 100)),
+          teacherNotes: "تم الرصد من سجل درجات المنظومة المعتمد",
+          notes: "تم الرصد من سجل درجات المنظومة المعتمد",
+          examDate: studentRow.updated_at ? studentRow.updated_at.slice(0, 10) : "",
+          createdAt: studentRow.updated_at || new Date().toISOString(),
+          scoreFormatted: studentRow.last_exam_score || `${scoreNum} / 10`,
+        });
+      }
+    }
+
+    // Derive numeric scores list
+    const finalScores: number[] =
+      examGradesList.length > 0
+        ? examGradesList.map((g) => g.score)
+        : parsedScores;
+
+    const latestExam = examGradesList[0];
+    const derivedLastExamTitle = latestExam?.examTitle || studentRow.last_exam_title || "";
+    const derivedLastExamScore = latestExam?.scoreFormatted || studentRow.last_exam_score || "";
+
+    // 5. Parse Messages / Chat History (Null-Safe)
+    const rawMessages = Array.isArray(studentRow.chat_messages)
+      ? studentRow.chat_messages
+      : Array.isArray(studentRow.messages)
+      ? studentRow.messages
+      : [];
+    const messagesList = [...rawMessages]
+      .map((m: any) => ({
+        id: m.id,
+        studentId: m.student_id || studentRow.id,
+        senderRole: m.sender_role || "admin",
+        senderName: m.sender_name || "إدارة المنظومة",
+        message: m.message || "",
+        isRead: m.is_read || false,
+        createdAt: m.created_at || new Date().toISOString(),
+      }))
+      .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+
+    // 6. Assemble Student Demographic Object
     const student = {
       id: studentRow.id,
       barcode: bCode,
@@ -1873,15 +2120,24 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       groupGrade: studentRow.grade || "الصف الرابع الابتدائي",
       groupDays: studentRow.group_days || "سبت - إثنين - أربعاء",
       groupTime: studentRow.group_time || "04:00 م",
-      customMonthlyFee: studentRow.monthly_fee !== undefined && studentRow.monthly_fee !== null ? Number(studentRow.monthly_fee) : undefined,
+      customMonthlyFee:
+        studentRow.monthly_fee !== undefined && studentRow.monthly_fee !== null
+          ? Number(studentRow.monthly_fee)
+          : undefined,
       discountReason: studentRow.notes || "",
       notes: studentRow.notes || "",
       points: studentRow.points || 0,
-      totalAttendanceDays: studentRow.total_attendance_days !== undefined ? Number(studentRow.total_attendance_days) : attendanceLogs.filter((a: any) => a.status === "حضور").length,
-      totalAbsentDays: studentRow.total_absent_days !== undefined ? Number(studentRow.total_absent_days) : attendanceLogs.filter((a: any) => a.status === "غياب" || a.status === "غائب").length,
-      totalExamScores: parsedScores,
-      lastExamTitle: studentRow.last_exam_title || "",
-      lastExamScore: studentRow.last_exam_score || "",
+      totalAttendanceDays:
+        studentRow.total_attendance_days !== undefined
+          ? Number(studentRow.total_attendance_days)
+          : attendanceLogs.filter((a: any) => a.status === "حضور").length,
+      totalAbsentDays:
+        studentRow.total_absent_days !== undefined
+          ? Number(studentRow.total_absent_days)
+          : attendanceLogs.filter((a: any) => a.status === "غياب" || a.status === "غائب").length,
+      totalExamScores: finalScores,
+      lastExamTitle: derivedLastExamTitle,
+      lastExamScore: derivedLastExamScore,
       createdAt: studentRow.created_at,
       updatedAt: studentRow.updated_at,
     };
@@ -1894,9 +2150,11 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       payments: paymentsMap,
       paymentsList,
       homeworkList,
-      examScores: student.totalExamScores,
-      lastExamTitle: student.lastExamTitle,
-      lastExamScore: student.lastExamScore,
+      examScores: finalScores,
+      examGradesList,
+      messagesList,
+      lastExamTitle: derivedLastExamTitle,
+      lastExamScore: derivedLastExamScore,
       account: null,
     };
   } catch (err: any) {
@@ -1910,6 +2168,8 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       paymentsList: [],
       homeworkList: [],
       examScores: [],
+      examGradesList: [],
+      messagesList: [],
       message: err.message || "حدث خطأ أثناء جلب البيانات من الخادم الموحد",
     };
   }
