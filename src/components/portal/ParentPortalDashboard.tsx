@@ -27,6 +27,7 @@ import {
   subscribeToAttendanceStatusChanges,
   subscribeToPaymentChanges,
 } from "../../utils/supabaseClient";
+import { useGlobalRealtimeSync } from "../../hooks/useGlobalRealtimeSync";
 import {
   getSessionPortalData,
   setSessionPortalData,
@@ -418,218 +419,142 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     }
   }, []);
 
-  // 2. Direct Supabase Realtime Channel with Strict Server-Filtered Realtime:
+  // 2. Unified Realtime Listener Engine for Student Tables (Attendance, Absences, Late, Grades, Payments, Homework, Chat):
+  useGlobalRealtimeSync({
+    studentBarcode: targetBarcode,
+    studentId: activeStudentIdRef.current || undefined,
+    linkedBarcodes: allChildBarcodes,
+    enableSoundAlerts: true,
+    onStudentChange: (change) => {
+      const newRow = change.new;
+      if (newRow) {
+        const updatedStudentData: Partial<Student> = {
+          barcode: String(newRow.barcode || targetBarcode).trim(),
+          name: newRow.name,
+          phone: newRow.phone || "",
+          parentPhone: newRow.parent_phone || newRow.parentPhone || "",
+          groupGrade: newRow.grade || newRow.groupGrade,
+          groupDays: newRow.group_days || newRow.groupDays,
+          points: newRow.points,
+          totalAttendanceDays: newRow.total_attendance_days || newRow.totalAttendanceDays,
+          totalAbsentDays: newRow.total_absent_days || newRow.totalAbsentDays,
+          customMonthlyFee: newRow.custom_monthly_fee || newRow.customMonthlyFee,
+          lastExamScore: newRow.last_exam_score || newRow.lastExamScore,
+          lastExamTitle: newRow.last_exam_title || newRow.lastExamTitle,
+        };
+
+        const updater = (prevStudent: any) => ({
+          ...(prevStudent || {}),
+          ...updatedStudentData,
+        });
+        setSupabasePortalData((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            student: updater(prev.student),
+          };
+        });
+      }
+    },
+    onAttendanceChange: (change) => {
+      const newRow = change.new;
+      if (newRow && newRow.date_key) {
+        const dateKey = newRow.date_key;
+        const status = newRow.status || "حضور";
+        setSupabasePortalData((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            attendanceHistory: {
+              ...prev.attendanceHistory,
+              [dateKey]: status,
+            },
+          };
+        });
+      }
+    },
+    onPaymentChange: (change) => {
+      const newRow = change.new;
+      if (newRow && newRow.month_key) {
+        const mKey = newRow.month_key;
+        const paymentRecord = {
+          barcode: targetBarcode,
+          monthKey: mKey,
+          amount: Number(newRow.amount_paid || newRow.amount || 0),
+          paidAmount: Number(newRow.amount_paid || newRow.amount || 0),
+          requiredAmount: Number(newRow.required_amount || 0),
+          date: newRow.payment_date || new Date().toISOString(),
+          month: mKey,
+          notes: newRow.notes || "",
+        };
+        setSupabasePortalData((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            payments: {
+              ...prev.payments,
+              [mKey]: {
+                ...(prev.payments[mKey] || {}),
+                ...paymentRecord,
+                [targetBarcode]: paymentRecord,
+              },
+            },
+          };
+        });
+      }
+    },
+    onHomeworkChange: (change) => {
+      const newRow = change.new;
+      if (newRow && newRow.date_key) {
+        setSupabasePortalData((prev) => {
+          if (!prev) return null;
+          const existingList = Array.isArray(prev.homeworkList) ? prev.homeworkList : [];
+          const index = existingList.findIndex((h: any) => h.date_key === newRow.date_key);
+          let updatedList = [];
+          if (index >= 0) {
+            updatedList = [...existingList];
+            updatedList[index] = { ...updatedList[index], ...newRow };
+          } else {
+            updatedList = [newRow, ...existingList];
+          }
+          return {
+            ...prev,
+            homeworkList: updatedList,
+          };
+        });
+      }
+    },
+    onMessageChange: (change) => {
+      const newRow = change.new;
+      if (newRow) {
+        const mappedMsg: ParentChatMessage = {
+          id: String(newRow.id || `msg-${Date.now()}`),
+          chatId: String(newRow.barcode || newRow.chat_id || targetBarcode),
+          sender: (newRow.sender === "admin" || newRow.sender_role === "supervisor") ? "admin" : "parent",
+          senderName: newRow.sender_name || (newRow.sender === "admin" ? "إدارة المنظومة" : "ولي الأمر"),
+          text: newRow.message || newRow.text || "",
+          timestamp: newRow.created_at ? new Date(newRow.created_at).getTime() : Date.now(),
+          timeFormatted: newRow.created_at
+            ? new Date(newRow.created_at).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })
+            : new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }),
+          isRead: Boolean(newRow.is_read || newRow.status === "READ"),
+          status: newRow.status || (newRow.is_read ? "READ" : "DELIVERED"),
+          senderRole: newRow.sender_role || (newRow.sender === "admin" ? "supervisor" : "parent"),
+        };
+        setChatMessages((prev) => {
+          if (prev.some((m) => m.id === mappedMsg.id)) {
+            return prev.map((m) => (m.id === mappedMsg.id ? mappedMsg : m));
+          }
+          return [...prev, mappedMsg];
+        });
+      }
+    },
+  });
+
+  // Cross-tab broadcast channel synchronization listeners:
   useEffect(() => {
     if (!targetBarcode) return;
-
     let isSubscribed = true;
-
-    const realtimeChannel = supabase
-      .channel(`portal-student-sync-${targetBarcode}-${Date.now()}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "students",
-          filter: `barcode=eq.${targetBarcode}`,
-        },
-        (payload) => {
-          if (!isSubscribed) return;
-          const newRow = payload.new as any;
-          const oldRow = payload.old as any;
-          const activeBarcode = targetBarcode;
-          const activeId = activeStudentIdRef.current;
-
-          // Strict Student-Level Realtime Filtering Guard
-          const isTargetStudent = Boolean(
-            (newRow && (
-              String(newRow.barcode || "").trim() === activeBarcode ||
-              (activeId && (newRow.id === activeId || newRow.student_id === activeId))
-            )) ||
-            (oldRow && (
-              String(oldRow.barcode || "").trim() === activeBarcode ||
-              (activeId && (oldRow.id === activeId || oldRow.student_id === activeId))
-            ))
-          );
-
-          // Reject any broad, global, or un-filtered table event
-          if (!isTargetStudent) return;
-
-          if (payload.eventType === "DELETE") return;
-
-          if (newRow) {
-            const updatedStudentData: Partial<Student> = {
-              barcode: String(newRow.barcode || activeBarcode).trim(),
-              name: newRow.name,
-              phone: newRow.phone || "",
-              parentPhone: newRow.parent_phone || newRow.parentPhone || "",
-              groupGrade: newRow.grade || newRow.groupGrade,
-              groupDays: newRow.group_days || newRow.groupDays,
-              points: newRow.points,
-              totalAttendanceDays: newRow.total_attendance_days || newRow.totalAttendanceDays,
-              totalAbsentDays: newRow.total_absent_days || newRow.totalAbsentDays,
-              customMonthlyFee: newRow.custom_monthly_fee || newRow.customMonthlyFee,
-              lastExamScore: newRow.last_exam_score || newRow.lastExamScore,
-              lastExamTitle: newRow.last_exam_title || newRow.lastExamTitle,
-            };
-
-            const updater = (prevStudent: any) => ({
-              ...(prevStudent || {}),
-              ...updatedStudentData,
-            });
-            updateSessionPortalStudent(activeBarcode, updater);
-            setSupabasePortalData((prev) => {
-              if (!prev) return null;
-              return {
-                ...prev,
-                student: updater(prev.student),
-              };
-            });
-          }
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "attendance_logs",
-          filter: `barcode=eq.${targetBarcode}`,
-        },
-        (payload) => {
-          if (!isSubscribed) return;
-          const newRow = payload.new as any;
-          const oldRow = payload.old as any;
-          const activeBarcode = targetBarcode;
-          const activeId = activeStudentIdRef.current;
-
-          // Strict Student-Level Realtime Filtering Guard
-          const isTargetStudent = Boolean(
-            (newRow && (
-              String(newRow.barcode || "").trim() === activeBarcode ||
-              (activeId && (newRow.student_id === activeId || newRow.id === activeId))
-            )) ||
-            (oldRow && (
-              String(oldRow.barcode || "").trim() === activeBarcode ||
-              (activeId && (oldRow.student_id === activeId || oldRow.id === activeId))
-            ))
-          );
-
-          // Reject any broad, global, or un-filtered table event
-          if (!isTargetStudent) return;
-
-          if (newRow && newRow.date_key) {
-            const dateKey = newRow.date_key;
-            const status = newRow.status || "حضور";
-            updateSessionPortalAttendance(activeBarcode, dateKey, status);
-            setSupabasePortalData((prev) => {
-              if (!prev) return null;
-              return {
-                ...prev,
-                attendanceHistory: {
-                  ...prev.attendanceHistory,
-                  [dateKey]: status,
-                },
-              };
-            });
-          }
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "payments",
-          filter: activeStudentIdRef.current ? `student_id=eq.${activeStudentIdRef.current}` : undefined,
-        },
-        (payload) => {
-          if (!isSubscribed) return;
-          const newRow = payload.new as any;
-          const oldRow = payload.old as any;
-          const activeBarcode = targetBarcode;
-          const activeId = activeStudentIdRef.current;
-
-          // Strict Student-Level Realtime Filtering Guard
-          const isTargetStudent = Boolean(
-            (newRow && (
-              String(newRow.barcode || "").trim() === activeBarcode ||
-              (activeId && (newRow.student_id === activeId || newRow.id === activeId))
-            )) ||
-            (oldRow && (
-              String(oldRow.barcode || "").trim() === activeBarcode ||
-              (activeId && (oldRow.student_id === activeId || oldRow.id === activeId))
-            ))
-          );
-
-          // Reject any broad, global, or un-filtered table event
-          if (!isTargetStudent) return;
-
-          if (newRow && newRow.month_key) {
-            const mKey = newRow.month_key;
-            const paymentRecord = {
-              barcode: activeBarcode,
-              monthKey: mKey,
-              amount: Number(newRow.amount_paid || newRow.amount || 0),
-              paidAmount: Number(newRow.amount_paid || newRow.amount || 0),
-              requiredAmount: Number(newRow.required_amount || 0),
-              date: newRow.payment_date || new Date().toISOString(),
-              month: mKey,
-              notes: newRow.notes || "",
-            };
-            updateSessionPortalPayment(activeBarcode, mKey, paymentRecord);
-            setSupabasePortalData((prev) => {
-              if (!prev) return null;
-              return {
-                ...prev,
-                payments: {
-                  ...prev.payments,
-                  [mKey]: {
-                    ...(prev.payments[mKey] || {}),
-                    ...paymentRecord,
-                    [activeBarcode]: paymentRecord,
-                  },
-                },
-              };
-            });
-          }
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "homework",
-          filter: activeStudentIdRef.current ? `student_id=eq.${activeStudentIdRef.current}` : undefined,
-        },
-        (payload) => {
-          if (!isSubscribed) return;
-          const newRow = payload.new as any;
-          const activeId = activeStudentIdRef.current;
-          if (activeId && newRow && newRow.student_id && newRow.student_id !== activeId) return;
-          if (newRow && newRow.date_key) {
-            setSupabasePortalData((prev) => {
-              if (!prev) return null;
-              const existingList = Array.isArray(prev.homeworkList) ? prev.homeworkList : [];
-              const index = existingList.findIndex((h: any) => h.date_key === newRow.date_key);
-              let updatedList = [];
-              if (index >= 0) {
-                updatedList = [...existingList];
-                updatedList[index] = { ...updatedList[index], ...newRow };
-              } else {
-                updatedList = [newRow, ...existingList];
-              }
-              return {
-                ...prev,
-                homeworkList: updatedList,
-              };
-            });
-          }
-        }
-      )
-      .subscribe();
 
     // Broadcast channel listeners with strict student-level filtering
     const unsubStudent = subscribeToStudentChanges((payload) => {
@@ -640,7 +565,6 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       const matchesId = Boolean(activeId && (payload as any).student_id === activeId);
 
       // Strict Student-Level Realtime Filtering:
-      // Reject any broad, global, or un-filtered table event
       if (!matchesBarcode && !matchesId) return;
 
       const updater = (prevStudent: any) => ({
@@ -665,7 +589,6 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       const matchesId = Boolean(activeId && (payload as any).student_id === activeId);
 
       // Strict Student-Level Realtime Filtering:
-      // Reject any broad, global, or un-filtered table event
       if (!matchesBarcode && !matchesId) return;
 
       const dateKey = payload.dateKey || getTodayKey();
@@ -690,7 +613,6 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       const matchesId = Boolean(activeId && (payload as any).student_id === activeId);
 
       // Strict Student-Level Realtime Filtering:
-      // Reject any broad, global, or un-filtered table event
       if (!matchesBarcode && !matchesId) return;
 
       const mKey = payload.monthKey;
@@ -723,7 +645,6 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
 
     return () => {
       isSubscribed = false;
-      supabase.removeChannel(realtimeChannel);
       unsubStudent();
       unsubAttendance();
       unsubPayment();

@@ -6,7 +6,7 @@ export interface PushNotificationPayload {
   targetUserIds: string[]; // List of barcodes or user identifiers
   title: string;
   body: string;
-  type?: "chat" | "alert" | "revocation" | "attendance" | "payment";
+  type?: "chat" | "alert" | "revocation" | "attendance" | "absence" | "late" | "grade" | "homework" | "payment" | "edit";
   sound?: string;
   url?: string;
   data?: Record<string, any>;

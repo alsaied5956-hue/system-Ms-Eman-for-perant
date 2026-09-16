@@ -204,6 +204,17 @@ export async function queryParentAccountFCMTokens(
   return { tokens: tokenMap, logs };
 }
 
+function getVibrationPattern(type: string): number[] {
+  const norm = String(type || "").toLowerCase();
+  if (norm.includes("abs") || norm === "absence") return [350, 100, 350, 100, 450]; // Absence
+  if (norm.includes("delay") || norm.includes("late")) return [250, 80, 250, 80, 250]; // Late
+  if (norm.includes("grade") || norm.includes("exam") || norm.includes("grades")) return [150, 80, 150, 80, 300]; // Grades
+  if (norm.includes("pay") || norm.includes("fee") || norm.includes("payment")) return [200, 100, 200, 100, 400]; // Payments
+  if (norm.includes("chat") || norm.includes("msg") || norm.includes("message")) return [120, 60, 120]; // Messages
+  if (norm.includes("edit") || norm.includes("update")) return [250, 100, 250]; // Data edits
+  return [200, 100, 200, 100, 300]; // Attendance / Default high-priority
+}
+
 /**
  * Step 2: Format the FCM HTTP v1 / Cloud Function payload correctly
  * with both `notification` (title, body) and `data` objects,
@@ -228,6 +239,7 @@ export function formatFcmV1Payload(
   const nowMs = Date.now();
   const cleanTag = tag || `eman-${type}-${nowMs}`;
   const cleanEventId = eventId || `ev-${type}-${nowMs}`;
+  const vibratePattern = getVibrationPattern(type);
 
   return {
     message: {
@@ -248,7 +260,7 @@ export function formatFcmV1Payload(
         timestamp: String(nowMs),
         channel_id: "high_importance_channel",
         sound: String(sound),
-        vibrate: JSON.stringify([200, 100, 200]),
+        vibrate: JSON.stringify(vibratePattern),
       },
       // 3. Android-specific configuration: OS Chime & Vibration
       android: {
@@ -288,16 +300,16 @@ export function formatFcmV1Payload(
           body: String(body),
           icon: icon,
           badge: badge,
-          tag: cleanTag,
-          requireInteraction: true,
+          vibrate: vibratePattern,
+          silent: false,
           renotify: true,
-          vibrate: [200, 100, 200],
-          dir: "rtl",
+          requireInteraction: true,
+          tag: String(cleanTag),
           data: {
-            url: url,
-            eventId: cleanEventId,
-            type: type,
-            timestamp: nowMs,
+            url: String(url),
+            type: String(type),
+            eventId: String(cleanEventId),
+            timestamp: String(nowMs),
           },
         },
       },

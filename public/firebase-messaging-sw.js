@@ -20,18 +20,30 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// Helper: High-priority vibration patterns for notification categories
+function getVibrationPattern(type) {
+  const norm = String(type || "").toLowerCase();
+  if (norm.includes("abs") || norm === "absence") return [350, 100, 350, 100, 450]; // Absence
+  if (norm.includes("delay") || norm.includes("late")) return [250, 80, 250, 80, 250]; // Late
+  if (norm.includes("grade") || norm.includes("exam") || norm.includes("grades")) return [150, 80, 150, 80, 300]; // Grades
+  if (norm.includes("pay") || norm.includes("fee") || norm.includes("payment")) return [200, 100, 200, 100, 400]; // Payments
+  if (norm.includes("chat") || norm.includes("msg") || norm.includes("message")) return [120, 60, 120]; // Messages
+  if (norm.includes("edit") || norm.includes("update")) return [250, 100, 250]; // Data edits
+  return [200, 100, 200, 100, 300]; // Attendance / Default high-priority
+}
+
 // Helper: Contextual interactive action buttons for notifications
 function getNotificationActions(type, tag) {
   const normType = String(type || "").toLowerCase();
   const normTag = String(tag || "").toLowerCase();
 
-  if (normType === "chat" || normTag.includes("chat")) {
+  if (normType === "chat" || normType === "message" || normType === "messages" || normTag.includes("chat") || normTag.includes("msg")) {
     return [
       { action: "open_chat", title: "💬 فتح المحادثة" },
       { action: "open_portal", title: "عرض المنظومة" },
     ];
   }
-  if (normType === "attendance" || normType === "absence" || normType === "delay" || normTag.includes("att") || normTag.includes("abs")) {
+  if (normType === "attendance" || normType === "absence" || normType === "delay" || normType === "late" || normTag.includes("att") || normTag.includes("abs") || normTag.includes("late")) {
     return [
       { action: "view_attendance", title: "📋 سجل الحضور" },
       { action: "open_portal", title: "عرض المنظومة" },
@@ -43,15 +55,21 @@ function getNotificationActions(type, tag) {
       { action: "open_portal", title: "عرض المنظومة" },
     ];
   }
-  if (normType === "grade" || normType === "exam" || normTag.includes("grade") || normTag.includes("exam")) {
+  if (normType === "grade" || normType === "exam" || normType === "grades" || normTag.includes("grade") || normTag.includes("exam")) {
     return [
       { action: "view_exams", title: "📊 كشف الدرجات" },
       { action: "open_portal", title: "عرض المنظومة" },
     ];
   }
-  if (normType === "fee" || normType === "payment" || normTag.includes("pay")) {
+  if (normType === "fee" || normType === "payment" || normType === "payments" || normTag.includes("pay")) {
     return [
       { action: "view_payments", title: "💳 إيصال المصروفات" },
+      { action: "open_portal", title: "عرض المنظومة" },
+    ];
+  }
+  if (normType === "edit" || normType === "data_edit" || normTag.includes("edit")) {
+    return [
+      { action: "open_portal", title: "عرض بيانات الطالب" },
       { action: "open_portal", title: "عرض المنظومة" },
     ];
   }
@@ -83,8 +101,8 @@ messaging.onBackgroundMessage((payload) => {
     body,
     icon: payload.notification?.icon || payload.data?.icon || "/icon.svg",
     badge: "/icon.svg",
-    vibrate: [200, 100, 200], // High-priority background vibration pattern
-    silent: false, // Rings mobile device default notification chime
+    vibrate: getVibrationPattern(notifType), // High-priority background vibration pattern
+    silent: false, // Rings mobile device default notification chime at high volume
     sound: "/notification.wav",
     renotify: true,
     requireInteraction: true,
@@ -118,21 +136,13 @@ self.addEventListener("push", (event) => {
       body,
       icon: data.icon || "/icon.svg",
       badge: data.badge || "/icon.svg",
-      vibrate: [200, 100, 200],
-      silent: false,
+      vibrate: getVibrationPattern(notifType),
+      silent: false, // Rings device notification chime
+      sound: "/notification.wav",
       renotify: true,
       requireInteraction: true,
       tag: notifTag,
-      actions:
-        notifType === "chat"
-          ? [
-              { action: "open_chat", title: "💬 فتح المحادثة" },
-              { action: "open_portal", title: "عرض المنظومة" },
-            ]
-          : [
-              { action: "open_portal", title: "عرض المنظومة" },
-              { action: "view_details", title: "عرض التفاصيل" },
-            ],
+      actions: getNotificationActions(notifType, notifTag),
       data: {
         url: data.url || (notifType === "chat" ? "/?tab=chat" : "/"),
         eventId: data.eventId,
@@ -150,8 +160,9 @@ self.addEventListener("push", (event) => {
       self.registration.showNotification("منظومة الأستاذة إيمان الدمشيتي", {
         body: text,
         icon: "/icon.svg",
-        vibrate: [200, 100, 200],
+        vibrate: [200, 100, 200, 100, 300],
         silent: false,
+        sound: "/notification.wav",
         renotify: true,
         dir: "rtl",
         lang: "ar",

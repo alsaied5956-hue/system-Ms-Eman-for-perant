@@ -121,6 +121,34 @@ export function updateSessionPortalPayment(barcode: string, monthKey: string, pa
 }
 
 /**
+ * Realtime helper: updates or inserts homework log inside the cached data
+ */
+export function updateSessionPortalHomework(barcode: string, homeworkItem: any): void {
+  const clean = String(barcode || "").trim();
+  const existing = sessionPortalCache.get(clean);
+  if (!existing) return;
+
+  const currentList = Array.isArray(existing.homeworkList) ? existing.homeworkList : [];
+  const itemDateKey = homeworkItem?.date_key || homeworkItem?.date;
+  const index = currentList.findIndex((h: any) => (h.date_key || h.date) === itemDateKey);
+
+  let updatedList = [];
+  if (index >= 0) {
+    updatedList = [...currentList];
+    updatedList[index] = { ...updatedList[index], ...homeworkItem };
+  } else {
+    updatedList = [homeworkItem, ...currentList];
+  }
+
+  const updated: UnifiedStudentPortalData = {
+    ...existing,
+    homeworkList: updatedList,
+  };
+
+  setSessionPortalData(clean, updated);
+}
+
+/**
  * Clear in-memory cache (e.g. upon user logout)
  */
 export function clearSessionPortalCache(): void {
