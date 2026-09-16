@@ -66,11 +66,19 @@ export async function fetchChildTableWithDualKey(
       q = q.or(orFilter);
     } else if (tableName === "attendance_logs") {
       const orFilter = studentBarcode
-        ? `student_id.eq.${studentId},barcode.eq.${studentBarcode}`
+        ? `student_id.eq.${studentId},student_barcode.eq.${studentBarcode},barcode.eq.${studentBarcode}`
+        : `student_id.eq.${studentId}`;
+      q = q.or(orFilter);
+    } else if (tableName === "payments") {
+      const orFilter = studentBarcode
+        ? `student_id.eq.${studentId},student_barcode.eq.${studentBarcode},barcode.eq.${studentBarcode}`
         : `student_id.eq.${studentId}`;
       q = q.or(orFilter);
     } else {
-      q = q.eq("student_id", studentId);
+      const orFilter = studentBarcode
+        ? `student_id.eq.${studentId},student_barcode.eq.${studentBarcode},barcode.eq.${studentBarcode},chat_id.eq.${studentBarcode}`
+        : `student_id.eq.${studentId}`;
+      q = q.or(orFilter);
     }
 
     if (orderCol) {

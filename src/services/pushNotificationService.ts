@@ -497,68 +497,77 @@ export async function autoRequestPermissionAndSyncFCMToken(
     console.warn("[FCM Pipeline] WebPush registration fallback notice:", wpErr);
   }
 
-  // Before calling setDoc or sending a fetch request to /api/push-subscribe, validate that fcmToken is non-null and not undefined:
-  if (!fcmToken || typeof fcmToken !== "string" || fcmToken.trim() === "" || fcmToken === "undefined" || fcmToken === "null") {
-    console.log("[FCM Pipeline] No valid FCM token string generated. Safely skipping token persistence.");
+  // Validate that fcmToken is non-null and not undefined string
+  const hasValidFcmToken = Boolean(
+    fcmToken &&
+    typeof fcmToken === "string" &&
+    fcmToken.trim() !== "" &&
+    fcmToken !== "undefined" &&
+    fcmToken !== "null"
+  );
+  const validFcmToken = hasValidFcmToken ? (fcmToken as string).trim() : null;
+
+  if (!hasValidFcmToken && !webPushSub) {
+    console.log("[FCM Pipeline] No valid FCM token string or WebPush subscription generated. Safely skipping token persistence.");
     return { success: false, token: null, permission };
   }
 
-  const validFcmToken = fcmToken.trim();
-
   // 5. CRITICAL: Safely update only valid token strings in parent_accounts / profiles
   try {
-    console.log(`[FCM Pipeline] CRITICAL: Updating parent_accounts with valid fcm_token for id: ${userId}`);
+    if (validFcmToken) {
+      console.log(`[FCM Pipeline] CRITICAL: Updating parent_accounts with valid fcm_token for id: ${userId}`);
 
-    // Direct required query:
-    const { error: directErr } = await supabase
-      .from("parent_accounts")
-      .update({ fcm_token: validFcmToken, updated_at: new Date().toISOString() })
-      .eq("id", userId);
-
-    if (directErr) {
-      console.warn("[FCM Pipeline] Direct eq('id', userId) update note:", directErr.message);
-    }
-
-    // Also ensure updates match when id is stored as student barcode, UUID, or phone
-    const cleanBarcode = normalizeBarcode(userId);
-    const uuid = barcodeToUUID(cleanBarcode || userId);
-    const allTargets = Array.from(new Set([userId, cleanBarcode, uuid, ...aliases])).filter(Boolean);
-
-    for (const target of allTargets) {
-      const targetUuid = barcodeToUUID(target);
-      await supabase
+      // Direct required query:
+      const { error: directErr } = await supabase
         .from("parent_accounts")
         .update({ fcm_token: validFcmToken, updated_at: new Date().toISOString() })
-        .or(`id.eq.${targetUuid},id.eq.${target},parent_phone.eq.${target}`);
-    }
-
-    // Also update profiles table if present in Supabase
-    try {
-      await supabase
-        .from("profiles")
-        .update({ fcm_token: validFcmToken, updated_at: new Date().toISOString() })
         .eq("id", userId);
-    } catch {}
 
-    // Update local storage accounts cache
-    try {
-      const raw = localStorage.getItem("eman_parent_accounts");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed[userId]) {
-          parsed[userId].fcmToken = validFcmToken;
-        }
-        if (cleanBarcode && parsed[cleanBarcode]) {
-          parsed[cleanBarcode].fcmToken = validFcmToken;
-        }
-        localStorage.setItem("eman_parent_accounts", JSON.stringify(parsed));
+      if (directErr) {
+        console.warn("[FCM Pipeline] Direct eq('id', userId) update note:", directErr.message);
       }
-    } catch {}
+
+      // Also ensure updates match when id is stored as student barcode, UUID, or phone
+      const cleanBarcode = normalizeBarcode(userId);
+      const uuid = barcodeToUUID(cleanBarcode || userId);
+      const allTargets = Array.from(new Set([userId, cleanBarcode, uuid, ...aliases])).filter(Boolean);
+
+      for (const target of allTargets) {
+        const targetUuid = barcodeToUUID(target);
+        await supabase
+          .from("parent_accounts")
+          .update({ fcm_token: validFcmToken, updated_at: new Date().toISOString() })
+          .or(`id.eq.${targetUuid},id.eq.${target},parent_phone.eq.${target}`);
+      }
+
+      // Also update profiles table if present in Supabase
+      try {
+        await supabase
+          .from("profiles")
+          .update({ fcm_token: validFcmToken, updated_at: new Date().toISOString() })
+          .eq("id", userId);
+      } catch {}
+
+      // Update local storage accounts cache
+      try {
+        const raw = localStorage.getItem("eman_parent_accounts");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed[userId]) {
+            parsed[userId].fcmToken = validFcmToken;
+          }
+          if (cleanBarcode && parsed[cleanBarcode]) {
+            parsed[cleanBarcode].fcmToken = validFcmToken;
+          }
+          localStorage.setItem("eman_parent_accounts", JSON.stringify(parsed));
+        }
+      } catch {}
+    }
 
     // Secondary sync to backend server & Firestore
     if (webPushSub) {
-      await savePushSubscription(userId, userRole, webPushSub, aliases, validFcmToken);
-    } else {
+      await savePushSubscription(userId, userRole, webPushSub, aliases, validFcmToken || undefined);
+    } else if (validFcmToken) {
       // Validate fcmToken before sending fetch request to /api/push-subscribe
       await fetch("/api/push-subscribe", {
         method: "POST",
@@ -574,7 +583,7 @@ export async function autoRequestPermissionAndSyncFCMToken(
       });
     }
 
-    console.info(`[FCM Pipeline] Successfully updated parent_accounts record with active fcm_token for ${userId}`);
+    console.info(`[FCM Pipeline] Successfully synchronized push credentials for ${userId}`);
     return { success: true, token: validFcmToken, permission: "granted" };
   } catch (updateErr) {
     console.error("[FCM Pipeline] Failed to update parent_accounts with fcm_token:", updateErr);

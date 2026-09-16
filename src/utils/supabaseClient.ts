@@ -11,6 +11,7 @@ import type { SystemData } from "./storage";
 import type { ParentAccount } from "../types/portal";
 import { withTimeout } from "./promiseTimeout";
 import { getSessionPortalData } from "./portalSessionStore";
+import { purgeAllOfflineDatabases } from "./indexedDB";
 export { withTimeout };
 
 const SUPABASE_URL =
@@ -22,6 +23,8 @@ export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON
   auth: {
     persistSession: true,
     autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: typeof window !== "undefined" ? window.localStorage : undefined,
   },
   global: {
     headers: {
@@ -46,6 +49,24 @@ export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON
     },
   },
 });
+
+// Setup global onAuthStateChange listener to prevent write/refresh race conditions
+// Never invoke signOut() or wipe tokens on transient network errors
+if (typeof window !== "undefined") {
+  try {
+    supabase.auth.onAuthStateChange((event, session) => {
+      console.log(`[Supabase Auth] Auth state change event: ${event}`, session ? "Session active" : "No session");
+      // Preserve auth tokens and prevent premature signouts on transient network delays
+      if (event === "TOKEN_REFRESHED" && session) {
+        console.info("[Supabase Auth] Session token refreshed successfully.");
+      } else if (event === "SIGNED_OUT") {
+        console.info("[Supabase Auth] User signed out.");
+      }
+    });
+  } catch (authErr) {
+    console.warn("[Supabase Auth] Listener registration notice:", authErr);
+  }
+}
 
 /**
  * Fast Query Executor with a strict 3-second timeout limit.
@@ -1010,14 +1031,86 @@ export async function saveStudentToSupabase(s: any): Promise<void> {
   }
 }
 
-/** Delete student from Supabase */
+/** Delete student from Supabase with complete Hard Delete cascade across all relational tables and local caches */
 export async function deleteStudentFromSupabase(barcode: string): Promise<void> {
   try {
-    const b = String(barcode).trim();
-    barcodeToIdCache.delete(b);
-    await supabase.from("students").delete().eq("barcode", b);
+    const cleanBarcode = normalizeBarcode(barcode);
+    if (!cleanBarcode) return;
+    barcodeToIdCache.delete(cleanBarcode);
+
+    // Resolve student UUID if cached or in DB
+    let studentId = barcodeToUUID(cleanBarcode);
+    try {
+      const { data: sRow } = await supabase
+        .from("students")
+        .select("id")
+        .or(`barcode.eq.${cleanBarcode},id.eq.${cleanBarcode}`)
+        .maybeSingle();
+      if (sRow?.id) {
+        studentId = sRow.id;
+      }
+    } catch {}
+
+    const orFilter = `student_id.eq.${studentId},barcode.eq.${cleanBarcode},student_barcode.eq.${cleanBarcode}`;
+
+    // 1. Cascade hard delete across all related relational tables in Supabase in parallel
+    await Promise.allSettled([
+      supabase.from("students").delete().or(`barcode.eq.${cleanBarcode},id.eq.${studentId}`),
+      supabase.from("parent_accounts").delete().or(`id.eq.${studentId},id.eq.${barcodeToUUID(cleanBarcode)},id.eq.${cleanBarcode},student_barcode.eq.${cleanBarcode},parent_phone.eq.${cleanBarcode}`),
+      supabase.from("attendance_logs").delete().or(orFilter),
+      supabase.from("homework").delete().or(orFilter),
+      supabase.from("payments").delete().or(orFilter),
+      supabase.from("exam_grades").delete().or(orFilter),
+      supabase.from("evaluations").delete().or(orFilter),
+      supabase.from("chat_messages").delete().or(`${orFilter},chat_id.eq.${cleanBarcode}`),
+      supabase.from("messages").delete().or(`${orFilter},chat_id.eq.${cleanBarcode}`),
+    ]);
+
+    // 2. Clear local client state & LocalStorage for this record so deleted accounts never resurrect
+    if (typeof window !== "undefined") {
+      try {
+        // Clean localStorage students cache
+        const rawStudents = localStorage.getItem("eman_students_data");
+        if (rawStudents) {
+          const parsed = JSON.parse(rawStudents);
+          if (Array.isArray(parsed)) {
+            const filtered = parsed.filter((s: any) => String(s.barcode).trim() !== cleanBarcode && s.id !== studentId);
+            localStorage.setItem("eman_students_data", JSON.stringify(filtered));
+          }
+        }
+
+        // Clean parent accounts cache
+        const rawAccounts = localStorage.getItem("eman_parent_accounts");
+        if (rawAccounts) {
+          const parsed = JSON.parse(rawAccounts);
+          delete parsed[cleanBarcode];
+          delete parsed[studentId];
+          localStorage.setItem("eman_parent_accounts", JSON.stringify(parsed));
+        }
+
+        // Purge IndexedDB cache to prevent stale restoration
+        purgeAllOfflineDatabases().catch(() => {});
+      } catch (lsErr) {
+        console.warn("[Hard Delete] Local storage cleanup notice:", lsErr);
+      }
+    }
+
+    // 3. Notify backend server to revoke push tokens and delete from in-memory stores
+    try {
+      fetch("/api/account-revoke", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ barcode: cleanBarcode, reason: "تم حذف الطالب نهائياً من المنظومة" }),
+      }).catch(() => {});
+      fetch(`/api/portal/admin/accounts/${encodeURIComponent(cleanBarcode)}?mode=hard`, {
+        method: "DELETE",
+        headers: { "x-user-role": "admin" },
+      }).catch(() => {});
+    } catch {}
+
+    console.info(`[Hard Delete] Successfully cascaded permanent deletion for student: ${cleanBarcode} (${studentId})`);
   } catch (err) {
-    console.warn("deleteStudentFromSupabase error:", err);
+    console.warn("deleteStudentFromSupabase cascade error:", err);
   }
 }
 
@@ -1664,7 +1757,7 @@ export async function updateParentAccountStatusInSupabase(
 
 /**
  * Hard delete parent account record permanently from Supabase production table
- * Single direct indexed query filtered ONLY by student barcode UUID.
+ * Cascade deletes parent account, associated chat messages, and clears local caches.
  */
 export async function deleteParentAccountRecordFromSupabase(barcode: string): Promise<boolean> {
   try {
@@ -1672,16 +1765,30 @@ export async function deleteParentAccountRecordFromSupabase(barcode: string): Pr
     if (!cleanBarcode) return false;
     const uuid = barcodeToUUID(cleanBarcode);
 
-    const { error } = await supabase
-      .from("parent_accounts")
-      .delete()
-      .eq("id", uuid);
+    const orFilter = `id.eq.${uuid},id.eq.${cleanBarcode},student_barcode.eq.${cleanBarcode},parent_phone.eq.${cleanBarcode}`;
 
-    if (error) {
-      console.warn("[Supabase parent_accounts] Delete error:", error.message);
-      return false;
+    const [accRes] = await Promise.allSettled([
+      supabase.from("parent_accounts").delete().or(orFilter),
+      supabase.from("chat_messages").delete().or(`student_id.eq.${uuid},barcode.eq.${cleanBarcode},chat_id.eq.${cleanBarcode}`),
+      supabase.from("messages").delete().or(`student_id.eq.${uuid},barcode.eq.${cleanBarcode},chat_id.eq.${cleanBarcode}`),
+    ]);
+
+    // Clear local parent accounts cache
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("eman_parent_accounts");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          delete parsed[cleanBarcode];
+          delete parsed[uuid];
+          localStorage.setItem("eman_parent_accounts", JSON.stringify(parsed));
+        }
+        purgeAllOfflineDatabases().catch(() => {});
+      } catch {}
     }
-    return true;
+
+    const isSuccess = accRes.status === "fulfilled" && !accRes.value.error;
+    return isSuccess;
   } catch (err) {
     console.warn("[Supabase parent_accounts] Delete exception:", err);
     return false;
@@ -1690,7 +1797,7 @@ export async function deleteParentAccountRecordFromSupabase(barcode: string): Pr
 
 /**
  * Save FCM token to parent account
- * Single direct indexed query filtered ONLY by student barcode UUID.
+ * Dual-key matching to update row whether keyed by UUID, barcode, or parent_phone.
  */
 export async function updateParentAccountFCMTokenInSupabase(
   barcode: string,
@@ -1698,7 +1805,7 @@ export async function updateParentAccountFCMTokenInSupabase(
 ): Promise<boolean> {
   try {
     const cleanBarcode = normalizeBarcode(barcode);
-    if (!cleanBarcode) return false;
+    if (!cleanBarcode || !fcmToken || fcmToken === "undefined" || fcmToken === "null") return false;
     const uuid = barcodeToUUID(cleanBarcode);
 
     const { error } = await supabase
@@ -1707,7 +1814,7 @@ export async function updateParentAccountFCMTokenInSupabase(
         fcm_token: fcmToken,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", uuid);
+      .or(`id.eq.${uuid},id.eq.${cleanBarcode},student_barcode.eq.${cleanBarcode},parent_phone.eq.${cleanBarcode}`);
     return !error;
   } catch {
     return false;
@@ -1716,7 +1823,7 @@ export async function updateParentAccountFCMTokenInSupabase(
 
 /**
  * Verify Parent Account Status in Supabase for silent background check on app launch
- * Single direct indexed query filtered ONLY by student barcode UUID with 2s timeout guard.
+ * Dual-Key Querying with resilient offline fallback so network errors never trigger premature logout.
  */
 export async function verifyParentAccountStatusInSupabase(
   barcode: string,
@@ -1731,13 +1838,23 @@ export async function verifyParentAccountStatusInSupabase(
       supabase
         .from("parent_accounts")
         .select("*")
-        .eq("id", uuid)
+        .or(`id.eq.${uuid},id.eq.${cleanBarcode},student_barcode.eq.${cleanBarcode},parent_phone.eq.${cleanBarcode}`)
         .maybeSingle(),
-      2000,
+      2500,
       "التحقق السريع من حالة حساب ولي الأمر"
-    );
+    ).catch(() => ({ data: null, error: "timeout" }));
 
-    if (error || !row) {
+    // Never log out user on network errors, timeouts, or transient database stalls
+    if (error) {
+      console.warn("[verifyParentAccountStatusInSupabase] Query notice (maintaining active state):", error);
+      return { exists: true, status: "unknown" };
+    }
+
+    if (!row) {
+      // If client is offline or network is degraded, preserve session
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        return { exists: true, status: "unknown" };
+      }
       return { exists: false, status: "deleted" };
     }
 
@@ -1764,7 +1881,7 @@ export async function verifyParentAccountStatusInSupabase(
 
     return { exists: true, status: "active", account };
   } catch (err) {
-    console.warn("[verifyParentAccountStatusInSupabase] notice:", err);
+    console.warn("[verifyParentAccountStatusInSupabase] notice (maintaining active state):", err);
     return { exists: true, status: "unknown" };
   }
 }
@@ -1980,12 +2097,20 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
               q = q.or(orFilter);
             } else if (tableName === "attendance_logs") {
               const orFilter = bCode
-                ? `student_id.eq.${sId},barcode.eq.${bCode}`
+                ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`
+                : `student_id.eq.${sId}`;
+              q = q.or(orFilter);
+            } else if (tableName === "payments") {
+              const orFilter = bCode
+                ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`
                 : `student_id.eq.${sId}`;
               q = q.or(orFilter);
             } else {
-              // payments, chat_messages, messages
-              q = q.eq("student_id", sId);
+              // chat_messages, messages
+              const orFilter = bCode
+                ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode},chat_id.eq.${bCode}`
+                : `student_id.eq.${sId}`;
+              q = q.or(orFilter);
             }
 
             if (orderCol) {
@@ -2051,8 +2176,10 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       const grades = Array.isArray(studentRecord?.exam_grades) ? studentRecord.exam_grades : [];
       const payments = Array.isArray(studentRecord?.payments) ? studentRecord.payments : [];
 
+      const chatMessages = Array.isArray(studentRecord?.chat_messages) ? studentRecord.chat_messages : [];
+
       // 3. Explicit Console Audit Logging: exact payload inspection
-      console.log("Parent Fetch Raw Response:", { attendance, homework, grades, payments });
+      console.log("Parent Fetch Raw Response:", { attendance, homework, grades, payments, chatMessages });
 
       return {
         ...studentRecord,
@@ -2060,7 +2187,7 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
         homework,
         payments,
         exam_grades: grades,
-        chat_messages: Array.isArray(studentRecord?.chat_messages) ? studentRecord.chat_messages : [],
+        chat_messages: chatMessages,
       };
     };
 

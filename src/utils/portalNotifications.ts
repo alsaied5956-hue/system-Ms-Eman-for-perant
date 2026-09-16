@@ -100,11 +100,17 @@ export function playPortalAudioChime(type: NotificationType): void {
     } catch {}
   }
 
-  // Attempt playing default high-volume notification WAV file
+  // Attempt playing default high-volume notification MP3/WAV file
   try {
-    const audio = new Audio("/notification.wav");
+    const audio = new Audio("/notification.mp3");
     audio.volume = 1.0;
-    audio.play().catch(() => {});
+    audio.play().catch(() => {
+      try {
+        const fallback = new Audio("/notification.wav");
+        fallback.volume = 1.0;
+        fallback.play().catch(() => {});
+      } catch {}
+    });
   } catch {}
 
   const ctx = getAudioContext();

@@ -959,14 +959,27 @@ app.get("/api/push-public-key", (_req, res) => {
 });
 
 // 3. Register or Update Web Push Subscription
-app.options("/api/push-subscribe", (_req, res) => {
+const pushSubscribePaths = ["/api/push-subscribe", "/api/push-subscribe/"];
+
+app.options(pushSubscribePaths, (_req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.sendStatus(200);
 });
 
-app.post("/api/push-subscribe", async (req, res) => {
+app.get(pushSubscribePaths, (_req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  return res.json({
+    status: "ok",
+    service: "web-push",
+    vapidPublicKey: VAPID_PUBLIC_KEY,
+    activeSubscriptions: subscriptionsCache.size,
+  });
+});
+
+app.post(pushSubscribePaths, async (req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
   try {
     const { userId, userRole, aliases, subscription, fcmToken } = req.body;
 
@@ -1078,11 +1091,6 @@ app.post("/api/push-subscribe", async (req, res) => {
     console.error("push-subscribe error:", err);
     return res.status(500).json({ error: err.message || "Failed to save subscription" });
   }
-});
-
-// Explicitly handle all non-POST methods to /api/push-subscribe with 405 Method Not Allowed
-app.all("/api/push-subscribe", (_req, res) => {
-  res.status(405).json({ error: "Method Not Allowed. /api/push-subscribe explicitly handles POST requests." });
 });
 
 // 4. Record account revocation and broadcast to connected phones immediately (Sub-50ms latency)

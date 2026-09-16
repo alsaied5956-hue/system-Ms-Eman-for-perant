@@ -468,6 +468,11 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
   const triggerAlertFeedback = useCallback(
     (type: NotificationType, title: string, body: string, eventId?: string) => {
       if (!enableSoundAlerts) return;
+      try {
+        const chime = new Audio('/notification.mp3');
+        chime.volume = 1.0;
+        chime.play().catch(() => {});
+      } catch {}
       playPortalAudioChime(type);
       sendPortalNotification(title, body, type, { eventId }).catch(() => {});
     },
