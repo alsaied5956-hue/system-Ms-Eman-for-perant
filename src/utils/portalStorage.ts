@@ -252,29 +252,114 @@ export async function saveAdminPortalSettings(settings: AdminPortalSettings): Pr
 /**
  * Load all registered parent accounts from LocalStorage
  */
+const LS_DELETED_TOMBSTONES = "eman_deleted_accounts_tombstones";
+
+export function getDeletedTombstones(): Set<string> {
+  try {
+    const raw = localStorage.getItem(LS_DELETED_TOMBSTONES);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        return new Set(arr.map((x) => normalizeBarcode(String(x))).filter(Boolean));
+      }
+    }
+  } catch {}
+  return new Set();
+}
+
+export function addDeletedTombstones(barcodes: string | string[]): void {
+  const set = getDeletedTombstones();
+  const list = Array.isArray(barcodes) ? barcodes : [barcodes];
+  let changed = false;
+  for (const b of list) {
+    const clean = normalizeBarcode(b);
+    if (clean && !set.has(clean)) {
+      set.add(clean);
+      changed = true;
+    }
+  }
+  if (changed) {
+    try {
+      localStorage.setItem(LS_DELETED_TOMBSTONES, JSON.stringify(Array.from(set)));
+    } catch {}
+  }
+}
+
+export function removeDeletedTombstone(barcode: string): void {
+  const clean = normalizeBarcode(barcode);
+  if (!clean) return;
+  const set = getDeletedTombstones();
+  if (set.has(clean)) {
+    set.delete(clean);
+    try {
+      localStorage.setItem(LS_DELETED_TOMBSTONES, JSON.stringify(Array.from(set)));
+    } catch {}
+  }
+}
+
 export function getLocalParentAccounts(): Record<string, ParentAccount> {
   try {
     const raw = localStorage.getItem(LS_PARENT_ACCOUNTS);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Record<string, ParentAccount>;
+      const tombstones = getDeletedTombstones();
+      const filtered: Record<string, ParentAccount> = {};
+      let dirty = false;
+      for (const [k, acc] of Object.entries(parsed)) {
+        const b = normalizeBarcode(k);
+        const studentBarcode = normalizeBarcode(acc?.studentBarcode);
+        if (
+          !acc ||
+          acc.status === "deleted" ||
+          tombstones.has(b) ||
+          tombstones.has(studentBarcode) ||
+          (Array.isArray(acc.linkedBarcodes) && acc.linkedBarcodes.some((lb) => tombstones.has(normalizeBarcode(lb))))
+        ) {
+          dirty = true;
+          continue;
+        }
+        filtered[b] = acc;
+      }
+      if (dirty) {
+        localStorage.setItem(LS_PARENT_ACCOUNTS, JSON.stringify(filtered));
+      }
+      return filtered;
+    }
   } catch {}
   return {};
 }
 
 export function saveLocalParentAccounts(accounts: Record<string, ParentAccount>): void {
   try {
-    localStorage.setItem(LS_PARENT_ACCOUNTS, JSON.stringify(accounts));
+    const tombstones = getDeletedTombstones();
+    const clean: Record<string, ParentAccount> = {};
+    for (const [k, acc] of Object.entries(accounts)) {
+      const b = normalizeBarcode(k);
+      const studentBarcode = normalizeBarcode(acc?.studentBarcode);
+      if (
+        !acc ||
+        acc.status === "deleted" ||
+        tombstones.has(b) ||
+        tombstones.has(studentBarcode) ||
+        (Array.isArray(acc.linkedBarcodes) && acc.linkedBarcodes.some((lb) => tombstones.has(normalizeBarcode(lb))))
+      ) {
+        continue;
+      }
+      clean[b] = acc;
+    }
+    localStorage.setItem(LS_PARENT_ACCOUNTS, JSON.stringify(clean));
   } catch {}
 }
 
 /**
- * Sync parent accounts from Firestore with deduplication & caching
- * Pulls from both global registry and individual parent_accounts collection
+ * Sync parent accounts from Cloud & Local Server with deduplication, tombstones & caching
  */
 let syncAccountsInFlight: Promise<Record<string, ParentAccount>> | null = null;
 let lastAccountsSyncTime = 0;
 
 export async function syncParentAccountsFromCloud(force: boolean = false): Promise<Record<string, ParentAccount>> {
   const local = getLocalParentAccounts();
+  const tombstones = getDeletedTombstones();
   const now = Date.now();
   if (!force && now - lastAccountsSyncTime < 3000 && Object.keys(local).length > 0) {
     return local;
@@ -284,82 +369,59 @@ export async function syncParentAccountsFromCloud(force: boolean = false): Promi
   }
   syncAccountsInFlight = (async () => {
     try {
-      // 1. Direct Production Supabase Table public.parent_accounts Query FIRST (Zero Quota Limits)
-      try {
-        const sbAccounts = await fetchPortalAccountsFromSupabase();
-        if (sbAccounts && typeof sbAccounts === "object" && Object.keys(sbAccounts).length > 0) {
-          const reconciled: Record<string, ParentAccount> = {};
-          for (const [b, acc] of Object.entries(sbAccounts)) {
-            const bCode = String(b).trim();
-            if (bCode && acc && acc.status !== "deleted") {
-              reconciled[bCode] = acc;
-            }
-          }
-          saveLocalParentAccounts(reconciled);
-          lastAccountsSyncTime = Date.now();
-          return reconciled;
-        }
-      } catch (sbErr) {
-        console.warn("[syncParentAccounts] Supabase direct fetch notice:", sbErr);
-      }
+      const allDeletedTombstones = new Set<string>(tombstones);
 
-      // 2. Fast Express Server Cache Sync (<5ms)
+      // 1. Authoritative Express Server Cache Sync (<5ms)
+      // Retrieves active accounts and tombstones of deleted accounts
       try {
         const resp = await fetch("/api/portal/accounts-sync");
         if (resp.ok) {
           const json = await resp.json();
-          if (json?.success && json?.accounts && typeof json.accounts === "object") {
-            const serverAccounts = json.accounts as Record<string, ParentAccount>;
-            const deletedSet = new Set<string>([
-              ...(Array.isArray(json.deletedBarcodes) ? json.deletedBarcodes : []),
-              ...(Array.isArray(json.revokedBarcodes) ? json.revokedBarcodes : []),
-            ]);
-
-            const reconciled: Record<string, ParentAccount> = {};
-
-            // A. Include all valid accounts from authoritative server
-            for (const [b, acc] of Object.entries(serverAccounts)) {
-              const bCode = String(b).trim();
-              if (!bCode || deletedSet.has(bCode) || acc.status === "deleted") continue;
-              reconciled[bCode] = acc;
+          if (json?.success) {
+            if (Array.isArray(json.deletedBarcodes)) {
+              json.deletedBarcodes.forEach((b: string) => allDeletedTombstones.add(normalizeBarcode(b)));
             }
+            if (Array.isArray(json.revokedBarcodes)) {
+              json.revokedBarcodes.forEach((b: string) => allDeletedTombstones.add(normalizeBarcode(b)));
+            }
+            addDeletedTombstones(Array.from(allDeletedTombstones));
 
-            // B. Reconcile local accounts: remove deleted ones, keep only active ones that were recently modified offline (<10s)
-            for (const [b, acc] of Object.entries(local)) {
-              const bCode = String(b).trim();
-              if (!bCode || deletedSet.has(bCode) || acc.status === "deleted") {
-                continue; // Purge deleted account from local
-              }
-              if (!reconciled[bCode]) {
-                const createdTime = acc.createdAt ? new Date(acc.createdAt).getTime() : 0;
-                if (Date.now() - createdTime < 10000 && acc.status === "active") {
-                  reconciled[bCode] = acc;
-                  persistParentAccount(acc).catch(() => {});
+            if (json.accounts && typeof json.accounts === "object") {
+              const serverAccounts = json.accounts as Record<string, ParentAccount>;
+              const reconciled: Record<string, ParentAccount> = {};
+
+              for (const [b, acc] of Object.entries(serverAccounts)) {
+                const bCode = normalizeBarcode(b);
+                const stBarcode = normalizeBarcode(acc?.studentBarcode);
+                if (!bCode || allDeletedTombstones.has(bCode) || allDeletedTombstones.has(stBarcode) || acc.status === "deleted") {
+                  continue;
                 }
+                if (Array.isArray(acc.linkedBarcodes) && acc.linkedBarcodes.some((lb) => allDeletedTombstones.has(normalizeBarcode(lb)))) {
+                  continue;
+                }
+                reconciled[bCode] = acc;
               }
+
+              saveLocalParentAccounts(reconciled);
+              lastAccountsSyncTime = Date.now();
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(
+                  new CustomEvent("eman_account_activated", {
+                    detail: { accounts: reconciled },
+                  })
+                );
+              }
+              return reconciled;
             }
-
-            saveLocalParentAccounts(reconciled);
-            lastAccountsSyncTime = Date.now();
-
-            if (typeof window !== "undefined") {
-              window.dispatchEvent(
-                new CustomEvent("eman_account_activated", {
-                  detail: { accounts: reconciled },
-                })
-              );
-            }
-
-            return reconciled;
           }
         }
-      } catch {
-        // Fall back to Firestore below
+      } catch (srvErr) {
+        console.warn("[syncParentAccounts] Server sync notice:", srvErr);
       }
 
+      // 2. Direct Firestore system_state/portal_accounts_registry sync
       await ensureFirebaseAuth();
       if (db) {
-        // 3. Fetch system_state registry
         try {
           const regSnap = await getDoc(doc(db, "system_state", "portal_accounts_registry"));
           if (regSnap.exists()) {
@@ -367,10 +429,15 @@ export async function syncParentAccountsFromCloud(force: boolean = false): Promi
             if (regData && typeof regData === "object") {
               const reconciled: Record<string, ParentAccount> = {};
               for (const [b, acc] of Object.entries(regData)) {
-                const bCode = String(b).trim();
-                if (bCode && acc && acc.status !== "deleted") {
-                  reconciled[bCode] = acc;
+                const bCode = normalizeBarcode(b);
+                const stBarcode = normalizeBarcode(acc?.studentBarcode);
+                if (!bCode || allDeletedTombstones.has(bCode) || allDeletedTombstones.has(stBarcode) || acc.status === "deleted") {
+                  continue;
                 }
+                if (Array.isArray(acc.linkedBarcodes) && acc.linkedBarcodes.some((lb) => allDeletedTombstones.has(normalizeBarcode(lb)))) {
+                  continue;
+                }
+                reconciled[bCode] = acc;
               }
               saveLocalParentAccounts(reconciled);
               lastAccountsSyncTime = Date.now();
@@ -378,6 +445,30 @@ export async function syncParentAccountsFromCloud(force: boolean = false): Promi
             }
           }
         } catch {}
+      }
+
+      // 3. Supabase Table public.parent_accounts (strictly guarded against tombstones)
+      try {
+        const sbAccounts = await fetchPortalAccountsFromSupabase();
+        if (sbAccounts && typeof sbAccounts === "object" && Object.keys(sbAccounts).length > 0) {
+          const reconciled: Record<string, ParentAccount> = {};
+          for (const [b, acc] of Object.entries(sbAccounts)) {
+            const bCode = normalizeBarcode(b);
+            const stBarcode = normalizeBarcode(acc?.studentBarcode);
+            if (!bCode || allDeletedTombstones.has(bCode) || allDeletedTombstones.has(stBarcode) || acc.status === "deleted") {
+              continue;
+            }
+            if (Array.isArray(acc.linkedBarcodes) && acc.linkedBarcodes.some((lb) => allDeletedTombstones.has(normalizeBarcode(lb)))) {
+              continue;
+            }
+            reconciled[bCode] = acc;
+          }
+          saveLocalParentAccounts(reconciled);
+          lastAccountsSyncTime = Date.now();
+          return reconciled;
+        }
+      } catch (sbErr) {
+        console.warn("[syncParentAccounts] Supabase direct fetch notice:", sbErr);
       }
     } catch (err) {
       console.warn("Could not fetch cloud parent accounts:", err);
@@ -404,6 +495,12 @@ export async function persistParentAccount(account: ParentAccount): Promise<void
   }
 
   account.updatedAt = nowIso;
+  if (account.status === "active") {
+    removeDeletedTombstone(account.studentBarcode);
+    if (Array.isArray(account.linkedBarcodes)) {
+      account.linkedBarcodes.forEach((b) => removeDeletedTombstone(b));
+    }
+  }
   accounts[account.studentBarcode] = account;
   saveLocalParentAccounts(accounts);
 
@@ -580,6 +677,7 @@ export async function deleteParentAccount(studentBarcode: string): Promise<void>
 
   delete accounts[cleanBarcode];
   saveLocalParentAccounts(accounts);
+  addDeletedTombstones(Array.from(allBarcodesToRevoke));
 
   // 🛡️ ISOLATE SUPERVISOR SESSION:
   // Never clear, mutate, or log out the currently logged-in supervisor/admin state.
@@ -685,12 +783,13 @@ export function subscribeToAllParentAccounts(
   const mergeAndNotify = (incoming: Record<string, ParentAccount>, isFullSet: boolean = false) => {
     if (isCancelled) return;
     const current = getLocalParentAccounts();
+    const tombstones = getDeletedTombstones();
     let hasChanges = false;
     const merged = { ...current };
 
     if (isFullSet) {
       for (const bCode of Object.keys(current)) {
-        if (!incoming[bCode]) {
+        if (!incoming[bCode] || tombstones.has(bCode)) {
           delete merged[bCode];
           hasChanges = true;
         }
@@ -698,12 +797,24 @@ export function subscribeToAllParentAccounts(
     }
 
     for (const [barcode, acc] of Object.entries(incoming)) {
-      const bCode = String(barcode).trim();
-      if (!bCode) continue;
+      const bCode = normalizeBarcode(barcode);
+      const stBarcode = normalizeBarcode(acc?.studentBarcode);
+      if (
+        !bCode ||
+        tombstones.has(bCode) ||
+        tombstones.has(stBarcode) ||
+        (Array.isArray(acc?.linkedBarcodes) && acc.linkedBarcodes.some((lb) => tombstones.has(normalizeBarcode(lb))))
+      ) {
+        if (merged[bCode]) {
+          delete merged[bCode];
+          hasChanges = true;
+        }
+        continue;
+      }
       const existing = current[bCode];
 
       if (acc.status === "deleted") {
-        if (existing) {
+        if (existing || merged[bCode]) {
           delete merged[bCode];
           hasChanges = true;
         }
@@ -779,14 +890,15 @@ export function subscribeToAllParentAccounts(
           (snapshot) => {
             if (isCancelled) return;
             const incoming: Record<string, ParentAccount> = {};
+            const tombstones = getDeletedTombstones();
             snapshot.forEach((docSnap) => {
               const data = docSnap.data() as ParentAccount;
-              const bCode = docSnap.id || data?.studentBarcode;
-              if (bCode && data) {
+              const bCode = normalizeBarcode(docSnap.id || data?.studentBarcode);
+              if (bCode && data && !tombstones.has(bCode) && data.status !== "deleted") {
                 incoming[bCode] = data;
               }
             });
-            mergeAndNotify(incoming);
+            mergeAndNotify(incoming, true);
           },
           (err) => {
             if (!isFirestoreQuotaError(err)) {
@@ -819,23 +931,29 @@ export function subscribeToAllParentAccounts(
           collection(db, "account_revocations"),
           (snapshot) => {
             if (isCancelled) return;
-            const incoming: Record<string, ParentAccount> = {};
+            const revokedList: string[] = [];
             snapshot.forEach((docSnap) => {
               const revData = docSnap.data();
-              const bCode = docSnap.id || revData?.barcode;
-              if (revData?.revoked && bCode) {
-                incoming[bCode] = {
-                  studentBarcode: String(bCode),
-                  linkedBarcodes: [String(bCode)],
-                  parentPhone: revData?.parentPhone || "",
-                  password: "",
-                  status: "deleted",
-                  createdAt: new Date().toISOString(),
-                  deletedAt: revData?.revokedAt || new Date().toISOString(),
-                };
+              const bCode = normalizeBarcode(docSnap.id || revData?.barcode);
+              if (revData?.revoked !== false && bCode) {
+                revokedList.push(bCode);
               }
             });
-            mergeAndNotify(incoming);
+            if (revokedList.length > 0) {
+              addDeletedTombstones(revokedList);
+              const current = getLocalParentAccounts();
+              let changed = false;
+              for (const b of revokedList) {
+                if (current[b]) {
+                  delete current[b];
+                  changed = true;
+                }
+              }
+              if (changed) {
+                saveLocalParentAccounts(current);
+                onUpdate({ ...current });
+              }
+            }
           },
           (err) => {
             if (!isFirestoreQuotaError(err)) {
@@ -1474,6 +1592,10 @@ export async function activateParentAccountDirectly(
   };
 
   // 1. Immediate local save (0ms)
+  removeDeletedTombstone(cleanBarcode);
+  if (Array.isArray(newAccount.linkedBarcodes)) {
+    newAccount.linkedBarcodes.forEach((b) => removeDeletedTombstone(b));
+  }
   accounts[cleanBarcode] = newAccount;
   saveLocalParentAccounts(accounts);
 

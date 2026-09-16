@@ -199,103 +199,32 @@ export function initPortalStore(): void {
       } catch {}
     }
 
-    // 5. Hydrate authoritative parent accounts and core data from production Supabase tables
+    // 5. Hydrate parent accounts from production Supabase tables (guarded by deleted tombstones)
     if (supabaseServer) {
-      Promise.allSettled([
-        supabaseServer.from("students").select("*"),
-        supabaseServer.from("payments").select("*"),
-        supabaseServer
-          .from("attendance_logs")
-          .select("student_id, barcode, date_key, status")
-          .order("date_key", { ascending: false })
-          .limit(3000),
-        supabaseServer.from("parent_accounts").select("*"),
-      ])
-        .then(([studentsRes, paymentsRes, attendanceRes, accountsRes]) => {
-          const studentIdToBarcode = new Map<string, string>();
-
-          // A. Hydrate Students
-          if (studentsRes.status === "fulfilled" && Array.isArray(studentsRes.value.data)) {
-            const list: StudentRecord[] = [];
-            for (const row of studentsRes.value.data) {
-              const b = String(row.barcode).trim();
-              if (row.id && b) {
-                studentIdToBarcode.set(row.id, b);
-              }
-              list.push({
-                id: row.id,
-                barcode: b,
-                name: row.name || "طالب بدون اسم",
-                phone: row.phone || "",
-                parentPhone: row.parent_phone || "",
-                groupGrade: row.grade || "الصف الرابع الابتدائي",
-                groupDays: row.group_days || "سبت - إثنين - أربعاء",
-                points: row.points || 0,
-                totalAttendanceDays: Number(row.total_attendance_days || 0),
-                totalAbsentDays: Number(row.total_absent_days || 0),
-                createdAt: row.created_at,
-                notes: row.notes || "",
-              });
-            }
-            systemDataCache.students = list;
-            console.log(`[PortalStore] Synced ${list.length} students from Supabase.`);
-          }
-
-          // B. Hydrate Payments
-          if (paymentsRes.status === "fulfilled" && Array.isArray(paymentsRes.value.data)) {
-            const paymentsMap: Record<string, Record<string, any>> = {};
-            for (const p of paymentsRes.value.data) {
-              const mKey = p.month_key;
-              const b = p.barcode ? String(p.barcode).trim() : (p.student_id ? studentIdToBarcode.get(p.student_id) : null);
-              if (!mKey || !b) continue;
-              if (!paymentsMap[mKey]) paymentsMap[mKey] = {};
-              paymentsMap[mKey][b] = {
-                monthKey: mKey,
-                amount: Number(p.amount_paid || 0),
-                paidAmount: Number(p.amount_paid || 0),
-                requiredAmount: Number(p.required_amount || 0),
-                discount: Number(p.discount || 0),
-                date: p.payment_date ? p.payment_date.slice(0, 10) : "",
-                time: p.payment_date ? p.payment_date.slice(11, 16) : "",
-                note: p.notes || "",
-                notes: p.notes || "",
-                recordedBy: p.received_by || "الإشراف",
-                timestamp: p.created_at ? new Date(p.created_at).getTime() : Date.now(),
-              };
-            }
-            systemDataCache.payments = paymentsMap;
-            console.log(`[PortalStore] Synced payments across ${Object.keys(paymentsMap).length} months from Supabase.`);
-          }
-
-          // C. Hydrate Attendance
-          if (attendanceRes.status === "fulfilled" && Array.isArray(attendanceRes.value.data)) {
-            const history: Record<string, Record<string, string>> = {};
-            for (const att of attendanceRes.value.data) {
-              const dKey = att.date_key;
-              const b = att.barcode ? String(att.barcode).trim() : (att.student_id ? studentIdToBarcode.get(att.student_id) : null);
-              if (!dKey || !b) continue;
-              if (!history[dKey]) history[dKey] = {};
-              history[dKey][b] = att.status || "حضور";
-            }
-            systemDataCache.attendanceHistory = history;
-            console.log(`[PortalStore] Synced attendance logs across ${Object.keys(history).length} days from Supabase.`);
-          }
-
-          // D. Hydrate Parent Accounts
-          if (accountsRes.status === "fulfilled" && Array.isArray(accountsRes.value.data)) {
+      Promise.resolve(supabaseServer.from("parent_accounts").select("*"))
+        .then((accountsRes) => {
+          if (Array.isArray(accountsRes.data)) {
             let loadedCount = 0;
-            for (const row of accountsRes.value.data) {
+            for (const row of accountsRes.data) {
               const barcodes: string[] = Array.isArray(row.linked_student_barcodes) && row.linked_student_barcodes.length > 0
-                ? row.linked_student_barcodes
+                ? row.linked_student_barcodes.map((x: any) => String(x).trim())
                 : [];
-              const primaryBarcode = barcodes[0] || "";
+              const primaryBarcode = barcodes[0] || (row.id ? String(row.id).trim() : "");
               if (!primaryBarcode) continue;
+
+              // Strictly enforce tombstones: Never hydrate deleted accounts!
+              if (deletedAccountsCache.has(primaryBarcode) || barcodes.some((b) => deletedAccountsCache.has(b))) {
+                continue;
+              }
+
               const status = (row.status || "active").toLowerCase() as "active" | "disabled" | "deleted";
               if (status === "deleted") {
                 deletedAccountsCache.add(primaryBarcode);
+                barcodes.forEach((b) => deletedAccountsCache.add(b));
                 delete parentAccountsCache[primaryBarcode];
                 continue;
               }
+
               const acc: ParentAccountRecord = {
                 id: row.id,
                 studentBarcode: primaryBarcode,
@@ -310,13 +239,13 @@ export function initPortalStore(): void {
               };
               parentAccountsCache[primaryBarcode] = acc;
               barcodes.forEach((b: string) => {
-                if (b && !parentAccountsCache[b]) {
+                if (b && !deletedAccountsCache.has(b)) {
                   parentAccountsCache[b] = acc;
                 }
               });
               loadedCount++;
             }
-            console.log(`[PortalStore] Synced ${loadedCount} accounts from Supabase production table.`);
+            console.log(`[PortalStore] Synced ${loadedCount} valid active accounts from Supabase.`);
           }
         })
         .catch((e: any) => console.warn("[PortalStore] Initial Supabase store hydration notice:", e));
@@ -1118,7 +1047,19 @@ export function recordLiveGroupFinished(data: {
 
 // Parent Accounts Operations
 export function getAllParentAccounts(): Record<string, ParentAccountRecord> {
-  return parentAccountsCache;
+  const result: Record<string, ParentAccountRecord> = {};
+  for (const [k, acc] of Object.entries(parentAccountsCache)) {
+    const bCode = String(k).trim();
+    if (!acc || acc.status === "deleted") continue;
+    if (deletedAccountsCache.has(bCode)) continue;
+    const primary = String(acc.studentBarcode || "").trim();
+    if (primary && deletedAccountsCache.has(primary)) continue;
+    if (Array.isArray(acc.linkedBarcodes) && acc.linkedBarcodes.some((lb) => deletedAccountsCache.has(String(lb).trim()))) {
+      continue;
+    }
+    result[bCode] = acc;
+  }
+  return result;
 }
 
 export function getDeletedAccountBarcodes(): string[] {
@@ -1238,14 +1179,35 @@ export function deleteParentAccountRecord(barcode: string): boolean {
 
   // Track barcode as deleted tombstone so all syncing devices purge it
   deletedAccountsCache.add(bCode);
-  persistDeletedAccountsDebounced();
 
   let existed = false;
   if (parentAccountsCache[bCode]) {
+    const acc = parentAccountsCache[bCode];
+    if (Array.isArray(acc?.linkedBarcodes)) {
+      acc.linkedBarcodes.forEach((lb) => deletedAccountsCache.add(String(lb).trim()));
+    }
     delete parentAccountsCache[bCode];
-    persistAccountsDebounced();
     existed = true;
   }
+
+  // Also purge any account whose studentBarcode or linkedBarcodes contains bCode
+  for (const [k, acc] of Object.entries(parentAccountsCache)) {
+    if (
+      acc?.studentBarcode === bCode ||
+      (Array.isArray(acc?.linkedBarcodes) && acc.linkedBarcodes.includes(bCode))
+    ) {
+      deletedAccountsCache.add(k);
+      if (acc.studentBarcode) deletedAccountsCache.add(String(acc.studentBarcode).trim());
+      if (Array.isArray(acc.linkedBarcodes)) {
+        acc.linkedBarcodes.forEach((lb) => deletedAccountsCache.add(String(lb).trim()));
+      }
+      delete parentAccountsCache[k];
+      existed = true;
+    }
+  }
+
+  persistAccountsDebounced();
+  persistDeletedAccountsDebounced();
 
   // HARD DELETE directly on production Supabase table public.parent_accounts
   if (supabaseServer) {

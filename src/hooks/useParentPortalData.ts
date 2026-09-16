@@ -107,25 +107,11 @@ export async function fetchChildTableWithDualKey(
  * - Renders raw authentic Supabase response immediately with zero stale cache fallback
  */
 export function useParentPortalData(targetBarcodeOrToken?: string): UseParentPortalDataReturn {
-  const [data, setData] = useState<UnifiedStudentPortalData | null>(() => {
-    let clean = String(targetBarcodeOrToken || "").trim();
-    if (clean.startsWith("sess-") || clean.includes("eman_portal_")) {
-      const ext = extractCleanBarcodeFromSession(clean);
-      if (ext) clean = ext;
-    }
-    return clean ? getSessionPortalData(clean) : null;
-  });
-
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  // Commandment 1: Bypass LocalStorage/IndexedDB for core entity records. State MUST initialize as null/empty until live queries resolve.
+  const [data, setData] = useState<UnifiedStudentPortalData | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [isHydrated, setIsHydrated] = useState<boolean>(() => {
-    let clean = String(targetBarcodeOrToken || "").trim();
-    if (clean.startsWith("sess-") || clean.includes("eman_portal_")) {
-      const ext = extractCleanBarcodeFromSession(clean);
-      if (ext) clean = ext;
-    }
-    return Boolean(clean && getSessionPortalData(clean)?.success);
-  });
+  const [isHydrated, setIsHydrated] = useState<boolean>(false);
 
   // Track active in-flight request to prevent race conditions during rapid revalidations
   const inFlightPromiseRef = useRef<{ barcode: string; promise: Promise<UnifiedStudentPortalData | null> } | null>(null);
@@ -223,12 +209,28 @@ export function useParentPortalData(targetBarcodeOrToken?: string): UseParentPor
 
     if (typeof window !== "undefined") {
       window.addEventListener("eman_portal_force_revalidate", handleRevalidate);
-    }
-    return () => {
-      if (typeof window !== "undefined") {
+
+      // Commandment 5: visibilitychange, focus, and online events MUST trigger instant REST data revalidation (< 200ms)
+      const onVisibilityChange = () => {
+        if (typeof document !== "undefined" && document.visibilityState === "visible") {
+          handleRevalidate();
+        }
+      };
+      const onFocus = () => handleRevalidate();
+      const onOnline = () => handleRevalidate();
+
+      document.addEventListener("visibilitychange", onVisibilityChange);
+      window.addEventListener("focus", onFocus);
+      window.addEventListener("online", onOnline);
+
+      return () => {
         window.removeEventListener("eman_portal_force_revalidate", handleRevalidate);
-      }
-    };
+        document.removeEventListener("visibilitychange", onVisibilityChange);
+        window.removeEventListener("focus", onFocus);
+        window.removeEventListener("online", onOnline);
+      };
+    }
+    return undefined;
   }, [targetBarcodeOrToken, executeFetch]);
 
   return {

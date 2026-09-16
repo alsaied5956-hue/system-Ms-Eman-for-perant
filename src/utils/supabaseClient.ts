@@ -1129,6 +1129,7 @@ export async function deleteStudentFromSupabase(barcode: string): Promise<void> 
       supabase.from("evaluations").delete().or(orFilter),
       supabase.from("chat_messages").delete().or(`${orFilter},chat_id.eq.${cleanBarcode}`),
       supabase.from("messages").delete().or(`${orFilter},chat_id.eq.${cleanBarcode}`),
+      supabase.from("push_subscriptions").delete().or(`barcode.eq.${cleanBarcode},student_barcode.eq.${cleanBarcode}`),
     ]);
 
     // 2. Clear local client state & LocalStorage for this record so deleted accounts never resurrect
@@ -1849,6 +1850,7 @@ export async function deleteParentAccountRecordFromSupabase(barcode: string): Pr
       supabase.from("parent_accounts").delete().or(orFilter),
       supabase.from("chat_messages").delete().or(`student_id.eq.${uuid},barcode.eq.${cleanBarcode},chat_id.eq.${cleanBarcode}`),
       supabase.from("messages").delete().or(`student_id.eq.${uuid},barcode.eq.${cleanBarcode},chat_id.eq.${cleanBarcode}`),
+      supabase.from("push_subscriptions").delete().or(`barcode.eq.${cleanBarcode},student_barcode.eq.${cleanBarcode}`),
     ]);
 
     // Clear local parent accounts cache

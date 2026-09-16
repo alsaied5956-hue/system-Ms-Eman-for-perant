@@ -1499,28 +1499,42 @@ export async function pullLatestCloudDataImmediately(force = false): Promise<boo
 
   pullInFlightPromise = (async () => {
     try {
-      // 1. Direct Production Supabase Cloud Sync FIRST (Authoritative Primary Database)
-      try {
-        const supabaseData = await pullFullStateFromSupabase();
-        if (supabaseData && Array.isArray(supabaseData.students) && supabaseData.students.length > 0) {
-          const currentLocal = loadLocalData();
-          const merged = mergeCloudDataWithLocal(currentLocal, supabaseData);
+      // 1. Direct Firestore Cloud Pull FIRST (Authoritative Primary Database of the Main Platform)
+      if (!isQuotaExceeded || Date.now() >= quotaExceededUntil) {
+        try {
+          await ensureFirebaseAuth();
+        } catch {}
 
-          lastSyncedDataHash = JSON.stringify(merged);
-          localStorage.setItem(PENDING_SYNC_KEY, "false");
-          saveToLocalStorage(merged, false);
-          notifySyncStatusChange();
-          notifyCloudDataListeners(merged);
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent("center-data-updated", { detail: merged }));
+        try {
+          const systemDocRef = doc(db, "system_state", "main_center_data");
+          const snapshot = await withTimeout(getDoc(systemDocRef), 8000, "Timeout pulling Firestore main data");
+
+          if (snapshot && snapshot.exists()) {
+            const val = snapshot.data();
+            if (val) {
+              const cloudObj: Partial<SystemData> = await resolvePayloadFromSnapshot(val);
+              if (cloudObj && Array.isArray(cloudObj.students) && cloudObj.students.length > 0) {
+                const currentLocal = loadLocalData();
+                const merged = mergeCloudDataWithLocal(currentLocal, cloudObj);
+
+                lastSyncedDataHash = JSON.stringify(merged);
+                localStorage.setItem(PENDING_SYNC_KEY, "false");
+                saveToLocalStorage(merged, false);
+                notifySyncStatusChange();
+                notifyCloudDataListeners(merged);
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new CustomEvent("center-data-updated", { detail: merged }));
+                }
+
+                lastSnapshotReceivedAt = Date.now();
+                lastSuccessfulPullTime = Date.now();
+                return true;
+              }
+            }
           }
-
-          lastSnapshotReceivedAt = Date.now();
-          lastSuccessfulPullTime = Date.now();
-          return true;
+        } catch (fsErr) {
+          console.warn("[Storage] Firestore direct pull notice:", fsErr);
         }
-      } catch (sbErr) {
-        console.warn("[Storage] Supabase direct pull notice:", sbErr);
       }
 
       // 2. HTTP ETag sync from local Express server cache (<5ms)
@@ -1539,7 +1553,7 @@ export async function pullLatestCloudDataImmediately(force = false): Promise<boo
           const etag = syncResp.headers.get("ETag");
           if (etag) lastSystemSyncETag = etag;
           const serverData = await syncResp.json();
-          if (serverData && typeof serverData === "object" && Array.isArray(serverData.students)) {
+          if (serverData && typeof serverData === "object" && Array.isArray(serverData.students) && serverData.students.length > 0) {
             const currentLocal = loadLocalData();
             const merged = mergeCloudDataWithLocal(currentLocal, serverData);
 
@@ -1558,25 +1572,16 @@ export async function pullLatestCloudDataImmediately(force = false): Promise<boo
           }
         }
       } catch {
-        // Fall back to Firestore if server is unreachable
+        // Fall through
       }
 
-      // 3. Fallback to Firestore getDoc if server was unreachable and Supabase had no state
-      if (!isQuotaExceeded || Date.now() >= quotaExceededUntil) {
+      // 3. Fallback: only if local storage has 0 students and cloud/server were unreachable
+      const localCheck = loadLocalData();
+      if (!Array.isArray(localCheck.students) || localCheck.students.length === 0) {
         try {
-          await ensureFirebaseAuth();
-        } catch {}
-
-        const systemDocRef = doc(db, "system_state", "main_center_data");
-        const snapshot = await withTimeout(getDoc(systemDocRef), 8000, "Timeout pulling cloud data");
-
-        if (snapshot && snapshot.exists()) {
-          const val = snapshot.data();
-          if (val) {
-            const cloudObj: Partial<SystemData> = await resolvePayloadFromSnapshot(val);
-            const currentLocal = loadLocalData();
-            const merged = mergeCloudDataWithLocal(currentLocal, cloudObj);
-
+          const supabaseData = await pullFullStateFromSupabase();
+          if (supabaseData && Array.isArray(supabaseData.students) && supabaseData.students.length > 0) {
+            const merged = mergeCloudDataWithLocal(localCheck, supabaseData);
             lastSyncedDataHash = JSON.stringify(merged);
             localStorage.setItem(PENDING_SYNC_KEY, "false");
             saveToLocalStorage(merged, false);
@@ -1585,12 +1590,10 @@ export async function pullLatestCloudDataImmediately(force = false): Promise<boo
             if (typeof window !== "undefined") {
               window.dispatchEvent(new CustomEvent("center-data-updated", { detail: merged }));
             }
-
-            lastSnapshotReceivedAt = Date.now();
             lastSuccessfulPullTime = Date.now();
             return true;
           }
-        }
+        } catch {}
       }
     } catch (err) {
       console.warn("Notice: Fast cloud pull on wake-up completed with fallback:", err);

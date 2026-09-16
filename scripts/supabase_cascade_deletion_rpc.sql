@@ -62,6 +62,10 @@ BEGIN
     WHERE (clean_barcode IS NOT NULL AND (student_barcode = clean_barcode OR parent_phone = clean_barcode OR id::TEXT = clean_barcode))
        OR (resolved_id IS NOT NULL AND id = resolved_id);
 
+    DELETE FROM public.push_subscriptions
+    WHERE (clean_barcode IS NOT NULL AND (student_barcode = clean_barcode OR barcode = clean_barcode))
+       OR (resolved_id IS NOT NULL AND (student_id = resolved_id OR id = resolved_id));
+
     -- Finally delete the student record
     DELETE FROM public.students 
     WHERE (clean_barcode IS NOT NULL AND barcode = clean_barcode)
@@ -103,6 +107,10 @@ BEGIN
     DELETE FROM public.parent_accounts 
     WHERE (clean_barcode IS NOT NULL AND (student_barcode = clean_barcode OR parent_phone = clean_barcode OR id::TEXT = clean_barcode))
        OR (resolved_id IS NOT NULL AND id = resolved_id);
+
+    DELETE FROM public.push_subscriptions
+    WHERE (clean_barcode IS NOT NULL AND (student_barcode = clean_barcode OR barcode = clean_barcode))
+       OR (resolved_id IS NOT NULL AND (student_id = resolved_id OR id = resolved_id));
 
     RETURN jsonb_build_object(
         'success', true,

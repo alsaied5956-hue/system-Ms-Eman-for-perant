@@ -8,7 +8,13 @@ import {
   throttledRealtimeConnect,
 } from "../utils/supabaseClient";
 import { ParentAccount } from "../types/portal";
-import { getLocalParentAccounts, saveLocalParentAccounts, getSavedPortalSession } from "../utils/portalStorage";
+import {
+  getLocalParentAccounts,
+  saveLocalParentAccounts,
+  getSavedPortalSession,
+  getDeletedTombstones,
+  addDeletedTombstones,
+} from "../utils/portalStorage";
 import {
   updateSessionPortalAttendance,
   updateSessionPortalPayment,
@@ -27,7 +33,7 @@ import {
   getVibrationPatternForType,
   NotificationType,
 } from "../utils/portalNotifications";
-import { shouldNotifyEvent } from "../utils/notificationTracker";
+import { shouldNotifyEvent, SESSION_START_TIME, markEventProcessed } from "../utils/notificationTracker";
 
 export type RealtimeTable =
   | "attendance_logs"
@@ -270,6 +276,16 @@ function ensureSharedSyncChannel() {
         const newAccount = mapRowToAccount(newRow);
         if (!newAccount || !newAccount.studentBarcode) return;
 
+        const tombstones = getDeletedTombstones();
+        const cleanB = normalizeBarcode(newAccount.studentBarcode);
+        if (
+          tombstones.has(cleanB) ||
+          newAccount.status === "deleted" ||
+          (Array.isArray(newAccount.linkedBarcodes) && newAccount.linkedBarcodes.some((lb) => tombstones.has(normalizeBarcode(lb))))
+        ) {
+          return; // Ignore resurrection
+        }
+
         const identifier = newAccount.id || newAccount.studentBarcode;
 
         activeSubscribers.forEach((sub) => {
@@ -316,7 +332,19 @@ function ensureSharedSyncChannel() {
         if (!updatedAccount || !updatedAccount.studentBarcode) return;
 
         const identifier = updatedAccount.id || updatedAccount.studentBarcode;
-        const isDeletedStatus = String(updatedAccount.status || "").toLowerCase() === "deleted";
+        const cleanB = normalizeBarcode(updatedAccount.studentBarcode);
+        const tombstones = getDeletedTombstones();
+        const isDeletedStatus =
+          String(updatedAccount.status || "").toLowerCase() === "deleted" ||
+          tombstones.has(cleanB) ||
+          (Array.isArray(updatedAccount.linkedBarcodes) && updatedAccount.linkedBarcodes.some((lb) => tombstones.has(normalizeBarcode(lb))));
+
+        if (isDeletedStatus) {
+          addDeletedTombstones(cleanB);
+          if (Array.isArray(updatedAccount.linkedBarcodes)) {
+            addDeletedTombstones(updatedAccount.linkedBarcodes);
+          }
+        }
 
         activeSubscribers.forEach((sub) => {
           if (sub.setAccounts) {
@@ -539,11 +567,20 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
 
   // Helper to trigger chime & vibration for received alerts with deduplication (Item 8) and safe autoplay handling (Item 3)
   const triggerAlertFeedback = useCallback(
-    (type: NotificationType, title: string, body: string, eventId?: string) => {
+    (type: NotificationType, title: string, body: string, eventId?: string, createdAt?: string | number) => {
       if (!enableSoundAlerts) return;
 
+      // Commandment 8: Drop stale CDC replay events older than current session start
+      if (createdAt) {
+        const time = typeof createdAt === "number" ? createdAt : new Date(createdAt).getTime();
+        if (!isNaN(time) && time < SESSION_START_TIME - 1000) {
+          if (eventId) markEventProcessed(eventId);
+          return;
+        }
+      }
+
       // Notification Deduplication: check if already processed (e.g. by Web Push / FCM / previous CDC)
-      if (eventId && !shouldNotifyEvent({ eventId })) {
+      if (eventId && !shouldNotifyEvent({ eventId, timestamp: createdAt ? (typeof createdAt === "number" ? createdAt : new Date(createdAt).getTime()) : undefined })) {
         console.log("[Notification Deduplication] Skipping duplicate alert already handled:", eventId);
         return;
       }
@@ -652,7 +689,7 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
                 alertBody = `تم تسجيل تأخير الطالب في حصة اليوم (${newRow.date_key})`;
               }
 
-              triggerAlertFeedback(alertType, alertTitle, alertBody, `att-${newRow.id || newRow.date_key}`);
+              triggerAlertFeedback(alertType, alertTitle, alertBody, `att-${newRow.id || newRow.date_key}`, newRow.created_at || newRow.date);
             }
 
             if (typeof window !== "undefined") {
@@ -716,7 +753,8 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
                 "homework",
                 "متابعة الواجب المدرسي",
                 `تم تحديث سجل الواجب: ${title} (${newRow.status || "مكتمل"})`,
-                `hw-${newRow.id || newRow.date_key}`
+                `hw-${newRow.id || newRow.date_key}`,
+                newRow.created_at || newRow.date
               );
             }
 
@@ -792,7 +830,8 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
                 "fee",
                 "إيصال سداد مصروفات جديد",
                 `تم تسجيل دفعة مصروفات بقيمة ${paymentRecord.paidAmount} ج.م لشهر (${mKey})`,
-                `pay-${newRow.id || mKey}`
+                `pay-${newRow.id || mKey}`,
+                newRow.created_at || newRow.payment_date
               );
             }
 
@@ -858,14 +897,16 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
                   "grade",
                   "رصد درجات امتحان جديدة",
                   `حصل الطالب على درجة ${newRow.last_exam_score} في ${newRow.last_exam_title || "الامتحان"}`,
-                  `grade-${newRow.id || Date.now()}`
+                  `grade-${newRow.id || Date.now()}`,
+                  newRow.updated_at || newRow.created_at
                 );
               } else {
                 triggerAlertFeedback(
                   "edit",
                   "تحديث بيانات الطالب",
                   `تم تحديث بيانات الطالب ${newRow.name || ""} في المنظومة`,
-                  `student-${newRow.id || Date.now()}`
+                  `student-${newRow.id || Date.now()}`,
+                  newRow.updated_at || newRow.created_at
                 );
               }
             }
@@ -932,7 +973,8 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
                 "grade",
                 "رصد درجات امتحان جديدة",
                 `حصل الطالب على درجة ${scoreStr} في ${title}`,
-                `grade-${newRow.id || Date.now()}`
+                `grade-${newRow.id || Date.now()}`,
+                newRow.created_at || newRow.exam_date || newRow.date
               );
             }
 
@@ -1048,7 +1090,8 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
                   "chat",
                   "رسالة جديدة من إدارة المنظومة",
                   newRow.message || newRow.text || "رسالة واردة جديدة بخصوص الطالب",
-                  `msg-${newRow.id || Date.now()}`
+                  `msg-${newRow.id || Date.now()}`,
+                  newRow.created_at
                 );
               }
             }
@@ -1112,7 +1155,8 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
                   "chat",
                   "رسالة جديدة من إدارة المنظومة",
                   newRow.message || newRow.text || "رسالة واردة جديدة بخصوص الطالب",
-                  `msg-${newRow.id || Date.now()}`
+                  `msg-${newRow.id || Date.now()}`,
+                  newRow.created_at
                 );
               }
             }
@@ -1224,6 +1268,9 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
 
     const cleanBarcode = normalizeBarcode(cleanId);
     const uuid = barcodeToUUID(cleanBarcode || cleanId);
+
+    // Immediately record in tombstone cache to prevent resurrection
+    addDeletedTombstones([cleanBarcode, cleanId].filter(Boolean));
 
     try {
       const { error } = await supabase
@@ -1390,12 +1437,23 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
 
       const list: ParentAccount[] = [];
       const seen = new Set<string>();
+      const tombstones = getDeletedTombstones();
 
       for (const row of data) {
         const acc = mapRowToAccount(row);
-        if (acc && acc.studentBarcode && !seen.has(acc.studentBarcode)) {
-          seen.add(acc.studentBarcode);
-          list.push(acc);
+        if (acc && acc.studentBarcode) {
+          const cleanB = normalizeBarcode(acc.studentBarcode);
+          if (
+            tombstones.has(cleanB) ||
+            acc.status === "deleted" ||
+            (Array.isArray(acc.linkedBarcodes) && acc.linkedBarcodes.some((lb) => tombstones.has(normalizeBarcode(lb))))
+          ) {
+            continue;
+          }
+          if (!seen.has(acc.studentBarcode)) {
+            seen.add(acc.studentBarcode);
+            list.push(acc);
+          }
         }
       }
 
