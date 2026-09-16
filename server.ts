@@ -70,6 +70,7 @@ import {
   recordLiveGroupFinished,
   updateAccountFCMTokenInStoreAndDb,
   getSupabaseServer,
+  onPortalHydrationComplete,
 } from "./server/portalStore";
 import { dispatchReliableParentPush } from "./server/fcmDispatcher";
 import { initFirestoreSync, pushServerStateToFirestore } from "./server/firestoreSync";
@@ -79,6 +80,14 @@ const db = getFirestore(fbApp, (firebaseConfig as any).firestoreDatabaseId || un
 
 // Start bidirectional Firestore synchronization immediately
 initFirestoreSync(db);
+
+// When full Supabase dataset finishes hydrating, push authoritative state to Firestore
+onPortalHydrationComplete(() => {
+  console.log("[Server] Hydration complete: pushing full authoritative state to Firestore...");
+  pushServerStateToFirestore(db).catch((err) => {
+    console.warn("[Server] Firestore push error on hydration:", err?.message || err);
+  });
+});
 
 const app = express();
 const PORT = 3000;

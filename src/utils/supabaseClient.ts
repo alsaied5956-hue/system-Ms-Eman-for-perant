@@ -1361,8 +1361,8 @@ export async function pullFullStateFromSupabase(): Promise<Partial<SystemData> |
   if (!isSupabaseConfigured()) return null;
 
   try {
-    // Parallelize snapshot fetch with live tables in a single batch (<300ms) with 3s timeout
-    const [snapshotRes, studentsRes, paymentsRes, attendanceRes, homeworkRes] = await executeFastQuery(
+    // 1. Fetch live tables in parallel
+    const [snapshotRes, studentsRes, paymentsRes] = await executeFastQuery(
       () =>
         Promise.allSettled([
           supabase
@@ -1373,20 +1373,47 @@ export async function pullFullStateFromSupabase(): Promise<Partial<SystemData> |
             .limit(1),
           supabase.from("students").select("*"),
           supabase.from("payments").select("*"),
-          supabase
-            .from("attendance_logs")
-            .select("student_id, barcode, date_key, status, time_recorded")
-            .order("date_key", { ascending: false })
-            .limit(3000),
-          supabase
-            .from("homework")
-            .select("*")
-            .order("date_key", { ascending: false })
-            .limit(2000),
         ]),
-      3000,
-      "استعلام مزامنة البيانات الشاملة من Supabase"
+      5000,
+      "استعلام الطلاب والمدفوعات من Supabase"
     );
+
+    // 2. Fetch full attendance records with pagination to include all 21k+ records
+    const allAttendanceLogs: any[] = [];
+    let attPage = 0;
+    const pageSize = 1000;
+    while (true) {
+      try {
+        const { data, error } = await supabase
+          .from("attendance_logs")
+          .select("student_id, barcode, date_key, status, time_recorded")
+          .range(attPage * pageSize, (attPage + 1) * pageSize - 1);
+        if (error || !data || data.length === 0) break;
+        allAttendanceLogs.push(...data);
+        if (data.length < pageSize) break;
+        attPage++;
+      } catch {
+        break;
+      }
+    }
+
+    // 3. Fetch homework / exams with pagination
+    const allHomework: any[] = [];
+    let hwPage = 0;
+    while (true) {
+      try {
+        const { data, error } = await supabase
+          .from("homework")
+          .select("*")
+          .range(hwPage * pageSize, (hwPage + 1) * pageSize - 1);
+        if (error || !data || data.length === 0) break;
+        allHomework.push(...data);
+        if (data.length < pageSize) break;
+        hwPage++;
+      } catch {
+        break;
+      }
+    }
 
     let baseState: Partial<SystemData> = {};
 
@@ -1467,10 +1494,10 @@ export async function pullFullStateFromSupabase(): Promise<Partial<SystemData> |
       baseState.payments = paymentsMap;
     }
 
-    // Merge attendance records
-    if (attendanceRes.status === "fulfilled" && attendanceRes.value.data && attendanceRes.value.data.length > 0) {
+    // Merge attendance records from paginated results
+    if (allAttendanceLogs.length > 0) {
       const history: Record<string, Record<string, string>> = baseState.attendanceHistory ? { ...baseState.attendanceHistory } : {};
-      attendanceRes.value.data.forEach((att: any) => {
+      allAttendanceLogs.forEach((att: any) => {
         const dKey = att.date_key;
         const b = att.barcode ? String(att.barcode).trim() : (att.student_id ? studentIdToBarcode.get(att.student_id) : null);
         if (!dKey || !b) return;
@@ -1480,10 +1507,10 @@ export async function pullFullStateFromSupabase(): Promise<Partial<SystemData> |
       baseState.attendanceHistory = history;
     }
 
-    // Merge homework and exam records
-    if (homeworkRes.status === "fulfilled" && homeworkRes.value.data && homeworkRes.value.data.length > 0) {
+    // Merge homework and exam records from paginated results
+    if (allHomework.length > 0) {
       const studentExamsMap = new Map<string, any[]>();
-      homeworkRes.value.data.forEach((hw: any) => {
+      allHomework.forEach((hw: any) => {
         const b = hw.barcode ? String(hw.barcode).trim() : (hw.student_id ? studentIdToBarcode.get(hw.student_id) : null);
         if (!b) return;
         const rawGrade = hw.grade !== undefined ? hw.grade : (hw.score !== undefined ? hw.score : hw.degree);

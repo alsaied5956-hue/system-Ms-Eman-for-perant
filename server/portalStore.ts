@@ -117,6 +117,10 @@ let parentAccountsCache: Record<string, ParentAccountRecord> = {};
 let deletedAccountsCache = new Set<string>();
 
 const STORE_PATH = path.join(process.cwd(), ".system_data_store.json");
+let onHydrationCompleteCallbacks: (() => void)[] = [];
+export function onPortalHydrationComplete(cb: () => void): void {
+  onHydrationCompleteCallbacks.push(cb);
+}
 const ACCOUNTS_PATH = path.join(process.cwd(), ".parent_accounts_store.json");
 const DELETED_ACCOUNTS_PATH = path.join(process.cwd(), ".deleted_accounts_store.json");
 
@@ -249,9 +253,203 @@ export function initPortalStore(): void {
           }
         })
         .catch((e: any) => console.warn("[PortalStore] Initial Supabase store hydration notice:", e));
+
+      // 6. Hydrate full original dataset (students, payments, attendance, homework) directly from Supabase
+      hydrateSystemStateFromSupabase().catch((e: any) =>
+        console.warn("[PortalStore] Supabase system state hydration notice:", e)
+      );
     }
   } catch (err) {
     console.error("[PortalStore] Init error:", err);
+  }
+}
+
+/**
+ * Hydrates complete baseline data (718+ students, 840+ payments, 21k+ attendance records)
+ * directly from Supabase tables into the server cache.
+ */
+export async function hydrateSystemStateFromSupabase(): Promise<boolean> {
+  if (!supabaseServer) return false;
+  try {
+    console.log("[PortalStore] Starting full data hydration from original Supabase database...");
+    const [studentsRes, paymentsRes] = await Promise.all([
+      supabaseServer.from("students").select("*"),
+      supabaseServer.from("payments").select("*"),
+    ]);
+
+    if (!Array.isArray(studentsRes.data) || studentsRes.data.length === 0) {
+      console.warn("[PortalStore] No students found in Supabase during hydration.");
+      return false;
+    }
+
+    const studentIdToBarcode = new Map<string, string>();
+    const studentsList: StudentRecord[] = studentsRes.data.map((row: any) => {
+      const b = String(row.barcode || "").trim();
+      if (row.id && b) {
+        studentIdToBarcode.set(row.id, b);
+      }
+      return {
+        barcode: b,
+        name: row.name || "طالب بدون اسم",
+        phone: row.phone && row.phone !== "0" ? String(row.phone) : "0",
+        parentPhone: row.parent_phone && row.parent_phone !== "0" ? String(row.parent_phone) : "0",
+        groupGrade: row.grade || "الصف الرابع الابتدائي",
+        groupDays: row.group_days || "سبت - إثنين - أربعاء",
+        points: Number(row.points || 0),
+        totalAttendanceDays: Number(row.total_attendance_days || 0),
+        totalAbsentDays: Number(row.total_absent_days || 0),
+        customMonthlyFee: row.monthly_fee !== undefined && row.monthly_fee !== null ? Number(row.monthly_fee) : undefined,
+        discountReason: row.notes || undefined,
+        notes: row.notes || undefined,
+        createdAt: row.created_at || undefined,
+      };
+    });
+
+    // Payments
+    const paymentsMap: Record<string, Record<string, any>> = {};
+    if (Array.isArray(paymentsRes.data)) {
+      paymentsRes.data.forEach((p: any) => {
+        const mKey = p.month_key;
+        const b = p.barcode ? String(p.barcode).trim() : (p.student_id ? studentIdToBarcode.get(p.student_id) : null);
+        if (!mKey || !b) return;
+        if (!paymentsMap[mKey]) paymentsMap[mKey] = {};
+        paymentsMap[mKey][b] = {
+          monthKey: mKey,
+          amount: Number(p.amount_paid || 0),
+          paidAmount: Number(p.amount_paid || 0),
+          requiredAmount: Number(p.required_amount || 0),
+          discount: Number(p.discount || 0),
+          date: p.payment_date ? p.payment_date.slice(0, 10) : "",
+          time: p.payment_date ? p.payment_date.slice(11, 16) : "",
+          note: p.notes || "",
+          notes: p.notes || "",
+          recordedBy: p.received_by || "الإشراف",
+          timestamp: p.created_at ? new Date(p.created_at).getTime() : Date.now(),
+        };
+      });
+    }
+
+    // Attendance (paginated to pull all ~21k+ records safely)
+    const historyMap: Record<string, Record<string, string>> = {};
+    const todayKey = getTodayKey();
+    const todayAttendance: Record<string, string> = {};
+    let attPage = 0;
+    const pageSize = 1000;
+    let totalAttFetched = 0;
+
+    while (true) {
+      const { data, error } = await supabaseServer
+        .from("attendance_logs")
+        .select("student_id, barcode, date_key, status, time_recorded")
+        .range(attPage * pageSize, (attPage + 1) * pageSize - 1);
+
+      if (error || !data || data.length === 0) break;
+      totalAttFetched += data.length;
+
+      data.forEach((att: any) => {
+        const dKey = att.date_key;
+        const b = att.barcode ? String(att.barcode).trim() : (att.student_id ? studentIdToBarcode.get(att.student_id) : null);
+        if (!dKey || !b) return;
+        if (!historyMap[dKey]) historyMap[dKey] = {};
+        historyMap[dKey][b] = att.status || "حضور";
+        if (dKey === todayKey) {
+          todayAttendance[b] = att.status || "حضور";
+        }
+      });
+
+      if (data.length < pageSize) break;
+      attPage++;
+    }
+
+    // Homework / Exams (paginated)
+    let hwPage = 0;
+    const studentExamsMap = new Map<string, any[]>();
+    while (true) {
+      const { data, error } = await supabaseServer
+        .from("homework")
+        .select("*")
+        .range(hwPage * pageSize, (hwPage + 1) * pageSize - 1);
+
+      if (error || !data || data.length === 0) break;
+
+      data.forEach((hw: any) => {
+        const b = hw.barcode ? String(hw.barcode).trim() : (hw.student_id ? studentIdToBarcode.get(hw.student_id) : null);
+        if (!b) return;
+        const rawGrade = hw.grade !== undefined ? hw.grade : (hw.score !== undefined ? hw.score : hw.degree);
+        const hasScore = rawGrade !== null && rawGrade !== undefined && rawGrade !== "";
+        const isExam =
+          hasScore ||
+          (typeof hw.notes === "string" && (hw.notes.includes("امتحان") || hw.notes.includes("اختبار") || hw.notes.includes("تقييم") || hw.notes.includes("درجة") || hw.notes.includes("رصد"))) ||
+          (typeof hw.title === "string" && (hw.title.includes("امتحان") || hw.title.includes("اختبار") || hw.title.includes("تقييم")));
+
+        if (isExam) {
+          if (!studentExamsMap.has(b)) studentExamsMap.set(b, []);
+          studentExamsMap.get(b)!.push(hw);
+        }
+      });
+
+      if (data.length < pageSize) break;
+      hwPage++;
+    }
+
+    // Calculate exam scores for students
+    if (studentExamsMap.size > 0) {
+      studentsList.forEach((s: any) => {
+        const b = String(s.barcode || "").trim();
+        const exams = studentExamsMap.get(b);
+        if (exams && exams.length > 0) {
+          const newest = exams[0];
+          const sc = Number(newest.grade ?? newest.score ?? newest.degree) || 0;
+          const maxSc = Number(newest.max_score || newest.maxScore || 10);
+          const pct = Math.min(100, Math.round((sc / maxSc) * 100));
+          s.lastExamTitle = s.lastExamTitle || newest.title || "التقييم الدوري";
+          s.lastExamScore = s.lastExamScore || `${sc}/${maxSc} (${pct}%)`;
+          s.totalExamScores = exams
+            .map((e: any) => {
+              const eSc = Number(e.grade ?? e.score ?? e.degree) || 0;
+              const eMax = Number(e.max_score || e.maxScore || 10);
+              return Math.min(100, Math.round((eSc / eMax) * 100));
+            })
+            .reverse();
+        }
+      });
+    }
+
+    // Populate server cache
+    systemDataCache.students = studentsList;
+    systemDataCache.payments = paymentsMap;
+    systemDataCache.attendanceHistory = historyMap;
+    systemDataCache.attendanceToday = todayAttendance;
+    systemDataCache.version++;
+    systemDataCache.lastUpdated = Date.now();
+
+    console.log(
+      `[PortalStore] Full Supabase hydration complete: ${studentsList.length} students, ${Object.keys(paymentsMap).length} months of payments (${paymentsRes.data?.length || 0} receipts), ${totalAttFetched} attendance records across ${Object.keys(historyMap).length} days.`
+    );
+
+    persistStoreDebounced();
+
+    // Broadcast SSE update so client browser pulls this complete state immediately
+    broadcastPortalSSE({
+      type: "SYSTEM_DATA_UPDATED",
+      version: systemDataCache.version,
+      studentsCount: systemDataCache.students.length,
+      timestamp: Date.now(),
+    });
+
+    // Notify registered listeners (e.g. Firestore sync push)
+    onHydrationCompleteCallbacks.forEach((cb) => {
+      try {
+        cb();
+      } catch (e) {
+        console.warn("[PortalStore] Hydration callback error:", e);
+      }
+    });
+
+    return true;
+  } catch (err) {
+    console.error("[PortalStore] Failed full Supabase hydration:", err);
+    return false;
   }
 }
 
@@ -916,28 +1114,67 @@ export function updateSystemDataPartial(updates: Partial<SystemDataCache>): void
 
 export function setSystemDataFromCloud(cloudData: any): void {
   if (!cloudData || typeof cloudData !== "object") return;
+  
+  // Guard against overwriting a full authoritative database state with an incomplete or truncated snapshot
   if (Array.isArray(cloudData.students)) {
-    systemDataCache.students = cloudData.students;
+    if (!systemDataCache.students || systemDataCache.students.length === 0 || cloudData.students.length >= systemDataCache.students.length) {
+      systemDataCache.students = cloudData.students;
+    } else {
+      // Merge: update fields of existing students or append new ones, never delete the full list
+      const existingMap = new Map<string, any>();
+      systemDataCache.students.forEach((s) => {
+        if (s && s.barcode) existingMap.set(String(s.barcode).trim(), s);
+      });
+      cloudData.students.forEach((s: any) => {
+        if (s && s.barcode) {
+          const b = String(s.barcode).trim();
+          existingMap.set(b, { ...existingMap.get(b), ...s });
+        }
+      });
+      systemDataCache.students = Array.from(existingMap.values());
+    }
   }
   if (cloudData.attendanceHistory) {
-    systemDataCache.attendanceHistory = cloudData.attendanceHistory;
+    if (!systemDataCache.attendanceHistory || Object.keys(systemDataCache.attendanceHistory).length === 0) {
+      systemDataCache.attendanceHistory = cloudData.attendanceHistory;
+    } else {
+      // Deep merge attendance history so we don't wipe out thousands of historical logs
+      const mergedHist: Record<string, Record<string, string>> = { ...systemDataCache.attendanceHistory };
+      for (const [dKey, dayMap] of Object.entries(cloudData.attendanceHistory)) {
+        if (dayMap && typeof dayMap === "object") {
+          mergedHist[dKey] = { ...(mergedHist[dKey] || {}), ...(dayMap as any) };
+        }
+      }
+      systemDataCache.attendanceHistory = mergedHist;
+    }
   }
   if (cloudData.attendanceToday) {
-    systemDataCache.attendanceToday = cloudData.attendanceToday;
+    systemDataCache.attendanceToday = { ...systemDataCache.attendanceToday, ...cloudData.attendanceToday };
   }
   if (cloudData.scanLogTimes) {
-    systemDataCache.scanLogTimes = cloudData.scanLogTimes;
+    systemDataCache.scanLogTimes = { ...systemDataCache.scanLogTimes, ...cloudData.scanLogTimes };
   }
-  if (Array.isArray(cloudData.scanLogOrder)) {
+  if (Array.isArray(cloudData.scanLogOrder) && cloudData.scanLogOrder.length > 0) {
     systemDataCache.scanLogOrder = cloudData.scanLogOrder;
   }
   if (cloudData.payments) {
-    systemDataCache.payments = cloudData.payments;
+    if (!systemDataCache.payments || Object.keys(systemDataCache.payments).length === 0) {
+      systemDataCache.payments = cloudData.payments;
+    } else {
+      // Deep merge payment months
+      const mergedPay: Record<string, Record<string, any>> = { ...systemDataCache.payments };
+      for (const [mKey, pMap] of Object.entries(cloudData.payments)) {
+        if (pMap && typeof pMap === "object") {
+          mergedPay[mKey] = { ...(mergedPay[mKey] || {}), ...(pMap as any) };
+        }
+      }
+      systemDataCache.payments = mergedPay;
+    }
   }
   if (cloudData.groupPrices) {
     systemDataCache.groupPrices = cloudData.groupPrices;
   }
-  if (Array.isArray(cloudData.usersList)) {
+  if (Array.isArray(cloudData.usersList) && cloudData.usersList.length > 0) {
     systemDataCache.usersList = cloudData.usersList;
   }
   if (Array.isArray(cloudData.platformMessages)) {
