@@ -31,6 +31,7 @@ import {
   deleteParentAccountRecordFromSupabase,
   updateParentAccountFCMTokenInSupabase,
 } from "../../utils/supabaseClient";
+import { useGlobalRealtimeSync } from "../../hooks/useGlobalRealtimeSync";
 import { AdminActivityLog } from "../../types/portal";
 import { openWhatsApp } from "../../utils/helpers";
 import {
@@ -95,6 +96,31 @@ export const AdminControlPanel: React.FC<AdminControlPanelProps> = ({
     getLocalParentAccounts()
   );
   const [isSyncingAccounts, setIsSyncingAccounts] = useState(false);
+
+  // Dedicated Realtime CDC Handler for live parent accounts sync across supervisor screens
+  const {
+    deleteAccount: cdcDeleteAccount,
+    updateAccount: cdcUpdateAccount,
+  } = useGlobalRealtimeSync({
+    onAccountDeleted: (deletedId) => {
+      setAccounts((prev) => {
+        const next: Record<string, ParentAccount> = { ...prev };
+        delete next[deletedId];
+        for (const [k, acc] of Object.entries(next)) {
+          if (acc?.studentBarcode === deletedId || acc?.linkedBarcodes?.includes(deletedId)) {
+            delete next[k];
+          }
+        }
+        return { ...next };
+      });
+    },
+    onAccountUpdated: (updated) => {
+      setAccounts((prev) => ({ ...prev, [updated.studentBarcode]: updated }));
+    },
+    onAccountInserted: (inserted) => {
+      setAccounts((prev) => ({ ...prev, [inserted.studentBarcode]: inserted }));
+    },
+  });
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -689,6 +715,7 @@ export const AdminControlPanel: React.FC<AdminControlPanelProps> = ({
     try {
       // 1. Commit status change to production Supabase database, server, and cloud
       await Promise.allSettled([
+        cdcUpdateAccount(item.barcode, { status: nextStatus }),
         updateParentAccountStatusInSupabase(item.barcode, nextStatus),
         persistParentAccount(updated),
         fetch(
@@ -745,6 +772,7 @@ export const AdminControlPanel: React.FC<AdminControlPanelProps> = ({
 
       // 1. Target ONLY the specified parent account: Invalidate FCM token & delete database record in Supabase
       await Promise.allSettled([
+        cdcDeleteAccount(barcode),
         updateParentAccountFCMTokenInSupabase(barcode, ""),
         deleteParentAccountRecordFromSupabase(barcode),
         deleteParentAccount(barcode),

@@ -746,6 +746,7 @@ export function subscribeToAllParentAccounts(
   if (typeof window !== "undefined") {
     window.addEventListener("eman_account_activated", handleCustomEvent);
     window.addEventListener("eman_account_revoked", handleCustomEvent);
+    window.addEventListener("eman_account_sync", handleCustomEvent);
   }
 
   // 4. Storage event (cross-tab LocalStorage modification)

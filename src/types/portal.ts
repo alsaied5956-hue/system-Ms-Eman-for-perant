@@ -1,6 +1,7 @@
 import { Student, PaymentRecord, GroupDays, GradeName } from "../types";
 
 export interface ParentAccount {
+  id?: string;
   studentBarcode: string;
   studentName?: string;
   parentName?: string;

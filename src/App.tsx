@@ -94,8 +94,12 @@ import { deleteParentAccount, syncParentAccountsFromCloud } from "./utils/portal
 import { PWAUpdateNotification } from "./components/portal/PWAUpdateNotification";
 import { initOnlineRealtimeSync } from "./utils/onlineRealtimeSync";
 import { broadcastStudentLiveEvent } from "./utils/studentLiveSync";
+import { useGlobalRealtimeSync } from "./hooks/useGlobalRealtimeSync";
 
 export default function App() {
+  // Dedicated Realtime CDC Handler for cross-device parent accounts synchronization
+  useGlobalRealtimeSync();
+
   const [appViewMode, setAppViewMode] = useState<"portal" | "teacher">(() => {
     if (typeof window !== "undefined") {
       const search = window.location.search.toLowerCase();
