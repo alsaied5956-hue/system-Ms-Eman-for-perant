@@ -13,17 +13,21 @@ if (typeof window !== 'undefined') {
   if ('serviceWorker' in navigator) {
     const registerSW = async () => {
       try {
-        // Clean up legacy or duplicate service workers
+        // Clean up legacy service workers if they don't match our service workers
         const registrations = await navigator.serviceWorker.getRegistrations();
         for (const reg of registrations) {
           const scriptUrl = reg.active?.scriptURL || reg.installing?.scriptURL || reg.waiting?.scriptURL || '';
-          if (scriptUrl && !scriptUrl.endsWith('/sw.js')) {
+          if (
+            scriptUrl &&
+            !scriptUrl.endsWith('/firebase-messaging-sw.js') &&
+            !scriptUrl.endsWith('/sw.js')
+          ) {
             console.log('[SW] Unregistering legacy worker:', scriptUrl);
             await reg.unregister();
           }
         }
 
-        const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
         if (registration) {
           registration.update().catch(() => {});
         }

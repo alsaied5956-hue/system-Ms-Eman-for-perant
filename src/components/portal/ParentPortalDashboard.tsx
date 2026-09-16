@@ -42,7 +42,7 @@ import {
   isNotificationSupported,
 } from "../../utils/portalNotifications";
 import { markEventProcessed, SESSION_START_TIME, shouldNotifyEvent } from "../../utils/notificationTracker";
-import { registerPushSubscription } from "../../services/pushNotificationService";
+import { registerPushSubscription, autoRequestPermissionAndSyncFCMToken } from "../../services/pushNotificationService";
 import {
   getTodayKey,
   getArabicDayName,
@@ -830,10 +830,11 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     };
   }, [activeStudent?.barcode]);
 
-  // Request push notification permission from modal
+  // Request push notification permission from modal and sync FCM token
   const handleRequestPermissionFromModal = async (): Promise<NotificationPermission> => {
     const allAliases = Array.from(
       new Set([
+        account.id,
         account.studentBarcode,
         ...(account.linkedBarcodes || []),
         account.parentPhone,
@@ -843,13 +844,13 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       ])
     ).filter(Boolean) as string[];
 
-    const targetId = activeStudent?.barcode || account.parentPhone;
-    const perm = await requestNotificationPermission(targetId, "parent", allAliases);
-    if (perm === "granted") {
+    const targetId = account.id || activeStudent?.barcode || account.studentBarcode || account.parentPhone;
+    const res = await autoRequestPermissionAndSyncFCMToken(targetId, "parent", allAliases);
+    if (res.permission === "granted") {
       setHasNotifPerm(true);
       sessionStorage.removeItem("eman_notif_modal_dismissed");
     }
-    return perm;
+    return res.permission;
   };
 
   const handleCloseNotifModal = () => {

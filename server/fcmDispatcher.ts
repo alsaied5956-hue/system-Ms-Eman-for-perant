@@ -179,9 +179,9 @@ export async function queryParentAccountFCMTokens(
           status,
         });
       } else {
-        const msg = `[FCM Parent Dispatcher] Missing active fcm_token for student/parent ID: "${target}" in parent_accounts (token is empty or unset).`;
+        const msg = `[FCM Parent Dispatcher ERROR] Missing active fcm_token for student/parent target ID: "${target}" in 'parent_accounts' table (token is empty or unset). Push notification dropped for this recipient.`;
         logs.push(msg);
-        console.warn(msg);
+        console.error(msg);
         tokenMap.set(target, {
           targetId: target,
           accountFound: true,
@@ -190,9 +190,9 @@ export async function queryParentAccountFCMTokens(
         });
       }
     } else {
-      const msg = `[FCM Parent Dispatcher] No parent account record found in parent_accounts for target ID: "${target}".`;
+      const msg = `[FCM Parent Dispatcher ERROR] No parent account record found in 'parent_accounts' for student/parent target ID: "${target}". Cannot deliver FCM push notification.`;
       logs.push(msg);
-      console.warn(msg);
+      console.error(msg);
       tokenMap.set(target, {
         targetId: target,
         accountFound: false,
@@ -420,9 +420,10 @@ export async function dispatchReliableParentPush(
             logs.push(`[FCM Parent Dispatcher] FCM HTTP v1 dispatch OK for target "${item.targetId}".`);
           } else {
             const errText = await res.text();
-            console.warn(`[FCM Parent Dispatcher] FCM HTTP v1 response ${res.status}:`, errText);
-            // Handle dead token (404/410/UNREGISTERED)
-            if (res.status === 404 || res.status === 410 || errText.includes("UNREGISTERED")) {
+            console.error(`[FCM Parent Dispatcher ERROR] FCM HTTP v1 rejected token for target "${item.targetId}" (${res.status}):`, errText);
+            // Handle dead token (404/410/UNREGISTERED/INVALID_ARGUMENT)
+            if (res.status === 404 || res.status === 410 || errText.includes("UNREGISTERED") || errText.includes("INVALID_ARGUMENT")) {
+              console.error(`[FCM Parent Dispatcher ERROR] Token for target "${item.targetId}" is EXPIRED or INVALID. Pruning dead token from database.`);
               invalidateDeadFCMToken(item.targetId, item.token);
             }
             fcmFailed++;

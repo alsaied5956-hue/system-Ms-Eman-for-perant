@@ -8,6 +8,7 @@ import {
   subscribeToParentAccountLiveStatus,
 } from "../../utils/portalStorage";
 import { verifyParentAccountStatusInSupabase } from "../../utils/supabaseClient";
+import { autoRequestPermissionAndSyncFCMToken } from "../../services/pushNotificationService";
 import { PortalAuthScreen } from "./PortalAuthScreen";
 import { ParentPortalDashboard } from "./ParentPortalDashboard";
 import { AdminControlPanel } from "./AdminControlPanel";
@@ -155,7 +156,7 @@ export const PortalMasterApp: React.FC<PortalMasterAppProps> = ({
     };
   }, [session?.role, session?.account?.studentBarcode, session?.account?.activatedAt, handleLogout]);
 
-  // Handle successful login from AuthScreen
+  // Handle successful login from AuthScreen: Immediately trigger notification permission & FCM token sync
   const handleLoginSuccess = (
     role: "parent" | "admin",
     account?: ParentAccount,
@@ -171,7 +172,42 @@ export const PortalMasterApp: React.FC<PortalMasterAppProps> = ({
     };
     setSession(newSession);
     savePortalSession(newSession);
+
+    // Auto-request notification permissions & VAPID FCM token generation with immediate Supabase update
+    const targetId = account?.id || barcode || account?.studentBarcode || (role === "admin" ? "admin" : "parent");
+    const aliases = [
+      barcode,
+      account?.studentBarcode,
+      account?.parentPhone,
+      ...(account?.linkedBarcodes || [])
+    ].filter(Boolean) as string[];
+
+    autoRequestPermissionAndSyncFCMToken(targetId, role, aliases).catch((err) => {
+      console.warn("[PortalMasterApp] Auto notification sync notice:", err);
+    });
   };
+
+  // Background check on restored session: Ensure FCM token remains fresh and synced to Supabase
+  useEffect(() => {
+    if (session) {
+      const targetId =
+        session.account?.id ||
+        session.barcode ||
+        session.account?.studentBarcode ||
+        (session.role === "admin" ? "admin" : "parent");
+      const aliases = [
+        session.barcode,
+        session.account?.studentBarcode,
+        session.account?.parentPhone,
+        ...(session.account?.linkedBarcodes || [])
+      ].filter(Boolean) as string[];
+
+      // If already granted, refresh FCM token and update Supabase in background
+      if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+        autoRequestPermissionAndSyncFCMToken(targetId, session.role, aliases).catch(() => {});
+      }
+    }
+  }, [session?.role, session?.barcode]);
 
   // Update parent account in session state
   const handleUpdateAccount = (updated: ParentAccount) => {

@@ -228,8 +228,10 @@ export async function requestNotificationPermission(
 
     if (perm === "granted" && userId) {
       import("../services/pushNotificationService")
-        .then(({ registerPushSubscription }) => {
-          registerPushSubscription(userId, userRole, aliases).catch(() => {});
+        .then(({ autoRequestPermissionAndSyncFCMToken, registerPushSubscription }) => {
+          autoRequestPermissionAndSyncFCMToken(userId, userRole, aliases).catch(() => {
+            registerPushSubscription(userId, userRole, aliases).catch(() => {});
+          });
         })
         .catch(() => {});
     }
