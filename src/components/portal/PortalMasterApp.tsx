@@ -13,6 +13,7 @@ import { PortalAuthScreen } from "./PortalAuthScreen";
 import { ParentPortalDashboard } from "./ParentPortalDashboard";
 import { AdminControlPanel } from "./AdminControlPanel";
 import { ParentChildProvider } from "../../contexts/ParentChildContext";
+import { IOSPwaInstallBanner } from "./IOSPwaInstallBanner";
 
 interface PortalMasterAppProps {
   students: Student[];
@@ -224,22 +225,28 @@ export const PortalMasterApp: React.FC<PortalMasterAppProps> = ({
   // 1. Not logged in -> Show Authentication / Registration Screen
   if (!session) {
     return (
-      <PortalAuthScreen
-        students={students}
-        onLoginSuccess={handleLoginSuccess}
-        revocationNotice={revocationNotice}
-        onClearRevocationNotice={() => setRevocationNotice(null)}
-      />
+      <>
+        <PortalAuthScreen
+          students={students}
+          onLoginSuccess={handleLoginSuccess}
+          revocationNotice={revocationNotice}
+          onClearRevocationNotice={() => setRevocationNotice(null)}
+        />
+        <IOSPwaInstallBanner />
+      </>
     );
   }
 
   // 2. Logged in as Admin / Supervisor -> Show Admin Control Panel
   if (session.role === "admin") {
     return (
-      <AdminControlPanel
-        students={students}
-        onLogout={() => handleLogout(false)}
-      />
+      <>
+        <AdminControlPanel
+          students={students}
+          onLogout={() => handleLogout(false)}
+        />
+        <IOSPwaInstallBanner />
+      </>
     );
   }
 
@@ -267,17 +274,21 @@ export const PortalMasterApp: React.FC<PortalMasterAppProps> = ({
           onLogout={() => handleLogout(false)}
           onUpdateAccount={handleUpdateAccount}
         />
+        <IOSPwaInstallBanner />
       </ParentChildProvider>
     );
   }
 
   // Fallback if account data was missing
   return (
-    <PortalAuthScreen
-      students={students}
-      onLoginSuccess={handleLoginSuccess}
-      revocationNotice={revocationNotice}
-      onClearRevocationNotice={() => setRevocationNotice(null)}
-    />
+    <>
+      <PortalAuthScreen
+        students={students}
+        onLoginSuccess={handleLoginSuccess}
+        revocationNotice={revocationNotice}
+        onClearRevocationNotice={() => setRevocationNotice(null)}
+      />
+      <IOSPwaInstallBanner />
+    </>
   );
 };

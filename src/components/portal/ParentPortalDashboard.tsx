@@ -44,6 +44,7 @@ import {
 } from "../../utils/portalNotifications";
 import { markEventProcessed, SESSION_START_TIME, shouldNotifyEvent } from "../../utils/notificationTracker";
 import { registerPushSubscription, autoRequestPermissionAndSyncFCMToken } from "../../services/pushNotificationService";
+import { formatLocalDate, formatLocalTime, formatLocalDateTime } from "../../utils/dateTimeUtils";
 import {
   getTodayKey,
   getArabicDayName,
@@ -596,9 +597,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
           senderName: newRow.sender_name || (newRow.sender === "admin" ? "إدارة المنظومة" : "ولي الأمر"),
           text: newRow.message || newRow.text || "",
           timestamp: newRow.created_at ? new Date(newRow.created_at).getTime() : Date.now(),
-          timeFormatted: newRow.created_at
-            ? new Date(newRow.created_at).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })
-            : new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }),
+          timeFormatted: formatLocalTime(newRow.created_at || Date.now()),
           isRead: Boolean(newRow.is_read || newRow.status === "READ"),
           status: newRow.status || (newRow.is_read ? "READ" : "DELIVERED"),
           senderRole: newRow.sender_role || (newRow.sender === "admin" ? "supervisor" : "parent"),
@@ -3102,7 +3101,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
                         <div className="text-[11px] text-slate-400 flex items-center justify-between pt-1">
                           <span>تاريخ الاختبار:</span>
                           <span className="font-mono text-slate-300">
-                            {String(exam.created_at || exam.date || exam.timestamp).slice(0, 10)}
+                            {formatLocalDate(exam.created_at || exam.date || exam.timestamp)}
                           </span>
                         </div>
                       )}
@@ -3181,7 +3180,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
                             </span>
                           </div>
                           <div className="flex items-center justify-between text-xs text-slate-400">
-                            <span>التاريخ: {hwDateStr}</span>
+                            <span>التاريخ: {hwDate ? formatLocalDate(hwDate) : "غير محدد"}</span>
                             {hwGrade !== undefined && hwGrade !== null && (
                               <span className="font-mono font-bold text-amber-300">
                                 الدرجة: {hwGrade} {hw.max_score || hw.maxScore ? `/ ${hw.max_score || hw.maxScore}` : ""}

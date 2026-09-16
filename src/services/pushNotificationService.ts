@@ -7,9 +7,50 @@
 import { supabase, barcodeToUUID, updateParentAccountFCMTokenInSupabase, normalizeBarcode } from "../utils/supabaseClient";
 import { db, app } from "../utils/firebase";
 import { collection, doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { markEventProcessed } from "../utils/notificationTracker";
+import { markEventProcessed, shouldNotifyEvent } from "../utils/notificationTracker";
 import { getMessaging, getToken, isSupported, onMessage } from "firebase/messaging";
-import { playPortalAudioChime } from "../utils/portalNotifications";
+import { playPortalAudioChime, sendPortalNotification } from "../utils/portalNotifications";
+
+// Resolves current Supabase JWT auth token or authenticated parent portal session token
+export async function getClientAuthToken(userId?: string): Promise<string> {
+  try {
+    const sessionRes = await supabase.auth.getSession();
+    const jwt = sessionRes?.data?.session?.access_token;
+    if (jwt) return jwt;
+  } catch {}
+
+  try {
+    if (typeof localStorage !== "undefined") {
+      const raw = localStorage.getItem("eman_portal_session_v1");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.token) return parsed.token;
+        if (parsed?.barcode) return parsed.barcode;
+      }
+    }
+  } catch {}
+
+  return userId || "";
+}
+
+/**
+ * Force Service Worker update across all registered workers on sign-in
+ * Guarantees clients always run the latest firebase-messaging-sw.js and VAPID key.
+ */
+export async function forceUpdateServiceWorker(): Promise<void> {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+  try {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    for (const reg of registrations) {
+      if (typeof reg.update === "function") {
+        await reg.update();
+        console.log(`[ServiceWorker Auto-Update] Forced update for: ${reg.scope}`);
+      }
+    }
+  } catch (err) {
+    console.warn("[ServiceWorker Auto-Update] Update check notice:", err);
+  }
+}
 
 // Standard VAPID Public Key matching the backend server and Firebase Web Push Certificates
 export const VAPID_PUBLIC_KEY =
@@ -84,6 +125,13 @@ export async function registerPushSubscription(
       registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js", { scope: "/" });
     }
     await navigator.serviceWorker.ready;
+
+    // Force swRegistration.update() to ensure clients always run the latest firebase-messaging-sw.js and VAPID key
+    try {
+      if (registration && typeof registration.update === "function") {
+        await registration.update();
+      }
+    } catch {}
 
     // 3. Register Periodic Background Sync if supported (PWA background capability)
     try {
@@ -205,9 +253,16 @@ export async function savePushSubscription(
     if (fcmToken) {
       payload.fcmToken = fcmToken;
     }
+    const authToken = await getClientAuthToken(userId);
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (authToken) {
+      headers["Authorization"] = `Bearer ${authToken}`;
+      headers["x-supabase-auth"] = authToken;
+    }
+
     await fetch("/api/push-subscribe", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(payload),
     });
   } catch (err) {
@@ -454,13 +509,31 @@ export async function autoRequestPermissionAndSyncFCMToken(
               const title = payload.notification?.title || payload.data?.title || "منظومة الأستاذة إيمان الدمشيتي";
               const body = payload.notification?.body || payload.data?.body || "إشعار جديد في المنظومة";
               const type = (payload.data?.type || "alert") as any;
+              const eventId =
+                payload.data?.eventId ||
+                payload.data?.id ||
+                payload.messageId ||
+                `${type}-${payload.data?.timestamp || Date.now()}`;
 
-              playPortalAudioChime(type);
+              // Notification Deduplication (Item 8): Prevent double alerts if already alerted via Realtime CDC
+              if (!shouldNotifyEvent({ eventId })) {
+                console.log("[FCM Pipeline] Foreground message skipped by deduplication layer (already alerted):", eventId);
+                return;
+              }
+
+              // Browser Autoplay & Audio Handling (Item 3): Wrap Audio in safe try/catch and rely on system notifications
+              try {
+                playPortalAudioChime(type);
+              } catch (audioErr) {
+                console.warn("[FCM Pipeline] Audio chime autoplay policy note:", audioErr);
+              }
+
+              sendPortalNotification(title, body, type, { eventId }).catch(() => {});
 
               if (typeof window !== "undefined") {
                 window.dispatchEvent(
                   new CustomEvent("eman_fcm_foreground_message", {
-                    detail: { payload, title, body, type },
+                    detail: { payload, title, body, type, eventId },
                   })
                 );
               }
@@ -569,9 +642,16 @@ export async function autoRequestPermissionAndSyncFCMToken(
       await savePushSubscription(userId, userRole, webPushSub, aliases, validFcmToken || undefined);
     } else if (validFcmToken) {
       // Validate fcmToken before sending fetch request to /api/push-subscribe
+      const authToken = await getClientAuthToken(userId);
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (authToken) {
+        headers["Authorization"] = `Bearer ${authToken}`;
+        headers["x-supabase-auth"] = authToken;
+      }
+
       await fetch("/api/push-subscribe", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           userId,
           userRole,

@@ -1053,6 +1053,19 @@ export async function deleteStudentFromSupabase(barcode: string): Promise<void> 
 
     const orFilter = `student_id.eq.${studentId},barcode.eq.${cleanBarcode},student_barcode.eq.${cleanBarcode}`;
 
+    // 0. Invoke PostgreSQL RPC SECURITY DEFINER function for atomic server-side cascade
+    try {
+      const { error: rpcErr } = await supabase.rpc("delete_student_cascade", {
+        target_barcode: cleanBarcode,
+        target_uuid: studentId,
+      });
+      if (!rpcErr) {
+        console.info(`[Hard Delete] PostgreSQL SECURITY DEFINER RPC delete_student_cascade executed successfully for ${cleanBarcode}`);
+      }
+    } catch (rpcEx) {
+      console.info("[Hard Delete] PostgreSQL RPC note (proceeding with direct table cascade):", rpcEx);
+    }
+
     // 1. Cascade hard delete across all related relational tables in Supabase in parallel
     await Promise.allSettled([
       supabase.from("students").delete().or(`barcode.eq.${cleanBarcode},id.eq.${studentId}`),
@@ -1766,6 +1779,19 @@ export async function deleteParentAccountRecordFromSupabase(barcode: string): Pr
     const uuid = barcodeToUUID(cleanBarcode);
 
     const orFilter = `id.eq.${uuid},id.eq.${cleanBarcode},student_barcode.eq.${cleanBarcode},parent_phone.eq.${cleanBarcode}`;
+
+    // 0. Invoke PostgreSQL RPC SECURITY DEFINER function for atomic server-side cascade
+    try {
+      const { error: rpcErr } = await supabase.rpc("delete_parent_account_cascade", {
+        target_barcode: cleanBarcode,
+        target_uuid: uuid,
+      });
+      if (!rpcErr) {
+        console.info(`[Hard Delete] PostgreSQL SECURITY DEFINER RPC delete_parent_account_cascade executed successfully for ${cleanBarcode}`);
+      }
+    } catch (rpcEx) {
+      console.info("[Hard Delete] PostgreSQL RPC note for parent account delete:", rpcEx);
+    }
 
     const [accRes] = await Promise.allSettled([
       supabase.from("parent_accounts").delete().or(orFilter),

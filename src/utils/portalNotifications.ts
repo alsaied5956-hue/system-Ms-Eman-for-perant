@@ -100,18 +100,27 @@ export function playPortalAudioChime(type: NotificationType): void {
     } catch {}
   }
 
-  // Attempt playing default high-volume notification MP3/WAV file
+  // Attempt playing default high-volume notification MP3/WAV file safely
   try {
     const audio = new Audio("/notification.mp3");
     audio.volume = 1.0;
-    audio.play().catch(() => {
-      try {
-        const fallback = new Audio("/notification.wav");
-        fallback.volume = 1.0;
-        fallback.play().catch(() => {});
-      } catch {}
-    });
-  } catch {}
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch((err) => {
+        console.warn("[Portal Audio] Autoplay policy prevented audio playback (relying on PWA system push notifications):", err?.name || err);
+        try {
+          const fallback = new Audio("/notification.wav");
+          fallback.volume = 1.0;
+          const fbPromise = fallback.play();
+          if (fbPromise !== undefined) {
+            fbPromise.catch(() => {});
+          }
+        } catch {}
+      });
+    }
+  } catch (err) {
+    console.warn("[Portal Audio] Audio constructor policy notice:", err);
+  }
 
   const ctx = getAudioContext();
   if (!ctx) return;

@@ -69,6 +69,7 @@ import {
   recordLiveStudentMutation,
   recordLiveGroupFinished,
   updateAccountFCMTokenInStoreAndDb,
+  getSupabaseServer,
 } from "./server/portalStore";
 import { dispatchReliableParentPush } from "./server/fcmDispatcher";
 import { initFirestoreSync, pushServerStateToFirestore } from "./server/firestoreSync";
@@ -980,7 +981,65 @@ app.get(pushSubscribePaths, (_req, res) => {
 
 app.post(pushSubscribePaths, async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-supabase-auth");
+
   try {
+    // 1. API Endpoint Security: Verify Supabase JWT Auth header before saving FCM tokens / subscriptions
+    const authHeader = req.headers.authorization || (req.headers as any)["x-supabase-auth"] || "";
+    const token = typeof authHeader === "string" && authHeader.startsWith("Bearer ")
+      ? authHeader.slice(7).trim()
+      : typeof authHeader === "string"
+      ? authHeader.trim()
+      : "";
+
+    let isAuthorized = false;
+    let authUserIdentifier: string | null = null;
+
+    if (token) {
+      // Step A: Supabase Auth JWT verification
+      const supabase = getSupabaseServer();
+      if (supabase) {
+        try {
+          const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+          if (!authErr && user) {
+            isAuthorized = true;
+            authUserIdentifier = user.id;
+          }
+        } catch (jwtErr) {
+          console.warn("[/api/push-subscribe] JWT validation note:", jwtErr);
+        }
+      }
+
+      // Step B: Authenticated Parent Portal Session / Barcode Token verification
+      if (!isAuthorized) {
+        const supabase = getSupabaseServer();
+        if (supabase) {
+          try {
+            const cleanToken = token.replace(/^sess-/, "").trim();
+            const { data: acc } = await supabase
+              .from("parent_accounts")
+              .select("id, student_barcode, status")
+              .or(`id.eq.${cleanToken},student_barcode.eq.${cleanToken}`)
+              .maybeSingle();
+
+            if (acc && acc.status !== "disabled" && acc.status !== "deleted") {
+              isAuthorized = true;
+              authUserIdentifier = acc.id || acc.student_barcode;
+            }
+          } catch (accErr) {
+            console.warn("[/api/push-subscribe] Parent account token validation note:", accErr);
+          }
+        }
+      }
+    }
+
+    if (!isAuthorized) {
+      return res.status(401).json({
+        error: "Unauthorized: A valid Supabase JWT Auth header is required before saving FCM tokens or push subscriptions.",
+      });
+    }
+
     const { userId, userRole, aliases, subscription, fcmToken } = req.body;
 
     // Validate fcmToken: ensure it is a valid non-null, non-undefined string

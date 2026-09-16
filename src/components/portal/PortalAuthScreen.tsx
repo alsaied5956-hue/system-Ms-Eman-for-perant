@@ -7,6 +7,7 @@ import {
 } from "../../utils/portalStorage";
 import { ParentAccount } from "../../types/portal";
 import { PWAInstallButton } from "./PWAInstallButton";
+import { forceUpdateServiceWorker } from "../../services/pushNotificationService";
 import {
   ShieldCheck,
   UserCheck,
@@ -106,6 +107,7 @@ export const PortalAuthScreen: React.FC<PortalAuthScreenProps> = ({
       const res = await authenticatePortalLogin(loginBarcode, loginPassword, students);
       if (res.success && res.role) {
         setSuccessMsg(res.message);
+        forceUpdateServiceWorker().catch(() => {});
         // Instant instantaneous transition
         onLoginSuccess(res.role, res.account, loginBarcode.trim());
       } else {
@@ -149,6 +151,7 @@ export const PortalAuthScreen: React.FC<PortalAuthScreenProps> = ({
 
       if (isSupervisor) {
         setSuccessMsg("تم تسجيل دخول المشرف العام بنجاح!");
+        forceUpdateServiceWorker().catch(() => {});
         onLoginSuccess("admin", undefined, cleanId);
         return;
       }
@@ -157,6 +160,7 @@ export const PortalAuthScreen: React.FC<PortalAuthScreenProps> = ({
       const res = await authenticatePortalLogin(cleanId, cleanPin, students);
       if (res.success && res.role === "admin") {
         setSuccessMsg(res.message);
+        forceUpdateServiceWorker().catch(() => {});
         onLoginSuccess("admin", res.account, cleanId);
       } else {
         setErrorMsg("بيانات دخول المشرف غير صحيحة. يرجى التأكد من رقم الهاتف والرمز السري (PIN).");
@@ -192,6 +196,7 @@ export const PortalAuthScreen: React.FC<PortalAuthScreenProps> = ({
       if (res.success && res.account) {
         setIsAlreadyActiveNotice(false);
         setSuccessMsg(res.message);
+        forceUpdateServiceWorker().catch(() => {});
         // Instant instantaneous transition
         onLoginSuccess("parent", res.account, res.account.studentBarcode);
       } else {

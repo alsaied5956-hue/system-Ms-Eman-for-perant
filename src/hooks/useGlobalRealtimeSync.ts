@@ -21,6 +21,7 @@ import {
   getVibrationPatternForType,
   NotificationType,
 } from "../utils/portalNotifications";
+import { shouldNotifyEvent } from "../utils/notificationTracker";
 
 export type RealtimeTable =
   | "attendance_logs"
@@ -464,16 +465,78 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
     options?.onAnyChange,
   ]);
 
-  // Helper to trigger chime & vibration for received alerts
+  // Background Reconnection & Visibility Change (Item 5):
+  // Force-reconnect the Supabase Realtime socket when the app returns from background
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        console.log("[Realtime Sync] App returned to foreground. Re-establishing Supabase socket connection...");
+        try {
+          supabase.realtime.connect();
+        } catch (connErr) {
+          console.warn("[Realtime Sync] Socket reconnect notice:", connErr);
+        }
+        // Dispatch revalidate event so portals refresh local cache if needed
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("eman_portal_force_revalidate", { detail: { timestamp: Date.now() } }));
+        }
+      }
+    };
+
+    const handleWindowFocus = () => {
+      try {
+        supabase.realtime.connect();
+      } catch {}
+    };
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+    }
+    if (typeof window !== "undefined") {
+      window.addEventListener("focus", handleWindowFocus);
+      window.addEventListener("online", handleWindowFocus);
+    }
+
+    return () => {
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+      }
+      if (typeof window !== "undefined") {
+        window.removeEventListener("focus", handleWindowFocus);
+        window.removeEventListener("online", handleWindowFocus);
+      }
+    };
+  }, []);
+
+  // Helper to trigger chime & vibration for received alerts with deduplication (Item 8) and safe autoplay handling (Item 3)
   const triggerAlertFeedback = useCallback(
     (type: NotificationType, title: string, body: string, eventId?: string) => {
       if (!enableSoundAlerts) return;
+
+      // Notification Deduplication: check if already processed (e.g. by Web Push / FCM / previous CDC)
+      if (eventId && !shouldNotifyEvent({ eventId })) {
+        console.log("[Notification Deduplication] Skipping duplicate alert already handled:", eventId);
+        return;
+      }
+
+      // Safe Audio autoplay attempt with fallback to PWA system push notification
       try {
         const chime = new Audio('/notification.mp3');
         chime.volume = 1.0;
-        chime.play().catch(() => {});
+        const playPromise = chime.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((playErr) => {
+            console.warn("[Realtime Audio] Autoplay policy prevented playback; relying on system push notifications:", playErr?.name || playErr);
+          });
+        }
+      } catch (err) {
+        console.warn("[Realtime Audio] Audio initialization notice:", err);
+      }
+
+      try {
+        playPortalAudioChime(type);
       } catch {}
-      playPortalAudioChime(type);
+
       sendPortalNotification(title, body, type, { eventId }).catch(() => {});
     },
     [enableSoundAlerts]

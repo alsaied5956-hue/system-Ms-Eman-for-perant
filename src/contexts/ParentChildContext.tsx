@@ -221,12 +221,27 @@ export const ParentChildProvider: React.FC<ParentChildProviderProps> = ({
       .filter(Boolean) as Student[];
   }, [linkedBarcodes, childrenMap]);
 
-  // Ultra-Fast 0ms In-Memory Child Switching (Zero duplicate network calls)
+  // Ultra-Fast In-Memory Child Switching with Explicit Channel Cleanup (Item 7)
   const switchChild = useCallback((barcode: string) => {
     const clean = String(barcode).trim();
-    if (!clean) return;
+    if (!clean || clean === activeBarcode) return;
+
+    // Memory Leak Prevention: Explicitly invoke supabase.removeChannel() when switching between siblings/students
+    try {
+      const channels = supabase.getChannels();
+      const prevChannelPrefix = `parent-student-engine-${activeBarcode}`;
+      channels.forEach((ch) => {
+        if (ch.topic.includes(prevChannelPrefix)) {
+          console.log(`[ParentChildContext] Removing stale student channel on child switch: ${ch.topic}`);
+          supabase.removeChannel(ch);
+        }
+      });
+    } catch (chErr) {
+      console.warn("[ParentChildContext] Channel cleanup notice on child switch:", chErr);
+    }
+
     setActiveBarcode(clean);
-  }, []);
+  }, [activeBarcode]);
 
   const updateActiveStudentData = useCallback(
     (updater: (prev: Student) => Student) => {
