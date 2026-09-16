@@ -61,6 +61,8 @@ import {
   saveStudentToSupabase,
   deleteStudentFromSupabase,
   deleteAttendanceFromSupabase,
+  saveExamGradeToSupabase,
+  deleteExamGradeFromSupabase,
 } from "./utils/supabaseClient";
 import { Navbar } from "./components/Navbar";
 import { Sidebar } from "./components/Sidebar";
@@ -1567,6 +1569,16 @@ export default function App() {
     const updatedStudent = updated.find((s) => s.barcode === barcode);
     if (updatedStudent) {
       saveStudentToSupabase(updatedStudent).catch(console.warn);
+      saveExamGradeToSupabase({
+        barcode,
+        studentId: updatedStudent.id,
+        examTitle,
+        score,
+        maxScore,
+        percentage: pct,
+        teacherNotes: `رصد درجة امتحان: ${examTitle} (${scoreFormatted})`,
+        examDate: new Date().toISOString().slice(0, 10),
+      }).catch(console.warn);
     }
 
     // ⚡ Supabase Realtime Hub: Broadcast Grade to all devices
@@ -1631,6 +1643,20 @@ export default function App() {
     const updatedStudent = updated.find((s) => s.barcode === barcode);
     if (updatedStudent) {
       saveStudentToSupabase(updatedStudent).catch(console.warn);
+      const match = String(lastScore).match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/);
+      if (match) {
+        const sc = parseFloat(match[1]);
+        const maxSc = parseFloat(match[2]);
+        saveExamGradeToSupabase({
+          barcode,
+          studentId: updatedStudent.id,
+          examTitle: lastTitle,
+          score: sc,
+          maxScore: maxSc,
+          teacherNotes: `رصد درجة امتحان: ${lastTitle} (${lastScore})`,
+          examDate: new Date().toISOString().slice(0, 10),
+        }).catch(console.warn);
+      }
     }
 
     broadcastGradeChange({
@@ -1665,6 +1691,7 @@ export default function App() {
     if (updatedStudent) {
       saveStudentToSupabase(updatedStudent).catch(console.warn);
     }
+    deleteExamGradeFromSupabase(barcode).catch(console.warn);
 
     broadcastGradeChange({
       action: "delete",

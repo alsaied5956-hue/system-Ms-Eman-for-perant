@@ -888,7 +888,7 @@ export async function saveHomeworkToSupabase(records: Array<{
   }
 }
 
-/** Save exam grade record to Supabase exam_grades table */
+/** Save exam grade record to Supabase (saves to homework table which is reliably present in Supabase, and also attempts exam_grades) */
 export async function saveExamGradeToSupabase(record: {
   barcode: string;
   studentId?: string;
@@ -907,24 +907,43 @@ export async function saveExamGradeToSupabase(record: {
         ? record.percentage
         : Math.round((Number(record.score) / (Number(record.maxScore) || 10)) * 100);
 
-    const payload: any = {
-      barcode: String(record.barcode).trim(),
-      exam_title: record.examTitle || "اختبار دوري",
-      score: Number(record.score) || 0,
-      max_score: Number(record.maxScore) || 10,
-      percentage: pct,
-      teacher_notes: record.teacherNotes || "",
-      exam_date: record.examDate || new Date().toISOString().slice(0, 10),
-    };
+    const examTitle = record.examTitle || "اختبار دوري";
+    const examDate = record.examDate || new Date().toISOString().slice(0, 10);
+    const score = Number(record.score) || 0;
+    const maxScore = Number(record.maxScore) || 10;
+    const scoreFormatted = `${score}/${maxScore} (${pct}%)`;
+    const notes = record.teacherNotes || `رصد درجة امتحان: ${examTitle} (${scoreFormatted})`;
+
+    // 1. Save to homework table which acts as the reliable evaluation store in Supabase
     if (studentId) {
-      payload.student_id = studentId;
+      const hwPayload = {
+        student_id: studentId,
+        date_key: examDate,
+        title: examTitle,
+        status: "done",
+        score: score,
+        max_score: maxScore,
+        notes: notes,
+      };
+      await supabase.from("homework").insert(hwPayload);
     }
 
-    const { error } = await supabase.from("exam_grades").insert(payload);
-    if (error) {
-      // If exam_grades table or column differs in remote instance, warn gracefully
-      console.warn("saveExamGradeToSupabase notice:", error.message);
-    }
+    // 2. Also attempt insert to exam_grades if table exists in environment
+    try {
+      const payload: any = {
+        barcode: String(record.barcode).trim(),
+        exam_title: examTitle,
+        score: score,
+        max_score: maxScore,
+        percentage: pct,
+        teacher_notes: notes,
+        exam_date: examDate,
+      };
+      if (studentId) {
+        payload.student_id = studentId;
+      }
+      await supabase.from("exam_grades").insert(payload);
+    } catch {}
   } catch (err) {
     console.warn("saveExamGradeToSupabase error:", err);
   }
@@ -934,16 +953,26 @@ export async function saveExamGradeToSupabase(record: {
 export async function deleteExamGradeFromSupabase(barcode: string, examTitle?: string): Promise<void> {
   try {
     const studentId = await getStudentIdByBarcode(barcode);
-    let q = supabase.from("exam_grades").delete();
     if (studentId) {
-      q = q.eq("student_id", studentId);
-    } else {
-      q = q.eq("barcode", barcode);
+      let qHw = supabase.from("homework").delete().eq("student_id", studentId);
+      if (examTitle) {
+        qHw = qHw.eq("title", examTitle);
+      }
+      await qHw;
     }
-    if (examTitle) {
-      q = q.eq("exam_title", examTitle);
-    }
-    await q;
+    // Also delete from exam_grades if exists
+    try {
+      let q = supabase.from("exam_grades").delete();
+      if (studentId) {
+        q = q.eq("student_id", studentId);
+      } else {
+        q = q.eq("barcode", barcode);
+      }
+      if (examTitle) {
+        q = q.eq("exam_title", examTitle);
+      }
+      await q;
+    } catch {}
   } catch (err) {
     console.warn("deleteExamGradeFromSupabase error:", err);
   }
@@ -1174,7 +1203,7 @@ export async function pullFullStateFromSupabase(): Promise<Partial<SystemData> |
 
   try {
     // Parallelize snapshot fetch with live tables in a single batch (<300ms) with 3s timeout
-    const [snapshotRes, studentsRes, paymentsRes, attendanceRes] = await executeFastQuery(
+    const [snapshotRes, studentsRes, paymentsRes, attendanceRes, homeworkRes] = await executeFastQuery(
       () =>
         Promise.allSettled([
           supabase
@@ -1190,6 +1219,11 @@ export async function pullFullStateFromSupabase(): Promise<Partial<SystemData> |
             .select("student_id, barcode, date_key, status, time_recorded")
             .order("date_key", { ascending: false })
             .limit(3000),
+          supabase
+            .from("homework")
+            .select("*")
+            .order("date_key", { ascending: false })
+            .limit(2000),
         ]),
       3000,
       "استعلام مزامنة البيانات الشاملة من Supabase"
@@ -1285,6 +1319,53 @@ export async function pullFullStateFromSupabase(): Promise<Partial<SystemData> |
         history[dKey][b] = att.status || "حضور";
       });
       baseState.attendanceHistory = history;
+    }
+
+    // Merge homework and exam records
+    if (homeworkRes.status === "fulfilled" && homeworkRes.value.data && homeworkRes.value.data.length > 0) {
+      const studentExamsMap = new Map<string, any[]>();
+      homeworkRes.value.data.forEach((hw: any) => {
+        const b = hw.barcode ? String(hw.barcode).trim() : (hw.student_id ? studentIdToBarcode.get(hw.student_id) : null);
+        if (!b) return;
+        const rawGrade = hw.grade !== undefined ? hw.grade : (hw.score !== undefined ? hw.score : hw.degree);
+        const hasScore = rawGrade !== null && rawGrade !== undefined && rawGrade !== "";
+        const isExam =
+          hasScore ||
+          (typeof hw.notes === "string" && (hw.notes.includes("امتحان") || hw.notes.includes("اختبار") || hw.notes.includes("تقييم") || hw.notes.includes("درجة") || hw.notes.includes("رصد"))) ||
+          (typeof hw.title === "string" && (hw.title.includes("امتحان") || hw.title.includes("اختبار") || hw.title.includes("تقييم")));
+
+        if (isExam) {
+          if (!studentExamsMap.has(b)) studentExamsMap.set(b, []);
+          studentExamsMap.get(b)!.push(hw);
+        }
+      });
+
+      if (baseState.students && studentExamsMap.size > 0) {
+        baseState.students = baseState.students.map((s: any) => {
+          const b = String(s.barcode || "").trim();
+          const exams = studentExamsMap.get(b);
+          if (exams && exams.length > 0) {
+            const newest = exams[0];
+            const sc = Number(newest.grade ?? newest.score ?? newest.degree) || 0;
+            const maxSc = Number(newest.max_score || newest.maxScore || 10);
+            const pct = Math.min(100, Math.round((sc / maxSc) * 100));
+            const scoreFormatted = `${sc}/${maxSc} (${pct}%)`;
+            const allPcts = exams.map((e: any) => {
+              const eSc = Number(e.grade ?? e.score ?? e.degree) || 0;
+              const eMax = Number(e.max_score || e.maxScore || 10);
+              return Math.min(100, Math.round((eSc / eMax) * 100));
+            }).reverse();
+
+            return {
+              ...s,
+              lastExamTitle: s.lastExamTitle || newest.title || "التقييم الدوري",
+              lastExamScore: s.lastExamScore || scoreFormatted,
+              totalExamScores: (s.totalExamScores && s.totalExamScores.length > 0) ? s.totalExamScores : allPcts,
+            };
+          }
+          return s;
+        });
+      }
     }
 
     return baseState;
@@ -2096,43 +2177,96 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
         String(b.date_key || b.date || b.created_at || "").localeCompare(String(a.date_key || a.date || a.created_at || ""))
       );
 
-    // 4. Parse Exam Grades & Evaluations (Null-Safe with key variations)
+    // 4. Parse Exam Grades & Evaluations (Merges exam_grades table + homework evaluations)
     const rawExamGrades = Array.isArray(studentRow.exam_grades) ? studentRow.exam_grades : [];
-    let examGradesList = rawExamGrades.map((g: any, idx: number) => {
-      const rawGrade = g.grade || g.score || g.degree;
+    const examGradesMap = new Map<string, any>();
+
+    // A. Parse records from dedicated exam_grades table (if present)
+    rawExamGrades.forEach((g: any, idx: number) => {
+      const rawGrade = g.grade !== undefined ? g.grade : (g.score !== undefined ? g.score : g.degree);
       const score = Number(rawGrade) || 0;
       const maxScore = Number(g.max_score || g.maxScore || 10);
       const pct =
         g.percentage !== undefined
           ? Number(g.percentage)
-          : Math.round((score / maxScore) * 100);
+          : Math.min(100, Math.round((score / maxScore) * 100));
       const examTitle = g.subject || g.title || g.name || g.exam_title || g.examTitle || "اختبار دوري";
       const examDate = g.created_at || g.date || g.timestamp || g.exam_date || "";
       const cleanExamDate = typeof examDate === "string" ? (examDate.length >= 10 ? examDate.slice(0, 10) : examDate) : "";
+      const notes = g.teacher_notes || g.notes || "";
+      const key = g.id || `${examTitle}-${cleanExamDate}-${score}`;
 
-      return {
+      examGradesMap.set(key, {
         id: g.id || `exam-${idx}`,
         studentId: g.student_id || studentRow.id,
         barcode: bCode,
         examTitle,
         title: examTitle,
-        subject: g.subject || examTitle,
-        name: g.name || examTitle,
+        subject: g.subject || "الرياضيات",
+        name: examTitle,
         grade: rawGrade,
         score,
         degree: g.degree,
         maxScore,
         max_score: maxScore,
         percentage: pct,
-        teacherNotes: g.teacher_notes || g.notes || "",
-        notes: g.teacher_notes || g.notes || "",
+        teacherNotes: notes,
+        notes,
         examDate: cleanExamDate,
         date: cleanExamDate,
         created_at: g.created_at || cleanExamDate,
         timestamp: g.timestamp,
-        scoreFormatted: `${rawGrade !== undefined ? rawGrade : score} / ${maxScore}`,
-      };
+        scoreFormatted: `${rawGrade !== undefined ? rawGrade : score} / ${maxScore} (${pct}%)`,
+      });
     });
+
+    // B. Parse evaluation and exam records stored in homework table (where scores and evaluations are recorded)
+    rawHomework.forEach((hw: any, idx: number) => {
+      const rawGrade = hw.grade !== undefined ? hw.grade : (hw.score !== undefined ? hw.score : hw.degree);
+      const hasScore = rawGrade !== null && rawGrade !== undefined && rawGrade !== "";
+      const isExam =
+        hasScore ||
+        (typeof hw.notes === "string" && (hw.notes.includes("امتحان") || hw.notes.includes("اختبار") || hw.notes.includes("تقييم") || hw.notes.includes("درجة") || hw.notes.includes("رصد"))) ||
+        (typeof hw.title === "string" && (hw.title.includes("امتحان") || hw.title.includes("اختبار") || hw.title.includes("تقييم")));
+
+      if (isExam) {
+        const score = Number(rawGrade) || 0;
+        const maxScore = Number(hw.max_score || hw.maxScore || 10);
+        const pct = Math.min(100, Math.round((score / maxScore) * 100));
+        const examTitle = hw.title || hw.subject || hw.name || "التقييم الدوري";
+        const examDate = hw.created_at || hw.date || hw.timestamp || hw.date_key || "";
+        const cleanExamDate = typeof examDate === "string" ? (examDate.length >= 10 ? examDate.slice(0, 10) : examDate) : "";
+        const notes = hw.notes || hw.teacher_notes || "";
+        const key = hw.id || `${examTitle}-${cleanExamDate}-${score}`;
+
+        if (!examGradesMap.has(key)) {
+          examGradesMap.set(key, {
+            id: hw.id || `exam-hw-${idx}`,
+            studentId: hw.student_id || studentRow.id,
+            barcode: bCode,
+            examTitle,
+            title: examTitle,
+            subject: hw.subject || "الرياضيات",
+            name: examTitle,
+            grade: rawGrade,
+            score,
+            degree: hw.degree,
+            maxScore,
+            max_score: maxScore,
+            percentage: pct,
+            teacherNotes: notes,
+            notes,
+            examDate: cleanExamDate,
+            date: cleanExamDate,
+            created_at: hw.created_at || cleanExamDate,
+            timestamp: hw.timestamp,
+            scoreFormatted: `${score} / ${maxScore} (${pct}%)`,
+          });
+        }
+      }
+    });
+
+    let examGradesList = Array.from(examGradesMap.values());
 
     // Sort exam grades descending by date/creation
     examGradesList.sort((a: any, b: any) =>
@@ -2171,10 +2305,10 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       }
     }
 
-    // Derive numeric scores list
+    // Derive numeric scores list (percentages for performance indicators)
     const finalScores: number[] =
       examGradesList.length > 0
-        ? examGradesList.map((g) => g.score)
+        ? examGradesList.map((g) => (g.percentage !== undefined ? g.percentage : g.score))
         : parsedScores;
 
     const latestExam = examGradesList[0];

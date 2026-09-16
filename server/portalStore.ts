@@ -612,33 +612,33 @@ export async function getStudentPortalData(query: string): Promise<{
         }
 
         // Concurrently fetch attendance_logs, payments, homework, exam_grades, and parent_accounts
-        // Query using both student_id (UUID) and student_barcode/barcode for 100% data parity
+        // Query using exact Supabase schema columns: student_id on all tables, and barcode where present
         const [attRes, payRes, accRes, examRes, hwRes] = await Promise.allSettled([
           supabaseServer
             .from("attendance_logs")
             .select("*")
-            .or(`student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`)
+            .or(`student_id.eq.${sId},barcode.eq.${bCode}`)
             .order("date_key", { ascending: false })
             .limit(500),
           supabaseServer
             .from("payments")
             .select("*")
-            .or(`student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`)
+            .eq("student_id", sId)
             .order("month_key", { ascending: false })
             .limit(100),
           parentAccountQuery.maybeSingle(),
           supabaseServer
             .from("exam_grades")
             .select("*")
-            .or(`student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`)
+            .or(`student_id.eq.${sId},barcode.eq.${bCode}`)
             .order("created_at", { ascending: false })
             .limit(100),
           supabaseServer
             .from("homework")
             .select("*")
-            .or(`student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`)
+            .eq("student_id", sId)
             .order("date_key", { ascending: false })
-            .limit(100),
+            .limit(200),
         ]);
 
         const studentHistory: Record<string, string> = {};
@@ -710,10 +710,56 @@ export async function getStudentPortalData(query: string): Promise<{
           });
         }
 
-        // Parse homework list
+        // Parse homework list and extract any exam evaluations
         const homeworkList: any[] = [];
         if (hwRes.status === "fulfilled" && hwRes.value.data) {
           hwRes.value.data.forEach((h: any, idx: number) => {
+            const rawGrade = h.grade !== undefined ? h.grade : (h.score !== undefined ? h.score : h.degree);
+            const hasScore = rawGrade !== null && rawGrade !== undefined && rawGrade !== "";
+            const isExam =
+              hasScore ||
+              (typeof h.notes === "string" && (h.notes.includes("امتحان") || h.notes.includes("اختبار") || h.notes.includes("تقييم") || h.notes.includes("درجة") || h.notes.includes("رصد"))) ||
+              (typeof h.title === "string" && (h.title.includes("امتحان") || h.title.includes("اختبار") || h.title.includes("تقييم")));
+
+            if (isExam) {
+              const sc = Number(rawGrade) || 0;
+              const maxSc = Number(h.max_score !== undefined && h.max_score !== null ? h.max_score : (h.maxScore !== undefined && h.maxScore !== null ? h.maxScore : 10)) || 10;
+              const pct = Math.min(100, Math.round((sc / maxSc) * 100));
+              const title = h.title || h.subject || "التقييم الدوري";
+              const date = h.date_key || h.date || (h.created_at ? String(h.created_at).slice(0, 10) : "");
+              const notes = h.notes || "";
+
+              const alreadyExists = examGradesList.some((e) => e.id === h.id || (e.examTitle === title && e.date === date && e.score === sc));
+              if (!alreadyExists) {
+                examGradesList.push({
+                  id: h.id || `exam-hw-${idx}`,
+                  studentId: h.student_id || sId,
+                  student_id: h.student_id || sId,
+                  barcode: bCode,
+                  student_barcode: bCode,
+                  studentBarcode: bCode,
+                  grade: rawGrade,
+                  score: sc,
+                  maxScore: maxSc,
+                  max_score: maxSc,
+                  subject: h.subject || "الرياضيات",
+                  date,
+                  examDate: date,
+                  exam_date: date,
+                  examTitle: title,
+                  exam_title: title,
+                  title,
+                  percentage: pct,
+                  teacherNotes: notes,
+                  teacher_notes: notes,
+                  notes,
+                  createdAt: h.created_at || new Date().toISOString(),
+                  scoreFormatted: `${sc} / ${maxSc} (${pct}%)`,
+                  score_formatted: `${sc} / ${maxSc} (${pct}%)`,
+                });
+              }
+            }
+
             homeworkList.push({
               id: h.id || `hw-${idx}`,
               studentId: h.student_id || sId,
@@ -735,6 +781,11 @@ export async function getStudentPortalData(query: string): Promise<{
           });
         }
 
+        // Sort exam grades descending by date
+        examGradesList.sort((a, b) =>
+          String(b.examDate || b.date || b.createdAt || "").localeCompare(String(a.examDate || a.date || a.createdAt || ""))
+        );
+
         // Merge live today status from memory cache if scanned recently
         const todayAttendance =
           systemDataCache.attendanceToday[bCode] ||
@@ -746,13 +797,19 @@ export async function getStudentPortalData(query: string): Promise<{
 
         // Parse exam scores
         let parsedScores: number[] = [];
-        if (Array.isArray(studentRow.total_exam_scores)) {
+        if (examGradesList.length > 0) {
+          parsedScores = examGradesList.map((g) => g.percentage);
+        } else if (Array.isArray(studentRow.total_exam_scores)) {
           parsedScores = studentRow.total_exam_scores;
         } else if (typeof studentRow.total_exam_scores === "string") {
           try {
             parsedScores = JSON.parse(studentRow.total_exam_scores);
           } catch {}
         }
+
+        const latestExamRecord = examGradesList[0];
+        const lastTitle = latestExamRecord?.examTitle || studentRow.last_exam_title || "";
+        const lastScore = latestExamRecord?.scoreFormatted || studentRow.last_exam_score || "";
 
         const student: StudentRecord = {
           id: studentRow.id,
@@ -772,8 +829,8 @@ export async function getStudentPortalData(query: string): Promise<{
               ? Number(studentRow.total_absent_days)
               : Object.values(studentHistory).filter((s) => s === "غائب").length,
           totalExamScores: parsedScores,
-          lastExamTitle: studentRow.last_exam_title || "",
-          lastExamScore: studentRow.last_exam_score || "",
+          lastExamTitle: lastTitle,
+          lastExamScore: lastScore,
           createdAt: studentRow.created_at,
           notes: studentRow.notes || "",
         };

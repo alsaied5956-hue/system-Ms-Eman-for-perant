@@ -1537,16 +1537,28 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     }[] = [];
     if (!activeStudent) return list;
 
-    // 1. If supabasePortalData has rich examGradesList, prioritize it
-    if (supabasePortalData?.examGradesList && supabasePortalData.examGradesList.length > 0) {
-      supabasePortalData.examGradesList.forEach((g: any, idx: number) => {
+    // 1. If supabasePortalData has rich examGradesList or exam-like homework, prioritize it
+    const rawExamItems = (supabasePortalData?.examGradesList && supabasePortalData.examGradesList.length > 0)
+      ? supabasePortalData.examGradesList
+      : (supabasePortalData?.homeworkList || []).filter((h: any) => {
+          const rawGrade = h.grade !== undefined ? h.grade : (h.score !== undefined ? h.score : h.degree);
+          const hasScore = rawGrade !== null && rawGrade !== undefined && rawGrade !== "";
+          return (
+            hasScore ||
+            (typeof h.notes === "string" && (h.notes.includes("امتحان") || h.notes.includes("اختبار") || h.notes.includes("تقييم"))) ||
+            (typeof h.title === "string" && (h.title.includes("امتحان") || h.title.includes("اختبار") || h.title.includes("تقييم")))
+          );
+        });
+
+    if (rawExamItems.length > 0) {
+      rawExamItems.forEach((g: any, idx: number) => {
         const rawGrade = g.grade !== undefined ? g.grade : g.score !== undefined ? g.score : g.degree;
         const numScore = Number(rawGrade) || 0;
         const maxScore = Number(g.maxScore || g.max_score || 10);
-        const examTitle = g.subject || g.title || g.name || g.examTitle || "اختبار دوري";
-        const examDate = g.created_at || g.date || g.timestamp || g.examDate || "";
+        const examTitle = g.examTitle || g.title || g.subject || g.name || "اختبار دوري";
+        const examDate = g.created_at || g.date || g.timestamp || g.examDate || g.dateKey || g.date_key || "";
         const cleanExamDate = typeof examDate === "string" ? (examDate.length >= 10 ? examDate.slice(0, 10) : examDate) : undefined;
-        const pct = g.percentage !== undefined ? g.percentage : Math.round((numScore / maxScore) * 100);
+        const pct = g.percentage !== undefined ? g.percentage : Math.min(100, Math.round((numScore / maxScore) * 100));
 
         list.push({
           id: g.id || `grade-${idx}`,
@@ -1556,7 +1568,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
           grade: rawGrade,
           score: numScore,
           degree: g.degree,
-          scoreStr: g.scoreFormatted || `${rawGrade !== undefined ? rawGrade : numScore} / ${maxScore}`,
+          scoreStr: g.scoreFormatted || `${rawGrade !== undefined ? rawGrade : numScore} / ${maxScore} (${pct}%)`,
           pct,
           isLatest: idx === 0,
           date: cleanExamDate,
@@ -1600,7 +1612,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     }
 
     return list;
-  }, [activeStudent, supabasePortalData?.examGradesList]);
+  }, [activeStudent, supabasePortalData?.examGradesList, supabasePortalData?.homeworkList]);
 
   // 6. Handle Linking another child
   const handleLinkChildSubmit = async (e: React.FormEvent) => {
