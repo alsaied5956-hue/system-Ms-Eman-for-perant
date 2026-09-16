@@ -97,9 +97,6 @@ import { broadcastStudentLiveEvent } from "./utils/studentLiveSync";
 import { useGlobalRealtimeSync } from "./hooks/useGlobalRealtimeSync";
 
 export default function App() {
-  // Dedicated Realtime CDC Handler for cross-device parent accounts synchronization
-  useGlobalRealtimeSync();
-
   const [appViewMode, setAppViewMode] = useState<"portal" | "teacher">(() => {
     if (typeof window !== "undefined") {
       const search = window.location.search.toLowerCase();
@@ -223,6 +220,139 @@ export default function App() {
   const [isCloudHydrating, setIsCloudHydrating] = useState<boolean>(true);
   const [isCloudHydrated, setIsCloudHydrated] = useState<boolean>(false);
   const isCloudHydratedRef = useRef<boolean>(false);
+
+  // Dedicated Realtime CDC Handler for cross-platform zero-refresh synchronization
+  useGlobalRealtimeSync({
+    mode: "admin",
+    onStudentChange: (change) => {
+      const newRow = change.new;
+      if (!newRow) return;
+      setStudents((prev) => {
+        const bCode = String(newRow.barcode || "").trim();
+        const sId = String(newRow.id || "").trim();
+        const idx = prev.findIndex((s) => (bCode && s.barcode === bCode) || (sId && s.id === sId));
+        if (idx >= 0) {
+          const updated = [...prev];
+          updated[idx] = {
+            ...updated[idx],
+            ...newRow,
+            groupGrade: newRow.grade || updated[idx].groupGrade,
+            groupDays: newRow.group_days || updated[idx].groupDays,
+            parentPhone: newRow.parent_phone || updated[idx].parentPhone,
+            lastExamScore: newRow.last_exam_score || updated[idx].lastExamScore,
+            lastExamTitle: newRow.last_exam_title || updated[idx].lastExamTitle,
+          };
+          return updated;
+        }
+        return [
+          ...prev,
+          {
+            id: sId,
+            barcode: bCode,
+            name: newRow.name || "",
+            phone: newRow.phone || "",
+            parentPhone: newRow.parent_phone || "",
+            groupGrade: newRow.grade || "الصف الرابع الابتدائي",
+            groupDays: newRow.group_days || "سبت - إثنين - أربعاء",
+            points: newRow.points || 0,
+            totalAttendanceDays: newRow.total_attendance_days || 0,
+            totalAbsentDays: newRow.total_absent_days || 0,
+            totalExamScores: [],
+            lastExamTitle: newRow.last_exam_title || "",
+            lastExamScore: newRow.last_exam_score || "",
+            createdAt: newRow.created_at || new Date().toISOString(),
+          },
+        ];
+      });
+    },
+    onAttendanceChange: (change) => {
+      const newRow = change.new;
+      const oldRow = change.old;
+      const bCode = String(newRow?.student_barcode || newRow?.barcode || oldRow?.student_barcode || oldRow?.barcode || "").trim();
+      const dateKey = String(newRow?.date_key || oldRow?.date_key || "").trim();
+      if (!bCode || !dateKey) return;
+
+      if (change.eventType === "DELETE") {
+        setAttendanceHistory((prev) => {
+          if (!prev[bCode]) return prev;
+          const copy = { ...prev[bCode] };
+          delete copy[dateKey];
+          return { ...prev, [bCode]: copy };
+        });
+      } else if (newRow) {
+        const status = newRow.status || "حضور";
+        setAttendanceHistory((prev) => ({
+          ...prev,
+          [bCode]: {
+            ...(prev[bCode] || {}),
+            [dateKey]: status,
+          },
+        }));
+        const todayKey = new Date().toISOString().slice(0, 10);
+        if (dateKey === todayKey) {
+          setAttendanceToday((prev) => ({
+            ...prev,
+            [bCode]: status,
+          }));
+        }
+      }
+    },
+    onPaymentChange: (change) => {
+      const newRow = change.new;
+      const oldRow = change.old;
+      const bCode = String(newRow?.student_barcode || newRow?.barcode || oldRow?.student_barcode || oldRow?.barcode || "").trim();
+      const mKey = String(newRow?.month_key || oldRow?.month_key || "").trim();
+      if (!bCode || !mKey) return;
+
+      if (change.eventType === "DELETE") {
+        setPayments((prev) => {
+          if (!prev[bCode]) return prev;
+          const copy = { ...prev[bCode] };
+          delete copy[mKey];
+          return { ...prev, [bCode]: copy };
+        });
+      } else if (newRow) {
+        const paymentRecord: PaymentRecord = {
+          barcode: bCode,
+          monthKey: mKey,
+          amount: Number(newRow.amount_paid || newRow.amount || 0),
+          paidAmount: Number(newRow.amount_paid || newRow.amount || 0),
+          requiredAmount: Number(newRow.required_amount || 0),
+          date: newRow.payment_date || new Date().toISOString(),
+          month: mKey,
+          notes: newRow.notes || "",
+        };
+        setPayments((prev) => ({
+          ...prev,
+          [bCode]: {
+            ...(prev[bCode] || {}),
+            [mKey]: paymentRecord,
+          },
+        }));
+      }
+    },
+    onGradeChange: (change) => {
+      const newRow = change.new;
+      if (!newRow) return;
+      const bCode = String(newRow.student_barcode || newRow.barcode || "").trim();
+      const sId = String(newRow.student_id || "").trim();
+      const score = Number(newRow.score) || 0;
+      const maxScore = Number(newRow.max_score) || 10;
+      const title = newRow.exam_title || newRow.title || "اختبار";
+      setStudents((prev) => {
+        return prev.map((s) => {
+          if ((bCode && s.barcode === bCode) || (sId && s.id === sId)) {
+            return {
+              ...s,
+              lastExamTitle: title,
+              lastExamScore: `${score} / ${maxScore}`,
+            };
+          }
+          return s;
+        });
+      });
+    },
+  });
 
   // Print PDF Modal State
   const [printModal, setPrintModal] = useState<{

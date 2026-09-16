@@ -41,6 +41,8 @@ export interface RealtimeTableChange<T = any> {
 }
 
 export interface UseGlobalRealtimeSyncOptions {
+  /** Operational mode: "admin" for whole-school synchronization, "parent" for child-scoped listening */
+  mode?: "admin" | "parent" | "global";
   /** Target student barcode (if omitted, auto-detected from logged-in parent session) */
   studentBarcode?: string;
   /** Target student ID / UUID (if known) */
@@ -474,13 +476,16 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
 
   // ─── Persistent Supabase Realtime Subscription for Student Tables ───
   useEffect(() => {
-    if (!activeBarcode) return;
+    const isGlobalAdmin = options?.mode === "admin" || (!activeBarcode && options?.mode !== "parent");
+    if (!isGlobalAdmin && !activeBarcode) return;
 
-    const cleanBarcode = normalizeBarcode(activeBarcode);
+    const cleanBarcode = normalizeBarcode(activeBarcode || "");
     const cleanStudentId = activeStudentId;
     const linkedList = options?.linkedBarcodes || [];
 
-    const channelTopic = `parent-student-engine-${cleanBarcode}`;
+    const channelTopic = isGlobalAdmin
+      ? "admin-global-realtime-engine"
+      : `parent-student-engine-${cleanBarcode}`;
 
     // Clean up any stale channel with this topic first
     try {
@@ -508,7 +513,11 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           const oldRow = payload?.old;
           const targetRow = newRow || oldRow;
 
-          if (!isRowForStudent(targetRow, cleanBarcode, cleanStudentId, linkedList)) return;
+          if (!isGlobalAdmin && !isRowForStudent(targetRow, cleanBarcode, cleanStudentId, linkedList)) return;
+
+          const rowBarcode = normalizeBarcode(
+            String(targetRow?.student_barcode || targetRow?.barcode || cleanBarcode)
+          );
 
           const change: RealtimeTableChange = {
             table: "attendance_logs",
@@ -518,7 +527,9 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           };
 
           if (payload.eventType === "DELETE") {
-            deleteSessionPortalAttendance(cleanBarcode, oldRow?.id || oldRow?.date_key);
+            if (!isGlobalAdmin) {
+              deleteSessionPortalAttendance(rowBarcode, oldRow?.id || oldRow?.date_key);
+            }
             if (typeof window !== "undefined") {
               window.dispatchEvent(
                 new CustomEvent("eman_realtime_data_update", { detail: change })
@@ -526,29 +537,31 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
             }
           } else if (newRow && newRow.date_key) {
             const status = String(newRow.status || "حضور").trim();
-            updateSessionPortalAttendance(cleanBarcode, newRow.date_key, status);
+            if (!isGlobalAdmin) {
+              updateSessionPortalAttendance(rowBarcode, newRow.date_key, status);
 
-            // Determine alert type & sound
-            let alertType: NotificationType = "attendance";
-            let alertTitle = "تسجيل حضور الطالب";
-            let alertBody = `تم تسجيل حضور الطالب بتاريخ ${newRow.date_key}`;
+              // Determine alert type & sound
+              let alertType: NotificationType = "attendance";
+              let alertTitle = "تسجيل حضور الطالب";
+              let alertBody = `تم تسجيل حضور الطالب بتاريخ ${newRow.date_key}`;
 
-            if (status === "غياب" || status === "غائب") {
-              alertType = "absence";
-              alertTitle = "تنبيه غياب الطالب";
-              alertBody = `تم تسجيل غياب الطالب اليوم (${newRow.date_key}) في المنظومة`;
-            } else if (status === "تأخير") {
-              alertType = "delay";
-              alertTitle = "تنبيه تأخير الطالب";
-              alertBody = `تم تسجيل تأخير الطالب في حصة اليوم (${newRow.date_key})`;
+              if (status === "غياب" || status === "غائب") {
+                alertType = "absence";
+                alertTitle = "تنبيه غياب الطالب";
+                alertBody = `تم تسجيل غياب الطالب اليوم (${newRow.date_key}) في المنظومة`;
+              } else if (status === "تأخير") {
+                alertType = "delay";
+                alertTitle = "تنبيه تأخير الطالب";
+                alertBody = `تم تسجيل تأخير الطالب في حصة اليوم (${newRow.date_key})`;
+              }
+
+              triggerAlertFeedback(alertType, alertTitle, alertBody, `att-${newRow.id || newRow.date_key}`);
             }
-
-            triggerAlertFeedback(alertType, alertTitle, alertBody, `att-${newRow.id || newRow.date_key}`);
 
             if (typeof window !== "undefined") {
               window.dispatchEvent(
                 new CustomEvent("eman_attendance_sync", {
-                  detail: { ...newRow, barcode: cleanBarcode },
+                  detail: { ...newRow, barcode: rowBarcode },
                 })
               );
               window.dispatchEvent(
@@ -576,7 +589,11 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           const oldRow = payload?.old;
           const targetRow = newRow || oldRow;
 
-          if (!isRowForStudent(targetRow, cleanBarcode, cleanStudentId, linkedList)) return;
+          if (!isGlobalAdmin && !isRowForStudent(targetRow, cleanBarcode, cleanStudentId, linkedList)) return;
+
+          const rowBarcode = normalizeBarcode(
+            String(targetRow?.student_barcode || targetRow?.barcode || cleanBarcode)
+          );
 
           const change: RealtimeTableChange = {
             table: "homework",
@@ -586,26 +603,30 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           };
 
           if (payload.eventType === "DELETE") {
-            deleteSessionPortalHomework(cleanBarcode, oldRow?.id || oldRow?.date_key);
+            if (!isGlobalAdmin) {
+              deleteSessionPortalHomework(rowBarcode, oldRow?.id || oldRow?.date_key);
+            }
             if (typeof window !== "undefined") {
               window.dispatchEvent(
                 new CustomEvent("eman_realtime_data_update", { detail: change })
               );
             }
           } else if (newRow) {
-            updateSessionPortalHomework(cleanBarcode, newRow);
-            const title = newRow.title || "الواجب المدرسي";
-            triggerAlertFeedback(
-              "homework",
-              "متابعة الواجب المدرسي",
-              `تم تحديث سجل الواجب: ${title} (${newRow.status || "مكتمل"})`,
-              `hw-${newRow.id || newRow.date_key}`
-            );
+            if (!isGlobalAdmin) {
+              updateSessionPortalHomework(rowBarcode, newRow);
+              const title = newRow.title || "الواجب المدرسي";
+              triggerAlertFeedback(
+                "homework",
+                "متابعة الواجب المدرسي",
+                `تم تحديث سجل الواجب: ${title} (${newRow.status || "مكتمل"})`,
+                `hw-${newRow.id || newRow.date_key}`
+              );
+            }
 
             if (typeof window !== "undefined") {
               window.dispatchEvent(
                 new CustomEvent("eman_homework_sync", {
-                  detail: { ...newRow, barcode: cleanBarcode },
+                  detail: { ...newRow, barcode: rowBarcode },
                 })
               );
               window.dispatchEvent(
@@ -633,7 +654,11 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           const oldRow = payload?.old;
           const targetRow = newRow || oldRow;
 
-          if (!isRowForStudent(targetRow, cleanBarcode, cleanStudentId, linkedList)) return;
+          if (!isGlobalAdmin && !isRowForStudent(targetRow, cleanBarcode, cleanStudentId, linkedList)) return;
+
+          const rowBarcode = normalizeBarcode(
+            String(targetRow?.student_barcode || targetRow?.barcode || cleanBarcode)
+          );
 
           const change: RealtimeTableChange = {
             table: "payments",
@@ -643,7 +668,9 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           };
 
           if (payload.eventType === "DELETE") {
-            deleteSessionPortalPayment(cleanBarcode, oldRow?.id || oldRow?.month_key);
+            if (!isGlobalAdmin) {
+              deleteSessionPortalPayment(rowBarcode, oldRow?.id || oldRow?.month_key);
+            }
             if (typeof window !== "undefined") {
               window.dispatchEvent(
                 new CustomEvent("eman_realtime_data_update", { detail: change })
@@ -652,7 +679,7 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           } else if (newRow && (newRow.month_key || newRow.monthKey)) {
             const mKey = newRow.month_key || newRow.monthKey;
             const paymentRecord = {
-              barcode: cleanBarcode,
+              barcode: rowBarcode,
               monthKey: mKey,
               amount: Number(newRow.amount_paid || newRow.amount || 0),
               paidAmount: Number(newRow.amount_paid || newRow.amount || 0),
@@ -662,18 +689,20 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
               notes: newRow.notes || "",
             };
 
-            updateSessionPortalPayment(cleanBarcode, mKey, paymentRecord);
-            triggerAlertFeedback(
-              "fee",
-              "إيصال سداد مصروفات جديد",
-              `تم تسجيل دفعة مصروفات بقيمة ${paymentRecord.paidAmount} ج.م لشهر (${mKey})`,
-              `pay-${newRow.id || mKey}`
-            );
+            if (!isGlobalAdmin) {
+              updateSessionPortalPayment(rowBarcode, mKey, paymentRecord);
+              triggerAlertFeedback(
+                "fee",
+                "إيصال سداد مصروفات جديد",
+                `تم تسجيل دفعة مصروفات بقيمة ${paymentRecord.paidAmount} ج.م لشهر (${mKey})`,
+                `pay-${newRow.id || mKey}`
+              );
+            }
 
             if (typeof window !== "undefined") {
               window.dispatchEvent(
                 new CustomEvent("eman_payment_sync", {
-                  detail: { paymentRecord, barcode: cleanBarcode },
+                  detail: { paymentRecord, barcode: rowBarcode },
                 })
               );
               window.dispatchEvent(
@@ -701,7 +730,11 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           const oldRow = payload?.old;
           const targetRow = newRow || oldRow;
 
-          if (!isRowForStudent(targetRow, cleanBarcode, cleanStudentId, linkedList)) return;
+          if (!isGlobalAdmin && !isRowForStudent(targetRow, cleanBarcode, cleanStudentId, linkedList)) return;
+
+          const rowBarcode = normalizeBarcode(
+            String(targetRow?.barcode || cleanBarcode)
+          );
 
           const change: RealtimeTableChange = {
             table: "students",
@@ -711,43 +744,39 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           };
 
           if (newRow) {
-            updateSessionPortalStudent(cleanBarcode, (prev: any) => ({
-              ...(prev || {}),
-              ...newRow,
-              barcode: cleanBarcode,
-            }));
+            if (!isGlobalAdmin) {
+              updateSessionPortalStudent(rowBarcode, (prev: any) => ({
+                ...(prev || {}),
+                ...newRow,
+                barcode: rowBarcode,
+              }));
 
-            // Differentiate between exam grades and data edits
-            const isGradeUpdate =
-              newRow.last_exam_score !== undefined &&
-              (!oldRow || newRow.last_exam_score !== oldRow.last_exam_score);
+              // Differentiate between exam grades and data edits
+              const isGradeUpdate =
+                newRow.last_exam_score !== undefined &&
+                (!oldRow || newRow.last_exam_score !== oldRow.last_exam_score);
 
-            if (isGradeUpdate) {
-              triggerAlertFeedback(
-                "grade",
-                "رصد درجات امتحان جديدة",
-                `حصل الطالب على درجة ${newRow.last_exam_score} في ${newRow.last_exam_title || "الامتحان"}`,
-                `grade-${newRow.id || Date.now()}`
-              );
-              onGradeRef.current?.({
-                table: "students",
-                eventType: "UPDATE",
-                new: newRow,
-                old: oldRow,
-              });
-            } else {
-              triggerAlertFeedback(
-                "edit",
-                "تحديث بيانات الطالب",
-                `تم تحديث بيانات الطالب ${newRow.name || ""} في المنظومة`,
-                `student-${newRow.id || Date.now()}`
-              );
+              if (isGradeUpdate) {
+                triggerAlertFeedback(
+                  "grade",
+                  "رصد درجات امتحان جديدة",
+                  `حصل الطالب على درجة ${newRow.last_exam_score} في ${newRow.last_exam_title || "الامتحان"}`,
+                  `grade-${newRow.id || Date.now()}`
+                );
+              } else {
+                triggerAlertFeedback(
+                  "edit",
+                  "تحديث بيانات الطالب",
+                  `تم تحديث بيانات الطالب ${newRow.name || ""} في المنظومة`,
+                  `student-${newRow.id || Date.now()}`
+                );
+              }
             }
 
             if (typeof window !== "undefined") {
               window.dispatchEvent(
                 new CustomEvent("eman_student_sync", {
-                  detail: { student: newRow, barcode: cleanBarcode },
+                  detail: { student: newRow, barcode: rowBarcode },
                 })
               );
               window.dispatchEvent(
@@ -775,7 +804,11 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           const oldRow = payload?.old;
           const targetRow = newRow || oldRow;
 
-          if (!isRowForStudent(targetRow, cleanBarcode, cleanStudentId, linkedList)) return;
+          if (!isGlobalAdmin && !isRowForStudent(targetRow, cleanBarcode, cleanStudentId, linkedList)) return;
+
+          const rowBarcode = normalizeBarcode(
+            String(targetRow?.student_barcode || targetRow?.barcode || cleanBarcode)
+          );
 
           const change: RealtimeTableChange = {
             table: "exam_grades",
@@ -785,27 +818,31 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           };
 
           if (payload.eventType === "DELETE") {
-            deleteSessionPortalExamGrade(cleanBarcode, oldRow?.id || oldRow?.exam_title);
+            if (!isGlobalAdmin) {
+              deleteSessionPortalExamGrade(rowBarcode, oldRow?.id || oldRow?.exam_title);
+            }
             if (typeof window !== "undefined") {
               window.dispatchEvent(
                 new CustomEvent("eman_realtime_data_update", { detail: change })
               );
             }
           } else if (newRow) {
-            updateSessionPortalExamGrade(cleanBarcode, newRow);
-            const title = newRow.exam_title || newRow.title || "اختبار جديد";
-            const scoreStr = `${newRow.score || 0} / ${newRow.max_score || 10}`;
-            triggerAlertFeedback(
-              "grade",
-              "رصد درجات امتحان جديدة",
-              `حصل الطالب على درجة ${scoreStr} في ${title}`,
-              `grade-${newRow.id || Date.now()}`
-            );
+            if (!isGlobalAdmin) {
+              updateSessionPortalExamGrade(rowBarcode, newRow);
+              const title = newRow.exam_title || newRow.title || "اختبار جديد";
+              const scoreStr = `${newRow.score || 0} / ${newRow.max_score || 10}`;
+              triggerAlertFeedback(
+                "grade",
+                "رصد درجات امتحان جديدة",
+                `حصل الطالب على درجة ${scoreStr} في ${title}`,
+                `grade-${newRow.id || Date.now()}`
+              );
+            }
 
             if (typeof window !== "undefined") {
               window.dispatchEvent(
                 new CustomEvent("eman_grade_sync", {
-                  detail: { ...newRow, barcode: cleanBarcode },
+                  detail: { ...newRow, barcode: rowBarcode },
                 })
               );
               window.dispatchEvent(
@@ -833,7 +870,11 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           const oldRow = payload?.old;
           const targetRow = newRow || oldRow;
 
-          if (!isRowForStudent(targetRow, cleanBarcode, cleanStudentId, linkedList)) return;
+          if (!isGlobalAdmin && !isRowForStudent(targetRow, cleanBarcode, cleanStudentId, linkedList)) return;
+
+          const rowBarcode = normalizeBarcode(
+            String(targetRow?.student_barcode || targetRow?.barcode || cleanBarcode)
+          );
 
           const change: RealtimeTableChange = {
             table: "evaluations",
@@ -843,9 +884,26 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           };
 
           if (payload.eventType === "DELETE") {
-            deleteSessionPortalExamGrade(cleanBarcode, oldRow?.id || oldRow?.exam_title);
+            if (!isGlobalAdmin) {
+              deleteSessionPortalExamGrade(rowBarcode, oldRow?.id || oldRow?.exam_title);
+            }
           } else if (newRow) {
-            updateSessionPortalExamGrade(cleanBarcode, newRow);
+            if (!isGlobalAdmin) {
+              updateSessionPortalExamGrade(rowBarcode, newRow);
+            }
+          }
+
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("eman_grade_sync", {
+                detail: { ...newRow, barcode: rowBarcode },
+              })
+            );
+            window.dispatchEvent(
+              new CustomEvent("eman_realtime_data_update", {
+                detail: change,
+              })
+            );
           }
 
           onGradeRef.current?.(change);
@@ -865,7 +923,11 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           const oldRow = payload?.old;
           const targetRow = newRow || oldRow;
 
-          if (!isRowForStudent(targetRow, cleanBarcode, cleanStudentId, linkedList)) return;
+          if (!isGlobalAdmin && !isRowForStudent(targetRow, cleanBarcode, cleanStudentId, linkedList)) return;
+
+          const rowBarcode = normalizeBarcode(
+            String(targetRow?.student_barcode || targetRow?.barcode || cleanBarcode)
+          );
 
           const change: RealtimeTableChange = {
             table: "chat_messages",
@@ -875,27 +937,29 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           };
 
           if (newRow) {
-            updateSessionPortalMessage(cleanBarcode, newRow);
-            const isFromSupervisor =
-              newRow.sender === "admin" ||
-              newRow.sender_role === "supervisor" ||
-              newRow.sender_role === "admin" ||
-              newRow.sender_role === "assistant" ||
-              (newRow.sender && newRow.sender !== "parent");
+            if (!isGlobalAdmin) {
+              updateSessionPortalMessage(rowBarcode, newRow);
+              const isFromSupervisor =
+                newRow.sender === "admin" ||
+                newRow.sender_role === "supervisor" ||
+                newRow.sender_role === "admin" ||
+                newRow.sender_role === "assistant" ||
+                (newRow.sender && newRow.sender !== "parent");
 
-            if (isFromSupervisor && payload.eventType === "INSERT") {
-              triggerAlertFeedback(
-                "chat",
-                "رسالة جديدة من إدارة المنظومة",
-                newRow.message || newRow.text || "رسالة واردة جديدة بخصوص الطالب",
-                `msg-${newRow.id || Date.now()}`
-              );
+              if (isFromSupervisor && payload.eventType === "INSERT") {
+                triggerAlertFeedback(
+                  "chat",
+                  "رسالة جديدة من إدارة المنظومة",
+                  newRow.message || newRow.text || "رسالة واردة جديدة بخصوص الطالب",
+                  `msg-${newRow.id || Date.now()}`
+                );
+              }
             }
 
             if (typeof window !== "undefined") {
               window.dispatchEvent(
                 new CustomEvent("eman_message_sync", {
-                  detail: { message: newRow, barcode: cleanBarcode },
+                  detail: { message: newRow, barcode: rowBarcode },
                 })
               );
               window.dispatchEvent(
@@ -923,7 +987,11 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           const oldRow = payload?.old;
           const targetRow = newRow || oldRow;
 
-          if (!isRowForStudent(targetRow, cleanBarcode, cleanStudentId, linkedList)) return;
+          if (!isGlobalAdmin && !isRowForStudent(targetRow, cleanBarcode, cleanStudentId, linkedList)) return;
+
+          const rowBarcode = normalizeBarcode(
+            String(targetRow?.student_barcode || targetRow?.barcode || cleanBarcode)
+          );
 
           const change: RealtimeTableChange = {
             table: "messages",
@@ -933,27 +1001,29 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
           };
 
           if (newRow) {
-            updateSessionPortalMessage(cleanBarcode, newRow);
-            const isFromSupervisor =
-              newRow.sender === "admin" ||
-              newRow.sender_role === "supervisor" ||
-              newRow.sender_role === "admin" ||
-              newRow.sender_role === "assistant" ||
-              (newRow.sender && newRow.sender !== "parent");
+            if (!isGlobalAdmin) {
+              updateSessionPortalMessage(rowBarcode, newRow);
+              const isFromSupervisor =
+                newRow.sender === "admin" ||
+                newRow.sender_role === "supervisor" ||
+                newRow.sender_role === "admin" ||
+                newRow.sender_role === "assistant" ||
+                (newRow.sender && newRow.sender !== "parent");
 
-            if (isFromSupervisor && payload.eventType === "INSERT") {
-              triggerAlertFeedback(
-                "chat",
-                "رسالة جديدة من إدارة المنظومة",
-                newRow.message || newRow.text || "رسالة واردة جديدة بخصوص الطالب",
-                `msg-${newRow.id || Date.now()}`
-              );
+              if (isFromSupervisor && payload.eventType === "INSERT") {
+                triggerAlertFeedback(
+                  "chat",
+                  "رسالة جديدة من إدارة المنظومة",
+                  newRow.message || newRow.text || "رسالة واردة جديدة بخصوص الطالب",
+                  `msg-${newRow.id || Date.now()}`
+                );
+              }
             }
 
             if (typeof window !== "undefined") {
               window.dispatchEvent(
                 new CustomEvent("eman_message_sync", {
-                  detail: { message: newRow, barcode: cleanBarcode },
+                  detail: { message: newRow, barcode: rowBarcode },
                 })
               );
               window.dispatchEvent(
@@ -979,11 +1049,11 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
       try {
         supabase.removeChannel(channel);
       } catch (e) {
-        console.warn("[parent-student-engine] Channel cleanup notice:", e);
+        console.warn("[realtime-engine] Channel cleanup notice:", e);
       }
       setIsConnected(false);
     };
-  }, [activeBarcode, activeStudentId, options?.linkedBarcodes, triggerAlertFeedback]);
+  }, [activeBarcode, activeStudentId, options?.mode, options?.linkedBarcodes, triggerAlertFeedback]);
 
   // ─── Backward-Compatible Account Sync Functionality ───
   const [internalAccounts, setInternalAccounts] = useState<ParentAccount[]>(() => {

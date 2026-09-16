@@ -54,13 +54,46 @@ export interface Student {
 
 export type AttendanceStatus = "حضور" | "تأخير" | "غائب" | "إذن";
 
+export interface ExamGradeRecord {
+  id?: string;
+  studentId?: string;
+  student_id?: string;
+  barcode: string;
+  studentBarcode?: string;
+  student_barcode?: string;
+  examTitle: string;
+  exam_title?: string;
+  title?: string;
+  grade?: string;
+  score: number;
+  maxScore: number;
+  max_score?: number;
+  subject?: string;
+  percentage?: number;
+  teacherNotes?: string;
+  teacher_notes?: string;
+  notes?: string;
+  date?: string;
+  examDate?: string;
+  exam_date?: string;
+  createdAt?: string;
+  created_at?: string;
+  scoreFormatted?: string;
+  score_formatted?: string;
+}
+
 export interface PaymentRecord {
   id?: string;
   barcode?: string;
+  student_barcode?: string;
+  student_id?: string;
   amount: number;
+  paidAmount?: number;
+  requiredAmount?: number;
   date: string;
-  time: string;
+  time?: string;
   note?: string;
+  notes?: string;
   month?: string; // YYYY-MM
   monthKey?: string; // YYYY-MM
   receiptNo?: string;

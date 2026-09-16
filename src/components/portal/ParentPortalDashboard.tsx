@@ -609,24 +609,35 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       } else if (newRow) {
         const itemTitle = newRow.exam_title || newRow.title || "اختبار دوري";
         const score = Number(newRow.score) || 0;
-        const maxScore = Number(newRow.max_score) || 10;
+        const maxScore = Number(newRow.max_score !== undefined ? newRow.max_score : (newRow.maxScore !== undefined ? newRow.maxScore : 10)) || 10;
+        const examDateVal = newRow.date || newRow.exam_date || (newRow.created_at ? newRow.created_at.slice(0, 10) : "");
         const normalized = {
           id: newRow.id || `exam-${Date.now()}`,
           studentId: newRow.student_id || targetBarcode,
+          student_id: newRow.student_id || targetBarcode,
           barcode: targetBarcode,
+          studentBarcode: targetBarcode,
+          student_barcode: targetBarcode,
+          subject: newRow.subject || "الرياضيات",
           examTitle: itemTitle,
+          exam_title: itemTitle,
           title: itemTitle,
           score,
           maxScore,
+          max_score: maxScore,
           percentage:
             newRow.percentage !== undefined
               ? Number(newRow.percentage)
               : Math.round((score / maxScore) * 100),
           teacherNotes: newRow.teacher_notes || newRow.notes || "",
+          teacher_notes: newRow.teacher_notes || newRow.notes || "",
           notes: newRow.teacher_notes || newRow.notes || "",
-          examDate: newRow.exam_date || (newRow.created_at ? newRow.created_at.slice(0, 10) : ""),
+          date: examDateVal,
+          examDate: examDateVal,
+          exam_date: examDateVal,
           createdAt: newRow.created_at || new Date().toISOString(),
           scoreFormatted: `${score} / ${maxScore}`,
+          score_formatted: `${score} / ${maxScore}`,
         };
 
         setSupabasePortalData((prev) => {

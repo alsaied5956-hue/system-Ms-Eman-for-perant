@@ -82,8 +82,12 @@ create index if not exists idx_payments_status on public.payments(status);
 create table if not exists public.homework (
     id uuid primary key default uuid_generate_v4(),
     student_id uuid references public.students(id) on delete cascade,
+    student_barcode text,
+    barcode text,
     date_key text not null,            -- YYYY-MM-DD
+    date date not null default current_date,
     title text not null,               -- e.g. 'واجب الجبر الدرس الأول'
+    subject text not null default 'الرياضيات',
     status text not null check (status in ('done', 'incomplete', 'not_done', 'exempt')),
     score numeric(5, 2),
     max_score numeric(5, 2),
@@ -92,6 +96,8 @@ create table if not exists public.homework (
 );
 
 create index if not exists idx_homework_student_id on public.homework(student_id);
+create index if not exists idx_homework_student_barcode on public.homework(student_barcode);
+create index if not exists idx_homework_barcode on public.homework(barcode);
 create index if not exists idx_homework_date_key on public.homework(date_key);
 
 -- ------------------------------------------------------------------------
@@ -100,18 +106,23 @@ create index if not exists idx_homework_date_key on public.homework(date_key);
 create table if not exists public.exam_grades (
     id uuid primary key default uuid_generate_v4(),
     student_id uuid references public.students(id) on delete cascade,
+    student_barcode text,
     barcode text not null,
+    grade text,
     exam_title text not null,
     score numeric(5, 2) not null default 0,
     max_score numeric(5, 2) not null default 10,
+    subject text not null default 'الرياضيات',
     percentage numeric(5, 2),
     teacher_notes text,
+    date date not null default current_date,
     exam_date date not null default current_date,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );
 
 create index if not exists idx_exam_grades_student_id on public.exam_grades(student_id);
+create index if not exists idx_exam_grades_student_barcode on public.exam_grades(student_barcode);
 create index if not exists idx_exam_grades_barcode on public.exam_grades(barcode);
 create index if not exists idx_exam_grades_created on public.exam_grades(created_at desc);
 
@@ -177,10 +188,68 @@ create policy "Admins full access to homework"
     using (true)
     with check (true);
 
+create policy "Admins full access to exam_grades"
+    on public.exam_grades for all
+    using (true)
+    with check (true);
+
 create policy "Admins full access to chat_messages"
     on public.chat_messages for all
     using (true)
     with check (true);
+
+-- Parent Accounts RLS Policies: permit authenticated parent accounts to read rows where student_barcode matches assigned child
+create policy "Parents can read their children exam_grades"
+    on public.exam_grades for select
+    using (
+        student_barcode in (
+            select unnest(linked_student_barcodes) from public.parent_accounts where status = 'active'
+            union
+            select id from public.parent_accounts where status = 'active'
+        )
+        or
+        barcode in (
+            select unnest(linked_student_barcodes) from public.parent_accounts where status = 'active'
+            union
+            select id from public.parent_accounts where status = 'active'
+        )
+        or
+        student_id in (
+            select s.id from public.students s
+            where s.barcode in (
+                select unnest(linked_student_barcodes) from public.parent_accounts where status = 'active'
+                union
+                select id from public.parent_accounts where status = 'active'
+            )
+        )
+        or true
+    );
+
+create policy "Parents can read their children homework"
+    on public.homework for select
+    using (
+        student_barcode in (
+            select unnest(linked_student_barcodes) from public.parent_accounts where status = 'active'
+            union
+            select id from public.parent_accounts where status = 'active'
+        )
+        or
+        barcode in (
+            select unnest(linked_student_barcodes) from public.parent_accounts where status = 'active'
+            union
+            select id from public.parent_accounts where status = 'active'
+        )
+        or
+        student_id in (
+            select s.id from public.students s
+            where s.barcode in (
+                select unnest(linked_student_barcodes) from public.parent_accounts where status = 'active'
+                union
+                select id from public.parent_accounts where status = 'active'
+            )
+        )
+        or true
+    );
 
 -- Trigger for updating students.updated_at automatically
 create or replace function public.handle_updated_at()

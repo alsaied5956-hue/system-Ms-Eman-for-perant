@@ -553,6 +553,10 @@ export async function getStudentPortalData(query: string): Promise<{
   payments?: Record<string, any>;
   groupPrices?: Record<string, number>;
   examScores?: number[];
+  examGradesList?: any[];
+  homeworkList?: any[];
+  attendanceLogs?: any[];
+  paymentsList?: any[];
   unreadNotices?: any[];
   account?: ParentAccountRecord | null;
   message?: string;
@@ -607,22 +611,34 @@ export async function getStudentPortalData(query: string): Promise<{
           );
         }
 
-        // Concurrently fetch attendance_logs, payments, homework, and parent_accounts
-        // payments table only uses student_id (UUID), no barcode column exists
-        const [attRes, payRes, accRes] = await Promise.allSettled([
+        // Concurrently fetch attendance_logs, payments, homework, exam_grades, and parent_accounts
+        // Query using both student_id (UUID) and student_barcode/barcode for 100% data parity
+        const [attRes, payRes, accRes, examRes, hwRes] = await Promise.allSettled([
           supabaseServer
             .from("attendance_logs")
             .select("*")
-            .or(`student_id.eq.${sId},barcode.eq.${bCode}`)
+            .or(`student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`)
             .order("date_key", { ascending: false })
             .limit(500),
           supabaseServer
             .from("payments")
             .select("*")
-            .eq("student_id", sId)
+            .or(`student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`)
             .order("month_key", { ascending: false })
             .limit(100),
           parentAccountQuery.maybeSingle(),
+          supabaseServer
+            .from("exam_grades")
+            .select("*")
+            .or(`student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`)
+            .order("created_at", { ascending: false })
+            .limit(100),
+          supabaseServer
+            .from("homework")
+            .select("*")
+            .or(`student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`)
+            .order("date_key", { ascending: false })
+            .limit(100),
         ]);
 
         const studentHistory: Record<string, string> = {};
@@ -652,6 +668,70 @@ export async function getStudentPortalData(query: string): Promise<{
                 timestamp: p.created_at ? new Date(p.created_at).getTime() : Date.now(),
               };
             }
+          });
+        }
+
+        // Parse exam_grades with unified dual naming
+        const examGradesList: any[] = [];
+        if (examRes.status === "fulfilled" && examRes.value.data) {
+          examRes.value.data.forEach((g: any, idx: number) => {
+            const score = Number(g.score) || 0;
+            const maxScore = Number(g.max_score !== undefined ? g.max_score : (g.maxScore !== undefined ? g.maxScore : 10)) || 10;
+            const pct = g.percentage !== undefined ? Number(g.percentage) : Math.round((score / maxScore) * 100);
+            const title = g.exam_title || g.title || "اختبار دوري";
+            const date = g.date || g.exam_date || (g.created_at ? String(g.created_at).slice(0, 10) : "");
+            const notes = g.teacher_notes || g.notes || "";
+            examGradesList.push({
+              id: g.id || `exam-${idx}`,
+              studentId: g.student_id || sId,
+              student_id: g.student_id || sId,
+              barcode: bCode,
+              student_barcode: bCode,
+              studentBarcode: bCode,
+              grade: g.grade || studentRow.grade || "",
+              score,
+              maxScore,
+              max_score: maxScore,
+              subject: g.subject || "الرياضيات",
+              date,
+              examDate: date,
+              exam_date: date,
+              examTitle: title,
+              exam_title: title,
+              title,
+              percentage: pct,
+              teacherNotes: notes,
+              teacher_notes: notes,
+              notes,
+              createdAt: g.created_at || new Date().toISOString(),
+              scoreFormatted: `${score} / ${maxScore}`,
+              score_formatted: `${score} / ${maxScore}`,
+            });
+          });
+        }
+
+        // Parse homework list
+        const homeworkList: any[] = [];
+        if (hwRes.status === "fulfilled" && hwRes.value.data) {
+          hwRes.value.data.forEach((h: any, idx: number) => {
+            homeworkList.push({
+              id: h.id || `hw-${idx}`,
+              studentId: h.student_id || sId,
+              student_id: h.student_id || sId,
+              barcode: bCode,
+              student_barcode: bCode,
+              dateKey: h.date_key || "",
+              date_key: h.date_key || "",
+              date: h.date || h.date_key || "",
+              title: h.title || "واجب الحصة",
+              subject: h.subject || "الرياضيات",
+              status: h.status || "done",
+              score: h.score !== null && h.score !== undefined ? Number(h.score) : undefined,
+              maxScore: h.max_score !== null && h.max_score !== undefined ? Number(h.max_score) : undefined,
+              max_score: h.max_score !== null && h.max_score !== undefined ? Number(h.max_score) : undefined,
+              notes: h.notes || "",
+              createdAt: h.created_at || new Date().toISOString(),
+            });
           });
         }
 
@@ -711,6 +791,11 @@ export async function getStudentPortalData(query: string): Promise<{
           parentAccountsCache[bCode] ||
           null;
 
+        if (examGradesList.length > 0) {
+          student.lastExamTitle = examGradesList[0].examTitle || student.lastExamTitle;
+          student.lastExamScore = examGradesList[0].scoreFormatted || student.lastExamScore;
+        }
+
         return {
           success: true,
           student,
@@ -720,6 +805,10 @@ export async function getStudentPortalData(query: string): Promise<{
           payments: studentPayments,
           groupPrices: systemDataCache.groupPrices,
           examScores: student.totalExamScores || [],
+          examGradesList,
+          homeworkList,
+          attendanceLogs: attRes.status === "fulfilled" && attRes.value.data ? attRes.value.data : [],
+          paymentsList: payRes.status === "fulfilled" && payRes.value.data ? payRes.value.data : [],
           unreadNotices,
           account,
           systemTime: new Date().toISOString(),
