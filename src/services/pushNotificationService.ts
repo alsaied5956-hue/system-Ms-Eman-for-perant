@@ -4,7 +4,7 @@
  * Periodic Background Sync, and synchronization with Supabase & Firebase Firestore.
  */
 
-import { supabase } from "../utils/supabaseClient";
+import { supabase, barcodeToUUID, updateParentAccountFCMTokenInSupabase } from "../utils/supabaseClient";
 import { db } from "../utils/firebase";
 import { collection, doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { markEventProcessed } from "../utils/notificationTracker";
@@ -169,7 +169,13 @@ export async function savePushSubscription(
   const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "";
   const cleanAliases = Array.isArray(aliases) ? aliases.map(String).filter(Boolean) : [];
 
-  // 1. Primary Backend Express API (for instant web-push sending)
+  // Extract FCM token if endpoint belongs to Google FCM / Chrome Web Push
+  let fcmToken = "";
+  if (endpoint.includes("/fcm/send/")) {
+    fcmToken = endpoint.split("/fcm/send/")[1] || "";
+  }
+
+  // 1. Primary Backend Express API (for instant web-push sending and FCM dispatch)
   try {
     await fetch("/api/push-subscribe", {
       method: "POST",
@@ -179,13 +185,34 @@ export async function savePushSubscription(
         userRole,
         aliases: cleanAliases,
         subscription: sub,
+        fcmToken: fcmToken || undefined,
       }),
     });
   } catch (err) {
     console.warn("Could not register push to Express backend:", err);
   }
 
-  // 2. Firestore push_subscriptions collection (secondary cloud backup)
+  // 2. Direct Supabase parent_accounts synchronization to retain active fcm_token
+  if (fcmToken && userRole === "parent" && userId && userId !== "guest") {
+    try {
+      const allBarcodes = [userId, ...cleanAliases];
+      for (const targetBarcode of allBarcodes) {
+        const uuid = barcodeToUUID(targetBarcode);
+        await supabase
+          .from("parent_accounts")
+          .update({
+            fcm_token: fcmToken,
+            updated_at: new Date().toISOString(),
+          })
+          .or(`id.eq.${uuid},id.eq.${targetBarcode},parent_phone.eq.${targetBarcode}`);
+      }
+      console.info(`[Push Service] Retained active FCM token in Supabase for user ${userId}`);
+    } catch (dbErr) {
+      console.warn("[Push Service] Supabase token retention notice:", dbErr);
+    }
+  }
+
+  // 3. Firestore push_subscriptions collection (secondary cloud backup)
   if (db) {
     try {
       const cleanDocId = encodeURIComponent(endpoint).slice(-80);
@@ -198,6 +225,7 @@ export async function savePushSubscription(
           endpoint,
           p256dh,
           auth,
+          fcmToken: fcmToken || undefined,
           userAgent,
           updatedAt: serverTimestamp(),
         },
@@ -243,9 +271,27 @@ export async function dispatchPushNotification(payload: {
       }),
     });
 
-    if (res.ok) {
+    const data = await res.json().catch(() => null);
+
+    if (data?.missingTokens && data.missingTokens.length > 0) {
+      console.warn(
+        `[FCM Parent Dispatcher] Notification alert sent, but missing active fcm_token for targets:`,
+        data.missingTokens
+      );
+    }
+
+    if (data?.failureDetails && data.failureDetails.length > 0) {
+      console.warn(`[FCM Parent Dispatcher] Delivery failure details reported:`, data.failureDetails);
+    }
+
+    if (data && (data.sent > 0 || data.fcmDispatched > 0 || data.webPushDispatched > 0)) {
+      console.info(
+        `[FCM Parent Dispatcher] Successfully delivered push notifications: ${data.sent} device(s) reached.`
+      );
       return true;
     }
+
+    return res.ok;
   } catch (err) {
     console.warn("dispatchPushNotification network warning:", err);
   }

@@ -22,6 +22,10 @@ try {
   console.warn("[portalStore] Supabase client init notice:", e);
 }
 
+export function getSupabaseServer(): SupabaseClient | null {
+  return supabaseServer;
+}
+
 export function barcodeToUUID(barcode: string): string {
   const raw = String(barcode || "").trim();
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
@@ -77,12 +81,14 @@ export interface SystemDataCache {
 }
 
 export interface ParentAccountRecord {
+  id?: string;
   studentBarcode: string;
   studentName?: string;
   linkedBarcodes?: string[];
   parentPhone: string;
   password: string;
   status: "active" | "disabled" | "deleted";
+  fcmToken?: string;
   reason?: string;
   createdAt?: string;
   activatedAt?: string;
@@ -291,10 +297,12 @@ export function initPortalStore(): void {
                 continue;
               }
               const acc: ParentAccountRecord = {
+                id: row.id,
                 studentBarcode: primaryBarcode,
                 linkedBarcodes: barcodes,
                 parentPhone: row.parent_phone || "",
                 password: row.password_hash || "",
+                fcmToken: row.fcm_token || "",
                 status,
                 createdAt: row.created_at,
                 updatedAt: row.updated_at,
@@ -984,6 +992,7 @@ export function saveParentAccountRecord(account: ParentAccountRecord): ParentAcc
     ...existing,
     ...account,
     studentBarcode: bCode,
+    fcmToken: account.fcmToken || existing?.fcmToken || "",
     updatedAt: nowIso,
     activatedAt: existing?.activatedAt || account.activatedAt || nowIso,
   };
@@ -1005,6 +1014,7 @@ export function saveParentAccountRecord(account: ParentAccountRecord): ParentAcc
           parent_phone: updated.parentPhone || "",
           password_hash: updated.password || "",
           linked_student_barcodes: barcodes,
+          fcm_token: updated.fcmToken || "",
           status: updated.status || "active",
           updated_at: nowIso,
         }, { onConflict: "id" })
@@ -1025,6 +1035,55 @@ export function saveParentAccountRecord(account: ParentAccountRecord): ParentAcc
   });
 
   return updated;
+}
+
+/**
+ * Updates fcm_token in in-memory cache and Supabase production table
+ */
+export async function updateAccountFCMTokenInStoreAndDb(
+  targetId: string,
+  fcmToken: string
+): Promise<boolean> {
+  const cleanId = String(targetId || "").trim();
+  if (!cleanId || !fcmToken) return false;
+
+  const cleanBarcode = normalizeBarcode(cleanId);
+  const cleanPhone = normalizePhone(cleanId);
+  const uuid = barcodeToUUID(cleanBarcode || cleanId);
+
+  // 1. Update in-memory cache
+  if (parentAccountsCache[cleanId]) {
+    parentAccountsCache[cleanId].fcmToken = fcmToken;
+  }
+  if (cleanBarcode && parentAccountsCache[cleanBarcode]) {
+    parentAccountsCache[cleanBarcode].fcmToken = fcmToken;
+  }
+  persistAccountsDebounced();
+
+  // 2. Update Supabase production table parent_accounts
+  if (supabaseServer) {
+    try {
+      const { error } = await supabaseServer
+        .from("parent_accounts")
+        .update({
+          fcm_token: fcmToken,
+          updated_at: new Date().toISOString(),
+        })
+        .or(
+          `id.eq.${uuid},id.eq.${cleanId},parent_phone.eq.${cleanId}${cleanPhone ? `,parent_phone.eq.${cleanPhone}` : ""}`
+        );
+
+      if (error) {
+        console.warn("[portalStore] Failed to update fcm_token in Supabase:", error.message);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.warn("[portalStore] update fcm_token exception:", err);
+      return false;
+    }
+  }
+  return true;
 }
 
 export function deleteParentAccountRecord(barcode: string): boolean {

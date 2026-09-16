@@ -68,7 +68,9 @@ import {
   recordLivePayment,
   recordLiveStudentMutation,
   recordLiveGroupFinished,
+  updateAccountFCMTokenInStoreAndDb,
 } from "./server/portalStore";
+import { dispatchReliableParentPush } from "./server/fcmDispatcher";
 import { initFirestoreSync, pushServerStateToFirestore } from "./server/firestoreSync";
 
 const fbApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
@@ -957,9 +959,9 @@ app.get("/api/push-public-key", (_req, res) => {
 });
 
 // 3. Register or Update Web Push Subscription
-app.post("/api/push-subscribe", (req, res) => {
+app.post("/api/push-subscribe", async (req, res) => {
   try {
-    const { userId, userRole, aliases, subscription } = req.body;
+    const { userId, userRole, aliases, subscription, fcmToken } = req.body;
     if (!subscription || !subscription.endpoint || !subscription.keys) {
       return res.status(400).json({ error: "Invalid subscription payload" });
     }
@@ -985,6 +987,25 @@ app.post("/api/push-subscribe", (req, res) => {
     subscriptionsCache.set(subscription.endpoint, stored);
     persistStoredSubscriptions();
 
+    // Extract or resolve active FCM token
+    const endpointStr = String(subscription.endpoint || "");
+    let resolvedFcmToken = String(fcmToken || "").trim();
+    if (!resolvedFcmToken && endpointStr.includes("/fcm/send/")) {
+      resolvedFcmToken = endpointStr.split("/fcm/send/")[1] || "";
+    }
+
+    // Retain active fcm_token in Supabase parent_accounts and in-memory cache
+    if (resolvedFcmToken && cleanUserId !== "guest") {
+      const targets = [cleanUserId, ...cleanAliases];
+      Promise.allSettled(
+        targets.map((t) => updateAccountFCMTokenInStoreAndDb(t, resolvedFcmToken))
+      ).then(() => {
+        console.log(`[Push] Synchronized active FCM token to Supabase parent_accounts for: ${targets.join(", ")}`);
+      }).catch((err) => {
+        console.warn("[Push] FCM token database synchronization notice:", err);
+      });
+    }
+
     // Persist to Firestore collection push_subscriptions (fire-and-forget, skip if quota limit reached)
     if (!isFirestoreQuotaExceededServer) {
       try {
@@ -996,6 +1017,7 @@ app.post("/api/push-subscribe", (req, res) => {
           endpoint: stored.endpoint,
           p256dh: stored.keys.p256dh,
           auth: stored.keys.auth,
+          fcmToken: resolvedFcmToken || undefined,
           userAgent: stored.userAgent,
           updatedAt: new Date(),
         }, { merge: true }).catch((err) => {
@@ -1007,7 +1029,7 @@ app.post("/api/push-subscribe", (req, res) => {
     }
 
     console.log(`[Push] Registered subscription for user ${cleanUserId} (aliases: ${cleanAliases.length}). Total: ${subscriptionsCache.size}`);
-    return res.json({ success: true, count: subscriptionsCache.size });
+    return res.json({ success: true, count: subscriptionsCache.size, fcmTokenRetained: !!resolvedFcmToken });
   } catch (err: any) {
     console.error("push-subscribe error:", err);
     return res.status(500).json({ error: err.message || "Failed to save subscription" });
@@ -1390,7 +1412,7 @@ async function sendWebPushToTargets(params: SendPushParams): Promise<{
   };
 }
 
-// 4. Send Web Push Notification to Specific User(s) or Role
+// 4. Reliable FCM Parent Push Notification Dispatcher
 app.post("/api/send-push", async (req, res) => {
   try {
     const { title, body } = req.body;
@@ -1403,24 +1425,43 @@ app.post("/api/send-push", async (req, res) => {
       await syncSubscriptionsFromFirestore();
     }
 
-    const result = await sendWebPushToTargets(req.body);
+    // Step 1, 2, & 3: Query Supabase parent_accounts for fcm_token, format FCM v1 payload, and dispatch reliably
+    const dispatchReport = await dispatchReliableParentPush(
+      req.body,
+      async (targets, payload) => {
+        const wpRes = await sendWebPushToTargets({ ...payload, targetUserIds: targets });
+        return { sent: wpRes.sent, failed: wpRes.failed };
+      }
+    );
 
-    if (result.sent === 0 && result.failed === 0) {
-      return res.json({
-        success: true,
-        sent: 0,
-        message: "No active push subscriptions found for this recipient.",
-      });
+    const totalDelivered = dispatchReport.fcmDispatched + dispatchReport.webPushDispatched;
+
+    if (totalDelivered === 0 && dispatchReport.missingTokens.length > 0) {
+      console.warn(
+        `[SendPush Dispatcher] No active tokens for targets: ${dispatchReport.missingTokens.join(", ")}`
+      );
     }
 
     return res.json({
       success: true,
-      sent: result.sent,
-      failed: result.failed,
-      cleaned: result.cleaned,
+      sent: totalDelivered,
+      fcmDispatched: dispatchReport.fcmDispatched,
+      webPushDispatched: dispatchReport.webPushDispatched,
+      fcmFailed: dispatchReport.fcmFailed,
+      totalTargets: dispatchReport.totalTargets,
+      tokensFound: dispatchReport.tokensFound,
+      missingTokens: dispatchReport.missingTokens,
+      failureDetails: dispatchReport.failureDetails,
+      logs: dispatchReport.logs,
+      message:
+        totalDelivered > 0
+          ? `تم إرسال الإشعار بنجاح إلى ${totalDelivered} جهاز.`
+          : dispatchReport.missingTokens.length > 0
+          ? `لم يتم العثور على رمز إشعار نشط (fcm_token) في قاعدة البيانات للمستلمين المحددين.`
+          : "لم يتم العثور على أجهزة مسجلة لهؤلاء المستلمين.",
     });
   } catch (err: any) {
-    console.error("send-push error:", err);
+    console.error("[SendPush Dispatcher] Uncaught error:", err);
     return res.status(500).json({ error: err.message || "Failed to send push notification" });
   }
 });
