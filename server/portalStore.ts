@@ -392,28 +392,44 @@ export async function hydrateSystemStateFromSupabase(): Promise<boolean> {
       hwPage++;
     }
 
-    // Calculate exam scores for students
-    if (studentExamsMap.size > 0) {
-      studentsList.forEach((s: any) => {
-        const b = String(s.barcode || "").trim();
-        const exams = studentExamsMap.get(b);
-        if (exams && exams.length > 0) {
-          const newest = exams[0];
-          const sc = Number(newest.grade ?? newest.score ?? newest.degree) || 0;
-          const maxSc = Number(newest.max_score || newest.maxScore || 10);
-          const pct = Math.min(100, Math.round((sc / maxSc) * 100));
-          s.lastExamTitle = s.lastExamTitle || newest.title || "التقييم الدوري";
-          s.lastExamScore = s.lastExamScore || `${sc}/${maxSc} (${pct}%)`;
-          s.totalExamScores = exams
-            .map((e: any) => {
-              const eSc = Number(e.grade ?? e.score ?? e.degree) || 0;
-              const eMax = Number(e.max_score || e.maxScore || 10);
-              return Math.min(100, Math.round((eSc / eMax) * 100));
-            })
-            .reverse();
+    // Calculate exam scores and accurate attendance totals from logs for students
+    const attCountsMap = new Map<string, { present: number; absent: number }>();
+    for (const dKey of Object.keys(historyMap)) {
+      const dayData = historyMap[dKey];
+      if (dayData && typeof dayData === "object") {
+        for (const [bCode, st] of Object.entries(dayData)) {
+          if (!attCountsMap.has(bCode)) attCountsMap.set(bCode, { present: 0, absent: 0 });
+          const counts = attCountsMap.get(bCode)!;
+          if (st === "حضور" || st === "present") counts.present++;
+          else if (st === "غياب" || st === "absent") counts.absent++;
         }
-      });
+      }
     }
+
+    studentsList.forEach((s: any) => {
+      const b = String(s.barcode || "").trim();
+      const counts = attCountsMap.get(b);
+      if (counts) {
+        s.totalAttendanceDays = counts.present;
+        s.totalAbsentDays = counts.absent;
+      }
+      const exams = studentExamsMap.get(b);
+      if (exams && exams.length > 0) {
+        const newest = exams[0];
+        const sc = Number(newest.grade ?? newest.score ?? newest.degree) || 0;
+        const maxSc = Number(newest.max_score || newest.maxScore || 10);
+        const pct = Math.min(100, Math.round((sc / maxSc) * 100));
+        s.lastExamTitle = s.lastExamTitle || newest.title || "التقييم الدوري";
+        s.lastExamScore = s.lastExamScore || `${sc}/${maxSc} (${pct}%)`;
+        s.totalExamScores = exams
+          .map((e: any) => {
+            const eSc = Number(e.grade ?? e.score ?? e.degree) || 0;
+            const eMax = Number(e.max_score || e.maxScore || 10);
+            return Math.min(100, Math.round((eSc / eMax) * 100));
+          })
+          .reverse();
+      }
+    });
 
     // Populate server cache
     systemDataCache.students = studentsList;

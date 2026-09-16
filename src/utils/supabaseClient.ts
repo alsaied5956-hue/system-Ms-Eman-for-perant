@@ -1526,9 +1526,29 @@ export async function pullFullStateFromSupabase(): Promise<Partial<SystemData> |
         }
       });
 
-      if (baseState.students && studentExamsMap.size > 0) {
+      if (baseState.students) {
+        // Calculate true attendance and absence from attendance logs
+        const clientAttCounts = new Map<string, { present: number; absent: number }>();
+        if (history) {
+          for (const dKey of Object.keys(history)) {
+            const dayMap = history[dKey];
+            if (dayMap && typeof dayMap === "object") {
+              for (const [bCode, st] of Object.entries(dayMap)) {
+                if (!clientAttCounts.has(bCode)) clientAttCounts.set(bCode, { present: 0, absent: 0 });
+                const counts = clientAttCounts.get(bCode)!;
+                if (st === "حضور" || st === "present") counts.present++;
+                else if (st === "غياب" || st === "absent") counts.absent++;
+              }
+            }
+          }
+        }
+
         baseState.students = baseState.students.map((s: any) => {
           const b = String(s.barcode || "").trim();
+          const counts = clientAttCounts.get(b);
+          const attDays = counts ? counts.present : (s.totalAttendanceDays || 0);
+          const absDays = counts ? counts.absent : (s.totalAbsentDays || 0);
+
           const exams = studentExamsMap.get(b);
           if (exams && exams.length > 0) {
             const newest = exams[0];
@@ -1544,12 +1564,18 @@ export async function pullFullStateFromSupabase(): Promise<Partial<SystemData> |
 
             return {
               ...s,
+              totalAttendanceDays: attDays,
+              totalAbsentDays: absDays,
               lastExamTitle: s.lastExamTitle || newest.title || "التقييم الدوري",
               lastExamScore: s.lastExamScore || scoreFormatted,
               totalExamScores: (s.totalExamScores && s.totalExamScores.length > 0) ? s.totalExamScores : allPcts,
             };
           }
-          return s;
+          return {
+            ...s,
+            totalAttendanceDays: attDays,
+            totalAbsentDays: absDays,
+          };
         });
       }
     }
