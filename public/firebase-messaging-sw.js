@@ -283,15 +283,18 @@ self.addEventListener("notificationclick", (event) => {
 });
 
 // 5. PWA Lifecycle & Caching Engine (Offline Support)
-const CACHE_NAME = "math-center-v10.0-fcm-pwa";
+const CACHE_NAME = "math-center-v10.1-fcm-pwa";
 const ASSETS_TO_CACHE = [
   "/",
   "/index.html",
   "/manifest.json",
   "/icon.svg",
   "/notification.wav",
+  "/notification.mp3",
   "/pwa-192x192.png",
-  "/pwa-512x512.png"
+  "/pwa-512x512.png",
+  "/pwa-maskable-512x512.png",
+  "/apple-touch-icon.png"
 ];
 
 self.addEventListener("install", (event) => {
@@ -389,7 +392,7 @@ self.addEventListener("fetch", (event) => {
         if (
           networkResponse &&
           networkResponse.status === 200 &&
-          (url.pathname === "/" || url.pathname.endsWith(".js") || url.pathname.endsWith(".css") || url.pathname.endsWith(".svg"))
+          (url.pathname === "/" || /\.(js|css|svg|png|jpe?g|webp|ico|woff2?|wav|mp3)$/i.test(url.pathname))
         ) {
           const responseClone = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {

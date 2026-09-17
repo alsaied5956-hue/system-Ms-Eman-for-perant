@@ -663,7 +663,8 @@ export const AdminControlPanel: React.FC<AdminControlPanelProps> = ({
       const updated = await activateParentAccountDirectly(
         activatingItem.barcode,
         actPhone.trim() || activatingItem.phone,
-        actPassword.trim()
+        actPassword.trim(),
+        activatingItem.studentName
       );
       setAccounts((prev) => ({ ...prev, [activatingItem.barcode]: updated }));
       setActFeedback(`تم تفعيل حساب ولي أمر الطالب (${activatingItem.studentName}) بنجاح!`);
@@ -686,6 +687,7 @@ export const AdminControlPanel: React.FC<AdminControlPanelProps> = ({
       .map((a) => ({
         studentBarcode: a.barcode,
         phone: a.parentPhone,
+        studentName: a.studentName,
       }));
 
     if (unactivatedStudents.length === 0) {

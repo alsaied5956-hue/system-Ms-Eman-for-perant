@@ -6,7 +6,8 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
+  "orientation": "any",
+  "categories": ["education", "productivity"],
   "background_color": "#070b14",
   "theme_color": "#f59e0b",
   "icons": [

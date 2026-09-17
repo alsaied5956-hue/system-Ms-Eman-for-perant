@@ -7,6 +7,10 @@
     --card-border: rgba(99, 102, 241, 0.18);
     --text-main: #f8fafc;
     --text-muted: #94a3b8;
+    --sat: env(safe-area-inset-top, 0px);
+    --sar: env(safe-area-inset-right, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
   }
 
   [data-theme="light"],
@@ -16,6 +20,20 @@
     --card-border: #e2e8f0;
     --text-main: #0f172a;
     --text-muted: #64748b;
+  }
+}
+
+/* Standalone PWA Safe-Area Support for iOS Notch & Android Gestures */
+@supports (padding-top: env(safe-area-inset-top)) {
+  header.sticky.top-0,
+  header.fixed.top-0 {
+    padding-top: max(0.75rem, calc(0.75rem + env(safe-area-inset-top)));
+  }
+}
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  #ios-pwa-install-banner {
+    bottom: max(1rem, calc(1rem + env(safe-area-inset-bottom)));
   }
 }
 

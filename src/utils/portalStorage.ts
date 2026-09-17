@@ -592,6 +592,11 @@ export async function persistParentAccount(account: ParentAccount): Promise<void
           "Content-Type": "application/json",
           "x-user-role": "admin",
         },
+        body: JSON.stringify({
+          parentPhone: account.parentPhone,
+          password: account.password,
+          studentName: account.studentName,
+        }),
       }).catch(() => {});
     } catch {}
   }
@@ -1711,19 +1716,20 @@ export async function registerParentAccount(
 export async function activateParentAccountDirectly(
   studentBarcode: string,
   phone: string,
-  password: string
+  password: string,
+  providedStudentName?: string
 ): Promise<ParentAccount> {
   const cleanBarcode = studentBarcode.trim();
   const accounts = getLocalParentAccounts();
   const existing = accounts[cleanBarcode];
 
   // Find student name from roster if not already known
-  let studentName = existing?.studentName;
+  let studentName = providedStudentName?.trim() || existing?.studentName;
 
   const nowIso = new Date().toISOString();
   const newAccount: ParentAccount = {
     studentBarcode: cleanBarcode,
-    studentName: studentName || existing?.studentName,
+    studentName: studentName || existing?.studentName || `طالب (${cleanBarcode})`,
     linkedBarcodes: existing?.linkedBarcodes || [cleanBarcode],
     parentPhone: phone.trim(),
     password: password.trim(),
@@ -1769,7 +1775,7 @@ export async function activateParentAccountDirectly(
  * Instant 0ms local update + parallel chunked cloud save
  */
 export async function batchActivateParentAccounts(
-  items: { studentBarcode: string; phone: string }[],
+  items: { studentBarcode: string; phone: string; studentName?: string }[],
   defaultPassword: string
 ): Promise<number> {
   const accounts = getLocalParentAccounts();
@@ -1784,7 +1790,7 @@ export async function batchActivateParentAccounts(
       removeDeletedTombstone(bCode);
       const acc: ParentAccount = {
         studentBarcode: bCode,
-        studentName: accounts[bCode]?.studentName || "طالب مسجل",
+        studentName: item.studentName?.trim() || accounts[bCode]?.studentName || "طالب مسجل",
         linkedBarcodes: [bCode],
         parentPhone: item.phone.trim() || "0",
         password: defaultPassword.trim() || "1234",

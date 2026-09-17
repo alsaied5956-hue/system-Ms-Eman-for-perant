@@ -1939,10 +1939,14 @@ app.post("/api/portal/admin/accounts/:barcode/suspend", authenticateSupervisor, 
 app.post("/api/portal/admin/accounts/:barcode/activate", authenticateSupervisor, (req, res) => {
   try {
     const barcode = String(req.params.barcode).trim();
+    const { parentPhone, password, studentName } = req.body || {};
     const allAccs = getAllParentAccounts();
     let acc = allAccs[barcode];
     if (acc) {
       acc.status = "active";
+      if (parentPhone) acc.parentPhone = String(parentPhone).trim();
+      if (password) acc.password = String(password).trim();
+      if (studentName) acc.studentName = String(studentName).trim();
       acc.activatedAt = new Date().toISOString();
       saveParentAccountRecord(acc);
     } else {
@@ -1951,9 +1955,9 @@ app.post("/api/portal/admin/accounts/:barcode/activate", authenticateSupervisor,
       const st = sys.students?.find((s) => String(s.barcode).trim() === barcode);
       acc = {
         studentBarcode: barcode,
-        studentName: st?.name || barcode,
-        parentPhone: st?.parentPhone || "",
-        password: "1234",
+        studentName: studentName || st?.name || barcode,
+        parentPhone: parentPhone || st?.parentPhone || "",
+        password: password || "1234",
         status: "active",
         createdAt: new Date().toISOString(),
         activatedAt: new Date().toISOString(),
