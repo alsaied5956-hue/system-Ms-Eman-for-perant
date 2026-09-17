@@ -1650,22 +1650,39 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
   // 7. Handle sending direct chat message
   const handleSendChat = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newChatText.trim() || isSendingChat || !activeStudent?.barcode) return;
+    const barcode = activeStudent?.barcode || selectedStudentBarcode || account.studentBarcode;
+    if (!newChatText.trim() || isSendingChat || !barcode) return;
 
     setIsSendingChat(true);
     const text = newChatText.trim();
     setNewChatText("");
 
+    // Instant safety fallback timeout so the button can NEVER get permanently stuck
+    const safetyTimeout = setTimeout(() => {
+      setIsSendingChat(false);
+    }, 4000);
+
     try {
-      await sendParentChatMessage(
-        activeStudent.barcode,
+      const sentMsg = await sendParentChatMessage(
+        barcode,
         "parent",
         `ولي أمر (${activeStudent?.name || "طالب"})`,
         text
       );
+
+      // Instant optimistic append to chat messages for 0ms lag
+      setChatMessages((prev) => {
+        if (prev.some((m) => m.id === sentMsg.id)) return prev;
+        return [...prev, sentMsg];
+      });
+
+      setTimeout(() => {
+        chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 50);
     } catch (err) {
       console.warn("Failed to send chat:", err);
     } finally {
+      clearTimeout(safetyTimeout);
       setIsSendingChat(false);
     }
   };

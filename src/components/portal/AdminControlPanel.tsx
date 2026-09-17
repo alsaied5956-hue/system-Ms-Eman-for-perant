@@ -942,6 +942,11 @@ export const AdminControlPanel: React.FC<AdminControlPanelProps> = ({
     const text = adminChatText.trim();
     setAdminChatText("");
 
+    // Safety timeout fallback: ensures button never stays stuck/faded in any network glitch
+    const safetyTimeout = setTimeout(() => {
+      setIsSending(false);
+    }, 4000);
+
     try {
       const sentMsg = await sendParentChatMessage(
         selectedChatBarcode,
@@ -966,6 +971,7 @@ export const AdminControlPanel: React.FC<AdminControlPanelProps> = ({
     } catch (err) {
       console.warn("Error sending admin chat:", err);
     } finally {
+      clearTimeout(safetyTimeout);
       setIsSending(false);
     }
   };

@@ -2233,79 +2233,83 @@ export async function sendParentChatMessage(
     }).catch(() => {});
   } catch {}
 
-  // Persist to Cloud Firestore & Firebase Realtime DB
-  try {
-    await ensureFirebaseAuth();
-    if (db) {
-      await setDoc(doc(db, "parent_chats", chatId), {
-        chatId,
-        messages: thread.slice(-100), // Retain last 100 messages (strict limit)
-        lastUpdated: Date.now(),
-      }, { merge: true });
+  // Persist to Cloud Firestore & Firebase Realtime DB in background (non-blocking for UI)
+  (async () => {
+    try {
+      await ensureFirebaseAuth();
+      if (db) {
+        await setDoc(doc(db, "parent_chats", chatId), {
+          chatId,
+          messages: thread.slice(-100), // Retain last 100 messages (strict limit)
+          lastUpdated: Date.now(),
+        }, { merge: true });
+      }
+      const rtdb = await getFirebaseRealtimeDB();
+      if (rtdb) {
+        const { ref, set } = await import("firebase/database");
+        await set(ref(rtdb, `parent_chats/${chatId}`), {
+          chatId,
+          messages: thread.slice(-100),
+          lastUpdated: Date.now(),
+        });
+      }
+    } catch (err) {
+      console.warn("Failed to persist chat to Firebase:", err);
     }
-    const rtdb = await getFirebaseRealtimeDB();
-    if (rtdb) {
-      const { ref, set } = await import("firebase/database");
-      await set(ref(rtdb, `parent_chats/${chatId}`), {
-        chatId,
-        messages: thread.slice(-100),
-        lastUpdated: Date.now(),
-      });
-    }
-  } catch (err) {
-    console.warn("Failed to persist chat to Firebase:", err);
-  }
+  })();
 
   // Background Web Push to recipient phone/device (delivers even if app is completely closed)
-  try {
-    const { dispatchPushNotification } = await import("../services/pushNotificationService");
-    if (sender === "admin") {
-      // Find all possible aliases (parent phone, linked student barcodes) for this chatId
-      const accounts = getLocalParentAccounts();
-      const matchedAccount = Object.values(accounts).find(
-        (a) =>
-          a.studentBarcode === chatId ||
-          a.parentPhone === chatId ||
-          a.linkedBarcodes?.includes(chatId)
-      );
+  (async () => {
+    try {
+      const { dispatchPushNotification } = await import("../services/pushNotificationService");
+      if (sender === "admin") {
+        // Find all possible aliases (parent phone, linked student barcodes) for this chatId
+        const accounts = getLocalParentAccounts();
+        const matchedAccount = Object.values(accounts).find(
+          (a) =>
+            a.studentBarcode === chatId ||
+            a.parentPhone === chatId ||
+            a.linkedBarcodes?.includes(chatId)
+        );
 
-      let studentParentPhone = "";
-      let studentPhone = "";
+        let studentParentPhone = "";
+        let studentPhone = "";
 
-      const targetUserIds = Array.from(
-        new Set([
-          chatId,
-          matchedAccount?.parentPhone,
-          matchedAccount?.studentBarcode,
-          ...(matchedAccount?.linkedBarcodes || []),
-          studentParentPhone,
-          studentPhone,
-        ])
-      ).filter(Boolean) as string[];
+        const targetUserIds = Array.from(
+          new Set([
+            chatId,
+            matchedAccount?.parentPhone,
+            matchedAccount?.studentBarcode,
+            ...(matchedAccount?.linkedBarcodes || []),
+            studentParentPhone,
+            studentPhone,
+          ])
+        ).filter(Boolean) as string[];
 
-      dispatchPushNotification({
-        targetUserIds,
-        title: "💬 رسالة جديدة من إدارة المركز",
-        body: `الأستاذة إيمان الدمشيتي: "${text.slice(0, 80)}"`,
-        type: "chat",
-        eventId: newMsg.id,
-        tag: `chat-${chatId}`,
-        url: "/?tab=chat",
-      }).catch(() => {});
-    } else {
-      dispatchPushNotification({
-        role: "admin",
-        title: `💬 رسالة من ولي أمر (${senderName})`,
-        body: text.slice(0, 80),
-        type: "chat",
-        eventId: newMsg.id,
-        tag: `chat-${chatId}`,
-        url: "/?tab=chat",
-      }).catch(() => {});
+        dispatchPushNotification({
+          targetUserIds,
+          title: "💬 رسالة جديدة من إدارة المركز",
+          body: `الأستاذة إيمان الدمشيتي: "${text.slice(0, 80)}"`,
+          type: "chat",
+          eventId: newMsg.id,
+          tag: `chat-${chatId}`,
+          url: "/?tab=chat",
+        }).catch(() => {});
+      } else {
+        dispatchPushNotification({
+          role: "admin",
+          title: `💬 رسالة من ولي أمر (${senderName})`,
+          body: text.slice(0, 80),
+          type: "chat",
+          eventId: newMsg.id,
+          tag: `chat-${chatId}`,
+          url: "/?tab=chat",
+        }).catch(() => {});
+      }
+    } catch (err) {
+      console.warn("Chat background push dispatch failed:", err);
     }
-  } catch (err) {
-    console.warn("Chat background push dispatch failed:", err);
-  }
+  })();
 
   return newMsg;
 }
