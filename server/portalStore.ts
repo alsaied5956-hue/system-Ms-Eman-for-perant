@@ -2,6 +2,21 @@ import fs from "fs";
 import path from "path";
 import type { Response } from "express";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getFirestore, doc, setDoc, getDocs, collection, deleteDoc, onSnapshot } from "firebase/firestore";
+
+let firestoreServerDb: any = null;
+try {
+  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(configPath)) {
+    const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    const firebaseApp = getApps().length === 0 ? initializeApp(config) : getApp();
+    firestoreServerDb = getFirestore(firebaseApp, config.firestoreDatabaseId);
+    console.log("[portalStore] Firestore server connection initialized successfully");
+  }
+} catch (e) {
+  console.warn("[portalStore] Firestore init notice:", e);
+}
 
 const SUPABASE_URL =
   process.env.VITE_SUPABASE_URL ||
@@ -258,6 +273,60 @@ export function initPortalStore(): void {
       hydrateSystemStateFromSupabase().catch((e: any) =>
         console.warn("[PortalStore] Supabase system state hydration notice:", e)
       );
+    }
+
+    // 7. Hydrate parent accounts from Firestore cloud collection & attach cross-device listener
+    if (firestoreServerDb) {
+      getDocs(collection(firestoreServerDb, "parent_accounts"))
+        .then((snapshot) => {
+          let count = 0;
+          snapshot.forEach((docSnap) => {
+            const acc = docSnap.data() as ParentAccountRecord;
+            const b = String(docSnap.id || acc?.studentBarcode).trim();
+            if (b && acc && !deletedAccountsCache.has(b) && acc.status !== "deleted") {
+              parentAccountsCache[b] = { ...acc, studentBarcode: b };
+              count++;
+            }
+          });
+          console.log(`[PortalStore] Synced ${count} accounts from Firestore cloud collection.`);
+        })
+        .catch((e: any) => console.warn("[PortalStore] Firestore hydration notice:", e));
+
+      // Realtime listener for cross-device mobile registrations
+      try {
+        onSnapshot(
+          collection(firestoreServerDb, "parent_accounts"),
+          (snapshot) => {
+            snapshot.docChanges().forEach((change) => {
+              const acc = change.doc.data() as ParentAccountRecord;
+              const b = String(change.doc.id || acc?.studentBarcode).trim();
+              if (!b) return;
+              if (change.type === "removed" || acc?.status === "deleted") {
+                delete parentAccountsCache[b];
+                broadcastPortalSSE({
+                  type: "ACCOUNT_DELETED",
+                  barcode: b,
+                  timestamp: Date.now(),
+                });
+              } else if (change.type === "added" || change.type === "modified") {
+                if (!deletedAccountsCache.has(b) && acc?.status === "active") {
+                  parentAccountsCache[b] = { ...acc, studentBarcode: b };
+                  broadcastPortalSSE({
+                    type: "ACCOUNT_SAVED",
+                    barcode: b,
+                    status: acc.status,
+                    account: acc,
+                    timestamp: Date.now(),
+                  });
+                }
+              }
+            });
+          },
+          (err) => console.warn("[PortalStore] Firestore realtime listener notice:", err)
+        );
+      } catch (snapErr) {
+        console.warn("[PortalStore] Firestore onSnapshot setup notice:", snapErr);
+      }
     }
   } catch (err) {
     console.error("[PortalStore] Init error:", err);
@@ -1365,6 +1434,12 @@ export function saveParentAccountRecord(account: ParentAccountRecord): ParentAcc
       .catch((e: any) => console.warn("[portalStore] Supabase upsert exception:", e));
   }
 
+  // Sync to Firestore parent_accounts cloud collection
+  if (firestoreServerDb) {
+    setDoc(doc(firestoreServerDb, "parent_accounts", bCode), updated, { merge: true })
+      .catch((e: any) => console.warn("[portalStore] Firestore upsert notice:", e));
+  }
+
   // Broadcast account state change over SSE stream to ALL clients (supervisors & parents)
   broadcastPortalSSE({
     type: "ACCOUNT_SAVED",
@@ -1479,6 +1554,11 @@ export function deleteParentAccountRecord(barcode: string): boolean {
         }
       })
       .catch((e: any) => console.warn("[portalStore] Supabase delete exception:", e));
+  }
+
+  // Delete from Firestore parent_accounts cloud collection
+  if (firestoreServerDb) {
+    deleteDoc(doc(firestoreServerDb, "parent_accounts", bCode)).catch(() => {});
   }
 
   // Instant broadcast to ALL connected mobile and desktop devices (<30ms, 0 quota)
