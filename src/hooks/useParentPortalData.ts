@@ -156,8 +156,47 @@ export function useParentPortalData(targetBarcodeOrToken?: string): UseParentPor
 
       const fetchPromise = (async () => {
         try {
-          // Strict Network-First: Fetch live authentic records directly from Supabase Cloud
-          const unifiedData = await fetchUnifiedStudentPortalDataFromSupabase(cleanInput);
+          // Fast-Path: Query high-performance server endpoint first (handles 720+ concurrent parents with micro-caching & request deduplication)
+          let unifiedData: UnifiedStudentPortalData | null = null;
+
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3500);
+            const res = await fetch(`/api/portal/student-data?barcode=${encodeURIComponent(cleanInput)}&_t=${Date.now()}`, {
+              headers: { Accept: "application/json" },
+              signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+
+            if (res.ok) {
+              const serverPayload = await res.json();
+              if (serverPayload && serverPayload.success && serverPayload.student) {
+                unifiedData = {
+                  success: true,
+                  student: serverPayload.student,
+                  attendanceHistory: serverPayload.attendanceHistory || {},
+                  attendanceLogs: serverPayload.attendanceLogs || [],
+                  payments: serverPayload.payments || {},
+                  paymentsList: serverPayload.paymentsList || [],
+                  homeworkList: serverPayload.homeworkList || [],
+                  examScores: serverPayload.examScores || [],
+                  examGradesList: serverPayload.examGradesList || [],
+                  messagesList: serverPayload.messagesList || serverPayload.unreadNotices || [],
+                  lastExamTitle: serverPayload.lastExamTitle || serverPayload.student?.lastExamTitle || "",
+                  lastExamScore: serverPayload.lastExamScore || serverPayload.student?.lastExamScore || "",
+                  account: serverPayload.account || null,
+                  message: serverPayload.message,
+                };
+              }
+            }
+          } catch (serverErr) {
+            console.warn("[useParentPortalData] Fast server endpoint notice, attempting direct Supabase query:", serverErr);
+          }
+
+          // Resilient Fallback: If server route did not return a student, fetch directly from Supabase Cloud
+          if (!unifiedData || !unifiedData.success || !unifiedData.student) {
+            unifiedData = await fetchUnifiedStudentPortalDataFromSupabase(cleanInput);
+          }
 
           if (unifiedData && unifiedData.success) {
             setSessionPortalData(cleanInput, unifiedData);
