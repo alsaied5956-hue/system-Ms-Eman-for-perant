@@ -1122,13 +1122,13 @@ export async function deleteStudentFromSupabase(barcode: string): Promise<void> 
     await Promise.allSettled([
       supabase.from("students").delete().or(`barcode.eq.${cleanBarcode},id.eq.${studentId}`),
       supabase.from("parent_accounts").delete().or(`id.eq.${studentId},id.eq.${barcodeToUUID(cleanBarcode)},id.eq.${cleanBarcode},student_barcode.eq.${cleanBarcode},parent_phone.eq.${cleanBarcode}`),
-      supabase.from("attendance_logs").delete().or(orFilter),
-      supabase.from("homework").delete().or(orFilter),
-      supabase.from("payments").delete().or(orFilter),
-      supabase.from("exam_grades").delete().or(orFilter),
-      supabase.from("evaluations").delete().or(orFilter),
-      supabase.from("chat_messages").delete().or(`${orFilter},chat_id.eq.${cleanBarcode}`),
-      supabase.from("messages").delete().or(`${orFilter},chat_id.eq.${cleanBarcode}`),
+      supabase.from("attendance_logs").delete().or(studentId ? `student_id.eq.${studentId},barcode.eq.${cleanBarcode}` : `barcode.eq.${cleanBarcode}`),
+      supabase.from("homework").delete().eq("student_id", studentId),
+      supabase.from("payments").delete().eq("student_id", studentId),
+      supabase.from("exam_grades").delete().eq("student_id", studentId),
+      supabase.from("evaluations").delete().eq("student_id", studentId),
+      supabase.from("chat_messages").delete().eq("student_id", studentId),
+      supabase.from("messages").delete().eq("student_id", studentId),
       supabase.from("push_subscriptions").delete().or(`barcode.eq.${cleanBarcode},student_barcode.eq.${cleanBarcode}`),
     ]);
 
@@ -2202,26 +2202,41 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       const sId = String(studentData.id || "").trim();
       const bCode = String(studentData.barcode || cleanInput).trim();
 
-      // Step B: Dual-Key matching filter across all sub-tables
-      const dualKeyFilter = bCode && sId
-        ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`
-        : sId
-        ? `student_id.eq.${sId}`
-        : `student_barcode.eq.${bCode},barcode.eq.${bCode}`;
-
-      const chatDualKeyFilter = bCode && sId
-        ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode},chat_id.eq.${bCode}`
-        : dualKeyFilter;
-
-      // Helper for direct sub-table queries using Dual-Key filter
+      // Helper for direct sub-table queries using table-appropriate filters
       const querySubTableDirect = async (
         tableName: string,
-        filter: string,
         orderCol?: string,
         ascending = false
       ): Promise<any[]> => {
         try {
-          let q = supabase.from(tableName).select("*").or(filter);
+          let q = supabase.from(tableName).select("*");
+          if (tableName === "payments" || tableName === "homework" || tableName === "chat_messages" || tableName === "messages") {
+            if (!sId) return [];
+            q = q.eq("student_id", sId);
+          } else if (tableName === "attendance_logs") {
+            if (sId && bCode) {
+              q = q.or(`student_id.eq.${sId},barcode.eq.${bCode}`);
+            } else if (sId) {
+              q = q.eq("student_id", sId);
+            } else if (bCode) {
+              q = q.eq("barcode", bCode);
+            } else {
+              return [];
+            }
+          } else if (tableName === "exam_grades" || tableName === "evaluations") {
+            if (sId && bCode) {
+              q = q.or(`student_id.eq.${sId},barcode.eq.${bCode}`);
+            } else if (sId) {
+              q = q.eq("student_id", sId);
+            } else if (bCode) {
+              q = q.eq("barcode", bCode);
+            } else {
+              return [];
+            }
+          } else {
+            if (sId) q = q.eq("student_id", sId);
+          }
+
           if (orderCol) {
             q = q.order(orderCol, { ascending });
           }
@@ -2231,7 +2246,15 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
           }
           if (res.error && orderCol) {
             // Retry without order column if schema does not support orderCol
-            const retryRes = await supabase.from(tableName).select("*").or(filter);
+            let retryQ = supabase.from(tableName).select("*");
+            if (tableName === "payments" || tableName === "homework" || tableName === "chat_messages" || tableName === "messages") {
+              if (sId) retryQ = retryQ.eq("student_id", sId);
+            } else if (tableName === "attendance_logs" || tableName === "exam_grades" || tableName === "evaluations") {
+              if (sId && bCode) retryQ = retryQ.or(`student_id.eq.${sId},barcode.eq.${bCode}`);
+              else if (sId) retryQ = retryQ.eq("student_id", sId);
+              else if (bCode) retryQ = retryQ.eq("barcode", bCode);
+            }
+            const retryRes = await retryQ;
             if (!retryRes.error && Array.isArray(retryRes.data)) {
               return retryRes.data;
             }
@@ -2243,20 +2266,20 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
         }
       };
 
-      // Parallel direct queries to all 5 sub-tables for authentic sub-second responses
+      // Parallel direct queries to all sub-tables for authentic sub-second responses
       const [attendance, homework, payments, grades, chatMessages] = await Promise.all([
-        querySubTableDirect("attendance_logs", dualKeyFilter, "date_key", false),
-        querySubTableDirect("homework", dualKeyFilter, "date_key", false),
-        querySubTableDirect("payments", dualKeyFilter, "month_key", false),
-        querySubTableDirect("exam_grades", dualKeyFilter, "created_at", false).then(async (rows) => {
+        querySubTableDirect("attendance_logs", "date_key", false),
+        querySubTableDirect("homework", "date_key", false),
+        querySubTableDirect("payments", "month_key", false),
+        querySubTableDirect("exam_grades", "created_at", false).then(async (rows) => {
           if (!rows || rows.length === 0) {
-            return await querySubTableDirect("evaluations", dualKeyFilter, "created_at", false);
+            return await querySubTableDirect("evaluations", "created_at", false);
           }
           return rows;
         }),
-        querySubTableDirect("chat_messages", chatDualKeyFilter, "created_at", true).then(async (rows) => {
+        querySubTableDirect("chat_messages", "created_at", true).then(async (rows) => {
           if (!rows || rows.length === 0) {
-            return await querySubTableDirect("messages", chatDualKeyFilter, "created_at", true);
+            return await querySubTableDirect("messages", "created_at", true);
           }
           return rows;
         }),
@@ -2323,7 +2346,7 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
     );
     const paymentsMap: Record<string, any> = {};
     paymentsList.forEach((p: any) => {
-      const pDate = p.created_at || p.date || p.timestamp || p.payment_date || "";
+      const pDate = p.payment_date || p.date || p.created_at || p.timestamp || "";
       const pDateStr = typeof pDate === "string" ? pDate.slice(0, 10) : "";
       const mKey = p.month_key || p.month || (pDateStr ? pDateStr.slice(0, 7) : "");
       const pTitle = p.subject || p.title || p.name || (mKey ? `مصروفات شهر ${mKey}` : "سداد اشتراك");
@@ -2338,15 +2361,16 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
           discount: Number(p.discount || 0),
           status: p.status || "paid",
           date: pDateStr,
-          time: typeof pDate === "string" && pDate.length >= 16 ? pDate.slice(11, 16) : "",
+          time: p.time || (typeof pDate === "string" && pDate.length >= 16 ? pDate.slice(11, 16) : ""),
           subject: pTitle,
           title: pTitle,
           name: pTitle,
           note: p.notes || "",
           notes: p.notes || "",
           recordedBy: p.received_by || "الإشراف",
-          timestamp: p.created_at ? new Date(p.created_at).getTime() : Date.now(),
+          timestamp: p.payment_date ? new Date(p.payment_date).getTime() : (p.created_at ? new Date(p.created_at).getTime() : Date.now()),
           created_at: p.created_at,
+          payment_date: p.payment_date,
         };
         paymentsMap[mKey] = {
           ...paymentRecord,

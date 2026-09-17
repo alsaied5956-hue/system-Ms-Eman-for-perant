@@ -1199,29 +1199,59 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
   }, []);
 
   const currentMonthPayment = useMemo(() => {
-    const monthMap = effectivePayments[currentMonthKey] || {};
-    return activeStudent?.barcode ? monthMap[activeStudent.barcode] : undefined;
-  }, [effectivePayments, currentMonthKey, activeStudent?.barcode]);
+    const bCode = activeStudent?.barcode ? String(activeStudent.barcode).trim() : "";
+    const monthData = effectivePayments ? effectivePayments[currentMonthKey] : undefined;
+    if (monthData) {
+      if (bCode && monthData[bCode]) return monthData[bCode];
+      if (monthData.amount !== undefined || monthData.paidAmount !== undefined || monthData.monthKey) return monthData;
+    }
+    if (supabasePortalData?.paymentsList && Array.isArray(supabasePortalData.paymentsList)) {
+      const found = supabasePortalData.paymentsList.find(
+        (p: any) => (p.month_key || p.month || p.monthKey) === currentMonthKey
+      );
+      if (found) {
+        const pDate = found.payment_date || found.date || found.created_at || "";
+        const pDateStr = typeof pDate === "string" ? pDate.slice(0, 10) : "";
+        const pAmount = Number(found.amount_paid ?? found.amount ?? found.paidAmount ?? 0);
+        return {
+          barcode: bCode,
+          monthKey: currentMonthKey,
+          amount: pAmount,
+          paidAmount: pAmount,
+          requiredAmount: Number(found.required_amount || 0),
+          discount: Number(found.discount || 0),
+          status: found.status || "paid",
+          date: pDateStr,
+          time: found.time || (typeof pDate === "string" && pDate.length >= 16 ? pDate.slice(11, 16) : ""),
+          note: found.notes || found.note || "",
+          notes: found.notes || found.note || "",
+          recordedBy: found.received_by || "الإشراف",
+        };
+      }
+    }
+    return undefined;
+  }, [effectivePayments, currentMonthKey, activeStudent?.barcode, supabasePortalData?.paymentsList]);
 
   // 3. Payment History (All recorded payments for this student with dynamic payload key normalization)
   const paymentHistoryList = useMemo(() => {
     const list: PaymentRecord[] = [];
     if (!activeStudent?.barcode) return list;
+    const bCode = String(activeStudent.barcode).trim();
     const seenMonths = new Set<string>();
 
     // 1. From supabasePortalData.paymentsList (Dual-Key Supabase Fetch)
     if (supabasePortalData?.paymentsList && Array.isArray(supabasePortalData.paymentsList)) {
       supabasePortalData.paymentsList.forEach((p: any) => {
-        const pDate = p.created_at || p.date || p.timestamp || p.payment_date || "";
+        const pDate = p.payment_date || p.date || p.created_at || p.timestamp || "";
         const pDateStr = typeof pDate === "string" ? pDate.slice(0, 10) : "";
         const mKey = p.month_key || p.month || p.monthKey || (pDateStr ? pDateStr.slice(0, 7) : "");
         const pTitle = p.subject || p.title || p.name || (mKey ? `مصروفات شهر ${mKey}` : "سداد اشتراك");
         const pAmount = Number(p.amount_paid ?? p.amount ?? p.paidAmount ?? 0);
-        if (mKey) {
+        if (mKey && !seenMonths.has(mKey)) {
           seenMonths.add(mKey);
           list.push({
             id: p.id,
-            barcode: activeStudent.barcode,
+            barcode: bCode,
             monthKey: mKey,
             month: mKey,
             amount: pAmount,
@@ -1230,25 +1260,37 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
             discount: Number(p.discount || 0),
             status: p.status || "paid",
             date: pDateStr,
-            time: typeof pDate === "string" && pDate.length >= 16 ? pDate.slice(11, 16) : "",
+            time: p.time || (typeof pDate === "string" && pDate.length >= 16 ? pDate.slice(11, 16) : ""),
             subject: pTitle,
             title: pTitle,
             name: pTitle,
             note: p.notes || p.note || pTitle,
             notes: p.notes || p.note || pTitle,
             recordedBy: p.received_by || "الإشراف",
-            timestamp: p.created_at ? new Date(p.created_at).getTime() : Date.now(),
+            timestamp: p.payment_date ? new Date(p.payment_date).getTime() : (p.created_at ? new Date(p.created_at).getTime() : Date.now()),
           } as any);
         }
       });
     }
 
-    // 2. From effectivePayments state map
+    // 2. From effectivePayments state map (handles both nested barcode map and flat month map)
     Object.keys(effectivePayments || {}).forEach((mKey) => {
-      const rec = effectivePayments[mKey]?.[activeStudent.barcode];
+      const monthData = effectivePayments[mKey];
+      let rec: any = undefined;
+      if (bCode && monthData?.[bCode]) {
+        rec = monthData[bCode];
+      } else if (monthData && (monthData.amount !== undefined || monthData.paidAmount !== undefined || monthData.monthKey)) {
+        rec = monthData;
+      }
       if (rec && !seenMonths.has(mKey)) {
         seenMonths.add(mKey);
-        list.push(rec);
+        list.push({
+          ...rec,
+          month: rec.month || rec.monthKey || mKey,
+          monthKey: rec.monthKey || rec.month || mKey,
+          amount: Number(rec.amount ?? rec.paidAmount ?? 0),
+          paidAmount: Number(rec.paidAmount ?? rec.amount ?? 0),
+        });
       }
     });
 
@@ -1283,9 +1325,13 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       { key: `${endYear}-07`, label: `يوليو ${endYear}`, monthNumber: 7, year: endYear },
     ];
 
-    // Also include any payment months that exist in payments for this student outside standard list
+    const bCode = activeStudent?.barcode ? String(activeStudent.barcode).trim() : "";
+
+    // Include any payment months from effectivePayments outside standard 12 months
     Object.keys(effectivePayments || {}).forEach((mKey) => {
-      if (activeStudent?.barcode && effectivePayments[mKey]?.[activeStudent.barcode] && !list.some((item) => item.key === mKey)) {
+      const monthData = effectivePayments[mKey];
+      const hasPay = (bCode && monthData?.[bCode]) || (monthData && (monthData.amount !== undefined || monthData.paidAmount !== undefined));
+      if (hasPay && !list.some((item) => item.key === mKey)) {
         list.push({
           key: mKey,
           label: mKey,
@@ -1295,16 +1341,66 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       }
     });
 
+    // Include any payment months from supabasePortalData.paymentsList
+    if (supabasePortalData?.paymentsList && Array.isArray(supabasePortalData.paymentsList)) {
+      supabasePortalData.paymentsList.forEach((p: any) => {
+        const mKey = p.month_key || p.month || p.monthKey;
+        if (mKey && !list.some((item) => item.key === mKey)) {
+          list.push({
+            key: mKey,
+            label: mKey,
+            monthNumber: parseInt(mKey.split("-")[1] || "1", 10),
+            year: parseInt(mKey.split("-")[0] || String(currentYear), 10),
+          });
+        }
+      });
+    }
+
     return list;
-  }, [effectivePayments, activeStudent?.barcode]);
+  }, [effectivePayments, activeStudent?.barcode, supabasePortalData?.paymentsList]);
 
   // 5. Full Academic Ledger Entries
   const ledgerEntries = useMemo(() => {
+    const bCode = activeStudent?.barcode ? String(activeStudent.barcode).trim() : "";
     return academicMonths.map((m) => {
-      const pay = activeStudent?.barcode ? effectivePayments[m.key]?.[activeStudent.barcode] : undefined;
-      const isPaid = !!pay;
-      const paidAmount = pay ? pay.amount : 0;
-      const requiredAmount = standardMonthlyFee;
+      let pay: any = undefined;
+      const monthData = effectivePayments ? effectivePayments[m.key] : undefined;
+      if (monthData) {
+        if (bCode && monthData[bCode]) {
+          pay = monthData[bCode];
+        } else if (monthData.amount !== undefined || monthData.paidAmount !== undefined || monthData.monthKey) {
+          pay = monthData;
+        }
+      }
+      if (!pay && supabasePortalData?.paymentsList && Array.isArray(supabasePortalData.paymentsList)) {
+        const found = supabasePortalData.paymentsList.find(
+          (p: any) => (p.month_key || p.month || p.monthKey) === m.key
+        );
+        if (found) {
+          const pDate = found.payment_date || found.date || found.created_at || "";
+          const pDateStr = typeof pDate === "string" ? pDate.slice(0, 10) : "";
+          const pAmount = Number(found.amount_paid ?? found.amount ?? found.paidAmount ?? 0);
+          pay = {
+            barcode: bCode,
+            monthKey: m.key,
+            amount: pAmount,
+            paidAmount: pAmount,
+            requiredAmount: Number(found.required_amount || 0),
+            discount: Number(found.discount || 0),
+            status: found.status || "paid",
+            date: pDateStr,
+            time: found.time || (typeof pDate === "string" && pDate.length >= 16 ? pDate.slice(11, 16) : ""),
+            note: found.notes || found.note || "",
+            notes: found.notes || found.note || "",
+            recordedBy: found.received_by || "الإشراف",
+            timestamp: found.payment_date ? new Date(found.payment_date).getTime() : (found.created_at ? new Date(found.created_at).getTime() : Date.now()),
+          };
+        }
+      }
+
+      const isPaid = !!pay && (Number(pay.amount || pay.paidAmount || 0) > 0 || pay.status === "paid");
+      const paidAmount = pay ? Number(pay.paidAmount ?? pay.amount ?? 0) : 0;
+      const requiredAmount = (pay && Number(pay.requiredAmount) > 0) ? Number(pay.requiredAmount) : standardMonthlyFee;
       const balance = isPaid ? paidAmount - requiredAmount : -requiredAmount;
       const isPastOrCurrent = m.key <= currentMonthKey;
 
@@ -1319,7 +1415,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
         isPastOrCurrent,
       };
     });
-  }, [academicMonths, effectivePayments, activeStudent?.barcode, standardMonthlyFee, currentMonthKey]);
+  }, [academicMonths, effectivePayments, activeStudent?.barcode, standardMonthlyFee, currentMonthKey, supabasePortalData?.paymentsList]);
 
   // Full Ledger Totals
   const totalRequiredAnnual = useMemo(() => ledgerEntries.reduce((acc, curr) => acc + curr.requiredAmount, 0), [ledgerEntries]);

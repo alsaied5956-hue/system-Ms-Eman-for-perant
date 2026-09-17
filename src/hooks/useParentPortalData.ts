@@ -60,20 +60,34 @@ export async function fetchChildTableWithDualKey(
   try {
     const sId = String(studentId || "").trim();
     const bCode = String(studentBarcode || "").trim();
-    const dualKeyFilter = bCode && sId
-      ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`
-      : sId
-      ? `student_id.eq.${sId}`
-      : `student_barcode.eq.${bCode},barcode.eq.${bCode}`;
-
     let q = supabase.from(tableName).select("*");
-    if (tableName === "chat_messages" || tableName === "messages") {
-      const chatFilter = bCode && sId
-        ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode},chat_id.eq.${bCode}`
-        : dualKeyFilter;
-      q = q.or(chatFilter);
+
+    if (tableName === "payments" || tableName === "homework" || tableName === "chat_messages" || tableName === "messages") {
+      if (!sId) return [];
+      q = q.eq("student_id", sId);
+    } else if (tableName === "attendance_logs") {
+      if (sId && bCode) {
+        q = q.or(`student_id.eq.${sId},barcode.eq.${bCode}`);
+      } else if (sId) {
+        q = q.eq("student_id", sId);
+      } else if (bCode) {
+        q = q.eq("barcode", bCode);
+      } else {
+        return [];
+      }
+    } else if (tableName === "exam_grades" || tableName === "evaluations") {
+      if (sId && bCode) {
+        q = q.or(`student_id.eq.${sId},barcode.eq.${bCode}`);
+      } else if (sId) {
+        q = q.eq("student_id", sId);
+      } else if (bCode) {
+        q = q.eq("barcode", bCode);
+      } else {
+        return [];
+      }
     } else {
-      q = q.or(dualKeyFilter);
+      if (sId) q = q.eq("student_id", sId);
+      else if (bCode) q = q.eq("barcode", bCode);
     }
 
     if (orderCol) {
@@ -86,7 +100,17 @@ export async function fetchChildTableWithDualKey(
 
     // Direct fallback without order column in case column is not indexed
     if (res.error && orderCol) {
-      const fallbackRes = await supabase.from(tableName).select("*").or(dualKeyFilter);
+      let retryQ = supabase.from(tableName).select("*");
+      if (tableName === "payments" || tableName === "homework" || tableName === "chat_messages" || tableName === "messages") {
+        if (sId) retryQ = retryQ.eq("student_id", sId);
+      } else if (tableName === "attendance_logs" || tableName === "exam_grades" || tableName === "evaluations") {
+        if (sId && bCode) retryQ = retryQ.or(`student_id.eq.${sId},barcode.eq.${bCode}`);
+        else if (sId) retryQ = retryQ.eq("student_id", sId);
+        else if (bCode) retryQ = retryQ.eq("barcode", bCode);
+      } else {
+        if (sId) retryQ = retryQ.eq("student_id", sId);
+      }
+      const fallbackRes = await retryQ;
       if (!fallbackRes.error && Array.isArray(fallbackRes.data)) {
         return fallbackRes.data;
       }

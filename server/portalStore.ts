@@ -867,17 +867,26 @@ export async function getStudentPortalData(query: string): Promise<{
           payRes.value.data.forEach((p: any) => {
             const mKey = p.month_key;
             if (mKey) {
-              studentPayments[mKey] = {
+              const rec = {
+                barcode: bCode,
                 monthKey: mKey,
                 amount: Number(p.amount_paid || 0),
                 paidAmount: Number(p.amount_paid || 0),
                 requiredAmount: Number(p.required_amount || 0),
+                discount: Number(p.discount || 0),
+                status: p.status || "paid",
                 date: p.payment_date ? p.payment_date.slice(0, 10) : "",
                 time: p.payment_date ? p.payment_date.slice(11, 16) : "",
                 note: p.notes || "",
                 notes: p.notes || "",
                 recordedBy: p.received_by || "الإشراف",
-                timestamp: p.created_at ? new Date(p.created_at).getTime() : Date.now(),
+                timestamp: p.payment_date ? new Date(p.payment_date).getTime() : (p.created_at ? new Date(p.created_at).getTime() : Date.now()),
+                created_at: p.created_at,
+                payment_date: p.payment_date,
+              };
+              studentPayments[mKey] = {
+                ...rec,
+                [bCode]: rec,
               };
             }
           });
