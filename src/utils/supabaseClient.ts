@@ -829,7 +829,7 @@ export async function saveBulkAttendanceToSupabase(
   records: Array<{
     barcode: string;
     studentName: string;
-    status: "حضور" | "تأخير" | "غياب";
+    status: "حضور" | "تأخير" | "غياب" | "غائب";
     dateKey: string;
     scannedBy?: string;
   }>
@@ -841,13 +841,14 @@ export async function saveBulkAttendanceToSupabase(
     for (const rec of records) {
       const sId = await getStudentIdByBarcode(rec.barcode);
       if (!sId) continue;
+      const normalizedStatus = (rec.status === "غياب" || rec.status === "غائب") ? "غائب" : rec.status;
       rowsToInsert.push({
         student_id: sId,
         barcode: String(rec.barcode).trim(),
         student_name: rec.studentName,
         date_key: rec.dateKey,
         time_recorded: new Date().toISOString(),
-        status: rec.status,
+        status: normalizedStatus,
         scanned_by: rec.scannedBy || "admin",
       });
     }
@@ -1495,8 +1496,8 @@ export async function pullFullStateFromSupabase(): Promise<Partial<SystemData> |
     }
 
     // Merge attendance records from paginated results
+    const history: Record<string, Record<string, string>> = baseState.attendanceHistory ? { ...baseState.attendanceHistory } : {};
     if (allAttendanceLogs.length > 0) {
-      const history: Record<string, Record<string, string>> = baseState.attendanceHistory ? { ...baseState.attendanceHistory } : {};
       allAttendanceLogs.forEach((att: any) => {
         const dKey = att.date_key;
         const b = att.barcode ? String(att.barcode).trim() : (att.student_id ? studentIdToBarcode.get(att.student_id) : null);

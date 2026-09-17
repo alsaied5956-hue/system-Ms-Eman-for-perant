@@ -276,18 +276,27 @@ export default function App() {
 
       if (change.eventType === "DELETE") {
         setAttendanceHistory((prev) => {
-          if (!prev[bCode]) return prev;
-          const copy = { ...prev[bCode] };
-          delete copy[dateKey];
-          return { ...prev, [bCode]: copy };
+          if (!prev[dateKey]) return prev;
+          const copy = { ...prev[dateKey] };
+          delete copy[bCode];
+          return { ...prev, [dateKey]: copy };
         });
+        const todayKey = new Date().toISOString().slice(0, 10);
+        if (dateKey === todayKey) {
+          setAttendanceToday((prev) => {
+            const next = { ...prev };
+            delete next[bCode];
+            return next;
+          });
+        }
       } else if (newRow) {
-        const status = newRow.status || "حضور";
+        const rawStatus = newRow.status || "حضور";
+        const status = (rawStatus === "غياب" || rawStatus === "غائب") ? "غائب" : rawStatus;
         setAttendanceHistory((prev) => ({
           ...prev,
-          [bCode]: {
-            ...(prev[bCode] || {}),
-            [dateKey]: status,
+          [dateKey]: {
+            ...(prev[dateKey] || {}),
+            [bCode]: status,
           },
         }));
         const todayKey = new Date().toISOString().slice(0, 10);
@@ -985,11 +994,11 @@ export default function App() {
     // ⚡ Supabase Direct Persistence: Bulk save all attendance statuses in parallel
     const bulkAttendanceRecords = groupStudents.map((s) => {
       const b = String(s.barcode).trim();
-      const st = absentBarcodes.has(b) ? "غياب" : lateBarcodes.has(b) ? "تأخير" : "حضور";
+      const st = absentBarcodes.has(b) ? "غائب" : lateBarcodes.has(b) ? "تأخير" : "حضور";
       return {
         barcode: b,
         studentName: s.name,
-        status: st as "حضور" | "تأخير" | "غياب",
+        status: st as "حضور" | "تأخير" | "غائب" | "غياب",
         dateKey: todayKey,
         scannedBy: currentUser?.username || "admin",
       };
