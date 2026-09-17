@@ -931,55 +931,11 @@ export async function getStudentPortalData(query: string): Promise<{
           });
         }
 
-        // Parse homework list and extract any exam evaluations
+        // Parse homework list
         const homeworkList: any[] = [];
         if (hwRes.status === "fulfilled" && hwRes.value.data) {
           hwRes.value.data.forEach((h: any, idx: number) => {
             const rawGrade = h.grade !== undefined ? h.grade : (h.score !== undefined ? h.score : h.degree);
-            const hasScore = rawGrade !== null && rawGrade !== undefined && rawGrade !== "";
-            const isExam =
-              hasScore ||
-              (typeof h.notes === "string" && (h.notes.includes("امتحان") || h.notes.includes("اختبار") || h.notes.includes("تقييم") || h.notes.includes("درجة") || h.notes.includes("رصد"))) ||
-              (typeof h.title === "string" && (h.title.includes("امتحان") || h.title.includes("اختبار") || h.title.includes("تقييم")));
-
-            if (isExam) {
-              const sc = Number(rawGrade) || 0;
-              const maxSc = Number(h.max_score !== undefined && h.max_score !== null ? h.max_score : (h.maxScore !== undefined && h.maxScore !== null ? h.maxScore : 10)) || 10;
-              const pct = Math.min(100, Math.round((sc / maxSc) * 100));
-              const title = h.title || h.subject || "التقييم الدوري";
-              const date = h.date_key || h.date || (h.created_at ? String(h.created_at).slice(0, 10) : "");
-              const notes = h.notes || "";
-
-              const alreadyExists = examGradesList.some((e) => e.id === h.id || (e.examTitle === title && e.date === date && e.score === sc));
-              if (!alreadyExists) {
-                examGradesList.push({
-                  id: h.id || `exam-hw-${idx}`,
-                  studentId: h.student_id || sId,
-                  student_id: h.student_id || sId,
-                  barcode: bCode,
-                  student_barcode: bCode,
-                  studentBarcode: bCode,
-                  grade: rawGrade,
-                  score: sc,
-                  maxScore: maxSc,
-                  max_score: maxSc,
-                  subject: h.subject || "الرياضيات",
-                  date,
-                  examDate: date,
-                  exam_date: date,
-                  examTitle: title,
-                  exam_title: title,
-                  title,
-                  percentage: pct,
-                  teacherNotes: notes,
-                  teacher_notes: notes,
-                  notes,
-                  createdAt: h.created_at || new Date().toISOString(),
-                  scoreFormatted: `${sc} / ${maxSc} (${pct}%)`,
-                  score_formatted: `${sc} / ${maxSc} (${pct}%)`,
-                });
-              }
-            }
 
             homeworkList.push({
               id: h.id || `hw-${idx}`,

@@ -753,22 +753,10 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     return payments || {};
   }, [payments, supabasePortalData, activeStudent?.barcode, selectedStudentBarcode, account.studentBarcode]);
 
-  // Live Authoritative Attendance History Map (Single Source Hydration Lock)
+  // Live Authoritative Attendance History Map (Preserves authentic attendance logs)
   const effectiveAttendanceHistory = useMemo(() => {
-    const targetBarcode = String(activeStudent?.barcode || selectedStudentBarcode || account.studentBarcode).trim();
-    if (!targetBarcode) return attendanceHistory || {};
-
-    if (supabasePortalData && supabasePortalData.attendanceHistory !== undefined) {
-      const result: Record<string, Record<string, string>> = {};
-      for (const [dKey, status] of Object.entries(supabasePortalData.attendanceHistory || {})) {
-        result[dKey] = {
-          [targetBarcode]: String(status || ""),
-        };
-      }
-      return result;
-    }
     return attendanceHistory || {};
-  }, [attendanceHistory, supabasePortalData, activeStudent?.barcode, selectedStudentBarcode, account.studentBarcode]);
+  }, [attendanceHistory]);
 
   // Real-time chat subscription for the active student's thread
   useEffect(() => {
@@ -1440,17 +1428,6 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       }
     });
 
-    // Also populate with supabasePortalData.attendanceLogs with payload key normalization:
-    if (supabasePortalData?.attendanceLogs && Array.isArray(supabasePortalData.attendanceLogs)) {
-      supabasePortalData.attendanceLogs.forEach((att: any) => {
-        const attDate = att.created_at || att.date || att.timestamp || att.date_key;
-        const dKey = att.date_key || (typeof attDate === "string" ? attDate.slice(0, 10) : "");
-        if (dKey) {
-          recordedDatesMap[dKey] = att.status || "حضور";
-        }
-      });
-    }
-
     // Also include today's live scan if active
     if (activeStudent.barcode && attendanceToday[activeStudent.barcode]) {
       recordedDatesMap[todayKey] = attendanceToday[activeStudent.barcode];
@@ -1580,7 +1557,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     logs.sort((a, b) => b.date.localeCompare(a.date));
 
     return logs;
-  }, [activeStudent, effectiveAttendanceHistory, attendanceToday, scanLogTimes, supabasePortalData?.attendanceLogs]);
+  }, [activeStudent, effectiveAttendanceHistory, attendanceToday, scanLogTimes]);
 
   // Filtered attendance logs based on tab selection
   const filteredAttendanceLogs = useMemo(() => {
@@ -1632,18 +1609,10 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     }[] = [];
     if (!activeStudent) return list;
 
-    // 1. If supabasePortalData has rich examGradesList or exam-like homework, prioritize it
+    // 1. If supabasePortalData has rich examGradesList, prioritize it
     const rawExamItems = (supabasePortalData?.examGradesList && supabasePortalData.examGradesList.length > 0)
       ? supabasePortalData.examGradesList
-      : (supabasePortalData?.homeworkList || []).filter((h: any) => {
-          const rawGrade = h.grade !== undefined ? h.grade : (h.score !== undefined ? h.score : h.degree);
-          const hasScore = rawGrade !== null && rawGrade !== undefined && rawGrade !== "";
-          return (
-            hasScore ||
-            (typeof h.notes === "string" && (h.notes.includes("امتحان") || h.notes.includes("اختبار") || h.notes.includes("تقييم"))) ||
-            (typeof h.title === "string" && (h.title.includes("امتحان") || h.title.includes("اختبار") || h.title.includes("تقييم")))
-          );
-        });
+      : [];
 
     if (rawExamItems.length > 0) {
       rawExamItems.forEach((g: any, idx: number) => {
@@ -1707,7 +1676,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     }
 
     return list;
-  }, [activeStudent, supabasePortalData?.examGradesList, supabasePortalData?.homeworkList]);
+  }, [activeStudent, supabasePortalData?.examGradesList]);
 
   // 6. Handle Linking another child
   const handleLinkChildSubmit = async (e: React.FormEvent) => {

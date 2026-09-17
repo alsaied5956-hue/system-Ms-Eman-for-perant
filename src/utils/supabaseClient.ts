@@ -2202,39 +2202,32 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       const sId = String(studentData.id || "").trim();
       const bCode = String(studentData.barcode || cleanInput).trim();
 
-      // Helper for direct sub-table queries using table-appropriate filters
+      // Step B: Dual-Key matching filter across all sub-tables
+      const dualKeyFilter = bCode && sId
+        ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`
+        : sId
+        ? `student_id.eq.${sId}`
+        : `student_barcode.eq.${bCode},barcode.eq.${bCode}`;
+
+      const chatDualKeyFilter = bCode && sId
+        ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode},chat_id.eq.${bCode}`
+        : dualKeyFilter;
+
+      // Helper for direct sub-table queries
       const querySubTableDirect = async (
         tableName: string,
+        filter: string,
         orderCol?: string,
         ascending = false
       ): Promise<any[]> => {
         try {
           let q = supabase.from(tableName).select("*");
-          if (tableName === "payments" || tableName === "homework" || tableName === "chat_messages" || tableName === "messages") {
+          // Keep payments fixed with student_id
+          if (tableName === "payments") {
             if (!sId) return [];
             q = q.eq("student_id", sId);
-          } else if (tableName === "attendance_logs") {
-            if (sId && bCode) {
-              q = q.or(`student_id.eq.${sId},barcode.eq.${bCode}`);
-            } else if (sId) {
-              q = q.eq("student_id", sId);
-            } else if (bCode) {
-              q = q.eq("barcode", bCode);
-            } else {
-              return [];
-            }
-          } else if (tableName === "exam_grades" || tableName === "evaluations") {
-            if (sId && bCode) {
-              q = q.or(`student_id.eq.${sId},barcode.eq.${bCode}`);
-            } else if (sId) {
-              q = q.eq("student_id", sId);
-            } else if (bCode) {
-              q = q.eq("barcode", bCode);
-            } else {
-              return [];
-            }
           } else {
-            if (sId) q = q.eq("student_id", sId);
+            q = q.or(filter);
           }
 
           if (orderCol) {
@@ -2247,12 +2240,10 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
           if (res.error && orderCol) {
             // Retry without order column if schema does not support orderCol
             let retryQ = supabase.from(tableName).select("*");
-            if (tableName === "payments" || tableName === "homework" || tableName === "chat_messages" || tableName === "messages") {
+            if (tableName === "payments") {
               if (sId) retryQ = retryQ.eq("student_id", sId);
-            } else if (tableName === "attendance_logs" || tableName === "exam_grades" || tableName === "evaluations") {
-              if (sId && bCode) retryQ = retryQ.or(`student_id.eq.${sId},barcode.eq.${bCode}`);
-              else if (sId) retryQ = retryQ.eq("student_id", sId);
-              else if (bCode) retryQ = retryQ.eq("barcode", bCode);
+            } else {
+              retryQ = retryQ.or(filter);
             }
             const retryRes = await retryQ;
             if (!retryRes.error && Array.isArray(retryRes.data)) {
@@ -2268,18 +2259,18 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
 
       // Parallel direct queries to all sub-tables for authentic sub-second responses
       const [attendance, homework, payments, grades, chatMessages] = await Promise.all([
-        querySubTableDirect("attendance_logs", "date_key", false),
-        querySubTableDirect("homework", "date_key", false),
-        querySubTableDirect("payments", "month_key", false),
-        querySubTableDirect("exam_grades", "created_at", false).then(async (rows) => {
+        querySubTableDirect("attendance_logs", dualKeyFilter, "date_key", false),
+        querySubTableDirect("homework", dualKeyFilter, "date_key", false),
+        querySubTableDirect("payments", dualKeyFilter, "month_key", false),
+        querySubTableDirect("exam_grades", dualKeyFilter, "created_at", false).then(async (rows) => {
           if (!rows || rows.length === 0) {
-            return await querySubTableDirect("evaluations", "created_at", false);
+            return await querySubTableDirect("evaluations", dualKeyFilter, "created_at", false);
           }
           return rows;
         }),
-        querySubTableDirect("chat_messages", "created_at", true).then(async (rows) => {
+        querySubTableDirect("chat_messages", chatDualKeyFilter, "created_at", true).then(async (rows) => {
           if (!rows || rows.length === 0) {
-            return await querySubTableDirect("messages", "created_at", true);
+            return await querySubTableDirect("messages", chatDualKeyFilter, "created_at", true);
           }
           return rows;
         }),
@@ -2453,52 +2444,6 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
         timestamp: g.timestamp,
         scoreFormatted: `${rawGrade !== undefined ? rawGrade : score} / ${maxScore} (${pct}%)`,
       });
-    });
-
-    // B. Parse evaluation and exam records stored in homework table (where scores and evaluations are recorded)
-    rawHomework.forEach((hw: any, idx: number) => {
-      const rawGrade = hw.grade !== undefined ? hw.grade : (hw.score !== undefined ? hw.score : hw.degree);
-      const hasScore = rawGrade !== null && rawGrade !== undefined && rawGrade !== "";
-      const isExam =
-        hasScore ||
-        (typeof hw.notes === "string" && (hw.notes.includes("امتحان") || hw.notes.includes("اختبار") || hw.notes.includes("تقييم") || hw.notes.includes("درجة") || hw.notes.includes("رصد"))) ||
-        (typeof hw.title === "string" && (hw.title.includes("امتحان") || hw.title.includes("اختبار") || hw.title.includes("تقييم")));
-
-      if (isExam) {
-        const score = Number(rawGrade) || 0;
-        const maxScore = Number(hw.max_score || hw.maxScore || 10);
-        const pct = Math.min(100, Math.round((score / maxScore) * 100));
-        const examTitle = hw.title || hw.subject || hw.name || "التقييم الدوري";
-        const examDate = hw.created_at || hw.date || hw.timestamp || hw.date_key || "";
-        const cleanExamDate = typeof examDate === "string" ? (examDate.length >= 10 ? examDate.slice(0, 10) : examDate) : "";
-        const notes = hw.notes || hw.teacher_notes || "";
-        const key = hw.id || `${examTitle}-${cleanExamDate}-${score}`;
-
-        if (!examGradesMap.has(key)) {
-          examGradesMap.set(key, {
-            id: hw.id || `exam-hw-${idx}`,
-            studentId: hw.student_id || studentRow.id,
-            barcode: bCode,
-            examTitle,
-            title: examTitle,
-            subject: hw.subject || "الرياضيات",
-            name: examTitle,
-            grade: rawGrade,
-            score,
-            degree: hw.degree,
-            maxScore,
-            max_score: maxScore,
-            percentage: pct,
-            teacherNotes: notes,
-            notes,
-            examDate: cleanExamDate,
-            date: cleanExamDate,
-            created_at: hw.created_at || cleanExamDate,
-            timestamp: hw.timestamp,
-            scoreFormatted: `${score} / ${maxScore} (${pct}%)`,
-          });
-        }
-      }
     });
 
     let examGradesList = Array.from(examGradesMap.values());
