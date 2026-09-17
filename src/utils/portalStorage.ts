@@ -849,10 +849,27 @@ export function subscribeToAllParentAccounts(
   };
   accountEventsBus?.addEventListener("message", handleBus);
 
-  // 3. Window Custom Event listeners
-  const handleCustomEvent = () => {
+  // 3. Window Custom Event listeners (with direct payload merging)
+  const handleCustomEvent = (ev: Event) => {
     if (isCancelled) return;
-    onUpdate(getLocalParentAccounts());
+    const customEv = ev as CustomEvent;
+    const current = getLocalParentAccounts();
+    if (customEv.detail?.account) {
+      const acc = customEv.detail.account;
+      const bCode = normalizeBarcode(acc.studentBarcode);
+      if (bCode) {
+        removeDeletedTombstone(bCode);
+        current[bCode] = acc;
+        saveLocalParentAccounts(current);
+      }
+    } else if (customEv.detail?.barcode && customEv.type === "eman_account_revoked") {
+      const bCode = normalizeBarcode(customEv.detail.barcode);
+      if (bCode && current[bCode]) {
+        delete current[bCode];
+        saveLocalParentAccounts(current);
+      }
+    }
+    onUpdate({ ...current });
   };
   if (typeof window !== "undefined") {
     window.addEventListener("eman_account_activated", handleCustomEvent);
@@ -874,7 +891,73 @@ export function subscribeToAllParentAccounts(
     window.addEventListener("storage", handleStorage);
   }
 
-  // 5. Firestore Live Realtime Listeners (Phone to PC / PC to Phone)
+  // 5. Server-Sent Events (SSE) Live Cloud Stream for Cross-Device Instant Sync (0ms latency without refresh)
+  let sseSource: EventSource | null = null;
+  if (typeof window !== "undefined" && typeof EventSource !== "undefined") {
+    try {
+      sseSource = new EventSource("/api/portal/live-stream?role=supervisor");
+      sseSource.onmessage = (event) => {
+        if (isCancelled || !event.data) return;
+        try {
+          const data = JSON.parse(event.data);
+          const type = data.type;
+          if (
+            type === "ACCOUNT_SAVED" ||
+            type === "ACCOUNT_ACTIVATED" ||
+            type === "account_status_changed" ||
+            type === "ACCOUNTS_MUTATED"
+          ) {
+            const acc = data.account as ParentAccount | undefined;
+            const b = normalizeBarcode(data.barcode || acc?.studentBarcode);
+            if (b) {
+              removeDeletedTombstone(b);
+              if (Array.isArray(acc?.linkedBarcodes)) {
+                acc.linkedBarcodes.forEach((lb: string) => removeDeletedTombstone(lb));
+              }
+              const current = getLocalParentAccounts();
+              if (acc) {
+                current[b] = { ...current[b], ...acc, status: (acc.status || data.status || "active") as any };
+              } else if (current[b]) {
+                current[b].status = (data.status || "active") as any;
+              }
+              saveLocalParentAccounts(current);
+              onUpdate({ ...current });
+            } else {
+              syncParentAccountsFromCloud(false).then((fresh) => {
+                if (!isCancelled && fresh) onUpdate(fresh);
+              }).catch(() => {});
+            }
+          } else if (type === "ACCOUNT_DELETED" || type === "ACCOUNT_REVOKED") {
+            const b = normalizeBarcode(data.barcode);
+            if (b) {
+              addDeletedTombstones([b]);
+              const current = getLocalParentAccounts();
+              delete current[b];
+              saveLocalParentAccounts(current);
+              onUpdate({ ...current });
+            }
+          }
+        } catch {}
+      };
+    } catch (err) {
+      console.warn("Supervisor SSE subscription notice:", err);
+    }
+  }
+
+  // 6. Real-time background delta-sync interval every 8s while tab is active (failsafe against network blips)
+  const syncInterval = setInterval(() => {
+    if (isCancelled) return;
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+    syncParentAccountsFromCloud(false)
+      .then((fresh) => {
+        if (!isCancelled && fresh && Object.keys(fresh).length > 0) {
+          onUpdate(fresh);
+        }
+      })
+      .catch(() => {});
+  }, 8000);
+
+  // 7. Firestore Live Realtime Listeners (Phone to PC / PC to Phone)
   let unsubCollection: (() => void) | null = null;
   let unsubRegistry: (() => void) | null = null;
   let unsubRevocations: (() => void) | null = null;
@@ -993,10 +1076,17 @@ export function subscribeToAllParentAccounts(
 
   return () => {
     isCancelled = true;
+    clearInterval(syncInterval);
+    if (sseSource) {
+      try {
+        sseSource.close();
+      } catch {}
+    }
     accountEventsBus?.removeEventListener("message", handleBus);
     if (typeof window !== "undefined") {
       window.removeEventListener("eman_account_activated", handleCustomEvent);
       window.removeEventListener("eman_account_revoked", handleCustomEvent);
+      window.removeEventListener("eman_account_sync", handleCustomEvent);
       window.removeEventListener("storage", handleStorage);
       window.removeEventListener("focus", refreshOnResume);
     }
@@ -1542,6 +1632,7 @@ export async function registerParentAccount(
   };
 
   // Immediate local save (0ms)
+  removeDeletedTombstone(student.barcode);
   existingAccounts[student.barcode] = newAccount;
   saveLocalParentAccounts(existingAccounts);
 
@@ -1639,6 +1730,7 @@ export async function batchActivateParentAccounts(
     const bCode = item.studentBarcode.trim();
     if (!bCode) continue;
     if (!accounts[bCode] || accounts[bCode].status !== "active") {
+      removeDeletedTombstone(bCode);
       const acc: ParentAccount = {
         studentBarcode: bCode,
         studentName: accounts[bCode]?.studentName || "طالب مسجل",
@@ -1816,6 +1908,25 @@ export async function authenticatePortalLogin(
               a.linkedBarcodes.includes(rawTrimmed)))
       );
     }
+  }
+
+  // 3. Query authoritative server store (<20ms) if missing or if local cache has mismatch
+  if (!account || account.status === "deleted" || (account.password && account.password !== passTrimmed)) {
+    try {
+      const serverRes = await fetch("/api/portal/accounts-sync", {
+        headers: { "Cache-Control": "no-cache" },
+      });
+      if (serverRes.ok) {
+        const sData = await serverRes.json();
+        const serverAcc = sData?.accounts?.[barcodeTrimmed] || sData?.accounts?.[rawTrimmed];
+        if (serverAcc && serverAcc.status === "active") {
+          account = serverAcc;
+          accounts[barcodeTrimmed] = serverAcc;
+          removeDeletedTombstone(barcodeTrimmed);
+          saveLocalParentAccounts(accounts);
+        }
+      }
+    } catch {}
   }
 
   if (!account || account.status === "deleted") {

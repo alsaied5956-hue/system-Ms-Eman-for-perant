@@ -53,28 +53,44 @@ function getAudioContext(): AudioContext | null {
   }
 }
 
+export function unlockAudioContext(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const ctx = getAudioContext();
+    if (ctx) {
+      if (ctx.state === "suspended") {
+        ctx.resume().catch(() => {});
+      }
+      const buffer = ctx.createBuffer(1, 1, 22050);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
 // Auto-unlock audio context on first user interaction so sound can play smoothly on mobile phones
 if (typeof window !== "undefined") {
   const unlockAudio = () => {
-    try {
-      const ctx = getAudioContext();
-      if (ctx && ctx.state === "suspended") {
-        ctx.resume().catch(() => {});
-      }
-    } catch {}
+    unlockAudioContext();
   };
   window.addEventListener("click", unlockAudio, { passive: true });
   window.addEventListener("touchstart", unlockAudio, { passive: true });
   window.addEventListener("keydown", unlockAudio, { passive: true });
+  window.addEventListener("pointerdown", unlockAudio, { passive: true });
 
   // Safe Post-Interaction Audio Chime: Dispatched by Service Worker upon user notification click
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.addEventListener("message", (event) => {
       if (event.data?.type === "USER_INTERACTED_PLAY_ALERT") {
-        unlockAudio();
+        unlockAudioContext();
         if (event.data.sound) {
           try {
             const audio = new Audio(event.data.sound);
+            audio.volume = 1.0;
             audio.play().catch(() => {
               playPortalAudioChime("alert");
             });
@@ -106,8 +122,7 @@ export function playPortalAudioChime(type: NotificationType): void {
     audio.volume = 1.0;
     const playPromise = audio.play();
     if (playPromise !== undefined) {
-      playPromise.catch((err) => {
-        console.warn("[Portal Audio] Autoplay policy prevented audio playback (relying on PWA system push notifications):", err?.name || err);
+      playPromise.catch(() => {
         try {
           const fallback = new Audio("/notification.wav");
           fallback.volume = 1.0;
@@ -118,9 +133,7 @@ export function playPortalAudioChime(type: NotificationType): void {
         } catch {}
       });
     }
-  } catch (err) {
-    console.warn("[Portal Audio] Audio constructor policy notice:", err);
-  }
+  } catch {}
 
   const ctx = getAudioContext();
   if (!ctx) return;
@@ -136,48 +149,48 @@ export function playPortalAudioChime(type: NotificationType): void {
 
   try {
     if (normType === "attendance") {
-      // Pleasant clear double-chime (D5 -> A5)
-      playTone(ctx, 587.33, now, 0.18, "sine", 0.45);
-      playTone(ctx, 880.0, now + 0.12, 0.45, "sine", 0.55);
+      // Pleasant clear high double-chime (D5 -> A5)
+      playTone(ctx, 587.33, now, 0.2, "triangle", 0.85);
+      playTone(ctx, 880.0, now + 0.12, 0.5, "sine", 0.95);
     } else if (normType === "absence") {
       // Urgent attention-grabbing minor alert triad (E4 -> C4 -> G4)
-      playTone(ctx, 329.63, now, 0.22, "triangle", 0.5);
-      playTone(ctx, 261.63, now + 0.16, 0.35, "sine", 0.55);
-      playTone(ctx, 392.0, now + 0.32, 0.45, "triangle", 0.6);
+      playTone(ctx, 329.63, now, 0.25, "triangle", 0.9);
+      playTone(ctx, 261.63, now + 0.16, 0.35, "sine", 0.95);
+      playTone(ctx, 392.0, now + 0.32, 0.55, "triangle", 1.0);
     } else if (normType === "delay" || normType === "late") {
       // Warning prompt (F4 -> G4 -> D5)
-      playTone(ctx, 349.23, now, 0.18, "sine", 0.45);
-      playTone(ctx, 392.0, now + 0.12, 0.25, "triangle", 0.5);
-      playTone(ctx, 587.33, now + 0.25, 0.4, "sine", 0.55);
+      playTone(ctx, 349.23, now, 0.2, "triangle", 0.85);
+      playTone(ctx, 392.0, now + 0.12, 0.3, "triangle", 0.9);
+      playTone(ctx, 587.33, now + 0.25, 0.45, "sine", 0.95);
     } else if (normType === "fee" || normType === "payment") {
       // Harmonic celebratory chime (C5 -> E5 -> G5)
-      playTone(ctx, 523.25, now, 0.15, "sine", 0.4);
-      playTone(ctx, 659.25, now + 0.1, 0.18, "sine", 0.45);
-      playTone(ctx, 783.99, now + 0.2, 0.45, "sine", 0.55);
+      playTone(ctx, 523.25, now, 0.16, "sine", 0.85);
+      playTone(ctx, 659.25, now + 0.1, 0.2, "triangle", 0.9);
+      playTone(ctx, 783.99, now + 0.2, 0.5, "sine", 0.95);
     } else if (normType === "grade" || normType === "exam") {
       // Ascending success arpeggio (G4 -> C5 -> E5 -> G5)
-      playTone(ctx, 392.0, now, 0.12, "sine", 0.4);
-      playTone(ctx, 523.25, now + 0.1, 0.12, "sine", 0.45);
-      playTone(ctx, 659.25, now + 0.18, 0.14, "sine", 0.5);
-      playTone(ctx, 783.99, now + 0.26, 0.5, "sine", 0.6);
+      playTone(ctx, 392.0, now, 0.14, "sine", 0.85);
+      playTone(ctx, 523.25, now + 0.1, 0.15, "triangle", 0.9);
+      playTone(ctx, 659.25, now + 0.18, 0.18, "sine", 0.95);
+      playTone(ctx, 783.99, now + 0.26, 0.6, "triangle", 1.0);
     } else if (normType === "homework") {
       // Academic task chime (E5 -> B5 -> G#5)
-      playTone(ctx, 659.25, now, 0.12, "sine", 0.4);
-      playTone(ctx, 987.77, now + 0.1, 0.22, "sine", 0.5);
-      playTone(ctx, 830.61, now + 0.2, 0.35, "sine", 0.45);
+      playTone(ctx, 659.25, now, 0.15, "triangle", 0.85);
+      playTone(ctx, 987.77, now + 0.12, 0.25, "sine", 0.95);
+      playTone(ctx, 830.61, now + 0.22, 0.4, "triangle", 0.9);
     } else if (normType === "chat" || normType === "message") {
       // Modern message bubble pop-chime (F5 -> C6)
-      playTone(ctx, 698.46, now, 0.1, "sine", 0.45);
-      playTone(ctx, 1046.5, now + 0.08, 0.3, "sine", 0.5);
+      playTone(ctx, 698.46, now, 0.12, "sine", 0.9);
+      playTone(ctx, 1046.5, now + 0.08, 0.35, "triangle", 0.95);
     } else if (normType === "edit" || normType === "data_edit") {
       // Data updated notification chime (A4 -> C#5 -> E5)
-      playTone(ctx, 440.0, now, 0.14, "sine", 0.4);
-      playTone(ctx, 554.37, now + 0.1, 0.18, "sine", 0.45);
-      playTone(ctx, 659.25, now + 0.2, 0.35, "sine", 0.5);
+      playTone(ctx, 440.0, now, 0.16, "sine", 0.85);
+      playTone(ctx, 554.37, now + 0.12, 0.2, "triangle", 0.9);
+      playTone(ctx, 659.25, now + 0.22, 0.4, "sine", 0.95);
     } else {
-      // General alert chime
-      playTone(ctx, 440.0, now, 0.3, "sine", 0.45);
-      playTone(ctx, 660.0, now + 0.15, 0.4, "sine", 0.5);
+      // General loud alert chime
+      playTone(ctx, 520.0, now, 0.25, "triangle", 0.9);
+      playTone(ctx, 780.0, now + 0.15, 0.45, "sine", 1.0);
     }
   } catch (err) {
     console.warn("Audio chime error:", err);

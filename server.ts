@@ -167,6 +167,7 @@ function persistRevokedAccounts(): void {
 function broadcastAccountEvent(eventData: {
   type: string;
   barcode: string;
+  account?: any;
   reason?: string;
   timestamp: number;
 }) {
@@ -793,12 +794,44 @@ app.get("/api/portal/accounts-sync", (_req, res) => {
 app.post("/api/portal/account-save", (req, res) => {
   try {
     const saved = saveParentAccountRecord(req.body);
+    const barcode = String(saved.studentBarcode || "").trim();
+
+    if (saved.status === "active" && barcode) {
+      revokedAccountsCache.delete(barcode);
+      if (Array.isArray(saved.linkedBarcodes)) {
+        saved.linkedBarcodes.forEach((b: string) => {
+          const cleanB = String(b || "").trim();
+          if (cleanB) revokedAccountsCache.delete(cleanB);
+        });
+      }
+      persistRevokedAccounts();
+
+      broadcastAccountEvent({
+        type: "ACCOUNT_ACTIVATED",
+        barcode,
+        account: saved,
+        timestamp: Date.now(),
+      });
+    }
+
     broadcastPortalSSE({
       type: "ACCOUNT_SAVED",
       account: saved,
-      barcode: saved.studentBarcode,
+      barcode,
+      status: saved.status,
       timestamp: Date.now(),
     });
+
+    if (saved.status === "active") {
+      broadcastPortalSSE({
+        type: "ACCOUNT_ACTIVATED",
+        account: saved,
+        barcode,
+        status: "active",
+        timestamp: Date.now(),
+      });
+    }
+
     return res.json({ success: true, account: saved });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });

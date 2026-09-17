@@ -38,6 +38,7 @@ import {
   sendPortalNotification,
   playPortalAudioChime,
   requestNotificationPermission,
+  unlockAudioContext,
 } from "../../utils/portalNotifications";
 import { SESSION_START_TIME, shouldNotifyEvent } from "../../utils/notificationTracker";
 import { PWAInstallButton } from "./PWAInstallButton";
@@ -78,6 +79,7 @@ import {
   CheckCheck,
   MessageCircle,
   X,
+  Volume2,
 } from "lucide-react";
 
 interface AdminControlPanelProps {
@@ -206,9 +208,22 @@ export const AdminControlPanel: React.FC<AdminControlPanelProps> = ({
       setActivityLogs(updatedLogs);
     });
 
+    // 4. Background auto-sync interval every 8 seconds while supervisor is on the page
+    const supervisorSyncTimer = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      syncParentAccountsFromCloud(false)
+        .then((synced) => {
+          if (synced && Object.keys(synced).length > 0) {
+            setAccounts(synced);
+          }
+        })
+        .catch(() => {});
+    }, 8000);
+
     return () => {
       unsubAccounts();
       unsubLogs();
+      clearInterval(supervisorSyncTimer);
     };
   }, []);
 
@@ -960,6 +975,7 @@ export const AdminControlPanel: React.FC<AdminControlPanelProps> = ({
 
   // Test Notification & Chime
   const handleTestChimeAndNotification = async () => {
+    unlockAudioContext();
     playPortalAudioChime("grade");
     await sendPortalNotification(
       "منظومة الأستاذة إيمان الدمشيتي",
@@ -993,6 +1009,16 @@ export const AdminControlPanel: React.FC<AdminControlPanelProps> = ({
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={handleTestChimeAndNotification}
+              className="px-2.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+              title="اختبار التنبيه الصوتي والإشعارات وفك قيود الصوت بالمتصفح"
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">تجربة الصوت</span>
+            </button>
+
             <PWAInstallButton variant="compact" />
 
             <button

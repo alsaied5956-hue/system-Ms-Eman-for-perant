@@ -1777,18 +1777,19 @@ export async function saveParentAccountRecordToSupabase(account: ParentAccount):
 
 /**
  * Single Indexed Parent Account Lookup Engine.
- * Direct indexed query filtered ONLY by student barcode UUID.
- * Zero sequential retries, zero phone column variations, zero cascading fallback lookups.
+ * Direct indexed query filtered by student barcode UUID with fallback by phone/id.
  */
 export async function queryParentAccountByBarcode(
   barcode?: string | null,
-  timeoutMs: number = 2000
+  timeoutMs: number = 2500
 ): Promise<any | null> {
   const cleanBarcode = normalizeBarcode(barcode);
   if (!cleanBarcode) return null;
   const uuid = barcodeToUUID(cleanBarcode);
+  const cleanPhone = normalizePhone(barcode);
 
   try {
+    // 1. Primary fast query by UUID
     const { data } = await withTimeout(
       supabase
         .from("parent_accounts")
@@ -1798,7 +1799,25 @@ export async function queryParentAccountByBarcode(
       timeoutMs,
       "استعلام حساب ولي الأمر المباشر"
     );
-    return data || null;
+    if (data) return data;
+
+    // 2. Direct query by raw ID or phone
+    const orConditions: string[] = [`id.eq.${cleanBarcode}`];
+    if (cleanPhone) {
+      orConditions.push(`parent_phone.eq.${cleanPhone}`);
+    }
+
+    const { data: fallbackData } = await withTimeout(
+      supabase
+        .from("parent_accounts")
+        .select("*")
+        .or(orConditions.join(","))
+        .limit(1)
+        .maybeSingle(),
+      1500,
+      "استعلام بديل لحساب ولي الأمر"
+    );
+    return fallbackData || null;
   } catch {
     return null;
   }

@@ -135,6 +135,7 @@ if (typeof firebase !== "undefined") {
       const vibratePattern = getVibrationPattern(notifType);
 
       // Enforce standard OS sound (default_sound: true) and high-priority vibration patterns
+      const soundUrl = self.location.origin + "/notification.wav";
       const notificationOptions = {
         title,
         body,
@@ -142,15 +143,18 @@ if (typeof firebase !== "undefined") {
         badge,
         vibrate: vibratePattern,
         silent: false, // Rings mobile device default notification chime
-        sound: "/notification.wav",
+        sound: soundUrl,
         renotify: true,
         requireInteraction: true,
         tag: payload.data?.tag || eventId,
+        channelId: "high_importance_loud_channel",
         data: {
           url: targetUrl,
           eventId,
           type: notifType,
+          sound: soundUrl,
           default_sound: true,
+          channelId: "high_importance_loud_channel",
           timestamp: Date.now(),
           ...payload.data,
         },
@@ -189,6 +193,7 @@ self.addEventListener("push", (event) => {
       return [200, 100, 200, 100, 300];
     }
 
+    const soundUrl = self.location.origin + "/notification.wav";
     const options = {
       title,
       body,
@@ -196,14 +201,17 @@ self.addEventListener("push", (event) => {
       badge,
       vibrate: getPushVibrationPattern(notifType),
       silent: false, // Rings device notification chime
-      sound: "/notification.wav",
+      sound: soundUrl,
       renotify: true,
       requireInteraction: true,
       tag: notifTag,
+      channelId: "high_importance_loud_channel",
       data: {
         url: data.url || (notifType === "chat" ? "/?tab=chat" : "/"),
         eventId: data.eventId,
+        sound: soundUrl,
         default_sound: true,
+        channelId: "high_importance_loud_channel",
         timestamp: data.timestamp || Date.now(),
       },
       dir: "rtl",
@@ -213,14 +221,16 @@ self.addEventListener("push", (event) => {
     event.waitUntil(self.registration.showNotification(title, options));
   } catch (err) {
     const text = event.data.text();
+    const soundUrl = self.location.origin + "/notification.wav";
     event.waitUntil(
       self.registration.showNotification("منظومة الأستاذة إيمان الدمشيتي", {
         body: text,
         icon: "/icon.svg",
         vibrate: [200, 100, 200, 100, 300],
         silent: false,
-        sound: "/notification.wav",
+        sound: soundUrl,
         renotify: true,
+        channelId: "high_importance_loud_channel",
         dir: "rtl",
         lang: "ar",
       })
