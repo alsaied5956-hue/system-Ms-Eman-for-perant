@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { barcodeToUUID, normalizeBarcode, normalizePhone, getAllParentAccounts } from "./portalStore";
+import { barcodeToUUID, normalizeBarcode, normalizePhone, getAllParentAccounts, getSystemCache } from "./portalStore";
 
 const SUPABASE_URL =
   process.env.VITE_SUPABASE_URL ||
@@ -110,10 +110,27 @@ export async function queryParentAccountFCMTokens(
   const memAccounts = getAllParentAccounts();
 
   // Match each target ID to a parent account
+  const sysStudents = getSystemCache()?.students || [];
+
   for (const target of cleanTargets) {
     const cleanBarcode = normalizeBarcode(target);
     const cleanPhone = normalizePhone(target);
     const targetUuid = barcodeToUUID(cleanBarcode || target).toLowerCase();
+
+    // Bi-directional lookup: find student if target matches barcode, parent phone, or phone
+    const matchedStudent = sysStudents.find((s: any) => {
+      const sB = normalizeBarcode(s.barcode) || String(s.barcode || "").trim();
+      const sP = normalizePhone(s.parentPhone) || String(s.parentPhone || "").trim();
+      const sPh = normalizePhone(s.phone) || String(s.phone || "").trim();
+      return (
+        (cleanBarcode && (sB === cleanBarcode || sB === target)) ||
+        (cleanPhone && (sP === cleanPhone || sPh === cleanPhone || sP.includes(cleanPhone) || cleanPhone.includes(sP)))
+      );
+    });
+
+    const associatedBarcode = matchedStudent ? (normalizeBarcode(matchedStudent.barcode) || String(matchedStudent.barcode || "").trim()) : cleanBarcode;
+    const associatedPhone = matchedStudent ? (normalizePhone(matchedStudent.parentPhone) || String(matchedStudent.parentPhone || "").trim()) : cleanPhone;
+    const associatedUuid = associatedBarcode ? barcodeToUUID(associatedBarcode).toLowerCase() : null;
 
     let matchedRow: any = null;
 
@@ -128,8 +145,11 @@ export async function queryParentAccountFCMTokens(
       if (
         rowId === targetUuid ||
         rowId === target.toLowerCase() ||
+        (associatedUuid && rowId === associatedUuid) ||
         (cleanPhone && rowPhone && (rowPhone === cleanPhone || rowPhone.includes(cleanPhone) || cleanPhone.includes(rowPhone))) ||
+        (associatedPhone && rowPhone && (rowPhone === associatedPhone || rowPhone.includes(associatedPhone) || associatedPhone.includes(rowPhone))) ||
         (cleanBarcode && linked.includes(cleanBarcode)) ||
+        (associatedBarcode && linked.includes(associatedBarcode)) ||
         linked.includes(target)
       ) {
         matchedRow = row;
@@ -139,12 +159,15 @@ export async function queryParentAccountFCMTokens(
 
     // Fallback to in-memory cache
     if (!matchedRow && memAccounts) {
-      const cached = memAccounts[target] || (cleanBarcode ? memAccounts[cleanBarcode] : undefined);
+      const cached =
+        memAccounts[target] ||
+        (cleanBarcode ? memAccounts[cleanBarcode] : undefined) ||
+        (associatedBarcode ? memAccounts[associatedBarcode] : undefined);
       if (cached) {
         matchedRow = {
           id: cached.id || targetUuid,
-          parent_phone: cached.parentPhone,
-          linked_student_barcodes: cached.linkedBarcodes || [target],
+          parent_phone: cached.parentPhone || associatedPhone,
+          linked_student_barcodes: cached.linkedBarcodes || [associatedBarcode || target],
           fcm_token: cached.fcmToken || "",
           status: cached.status || "active",
         };
@@ -174,25 +197,27 @@ export async function queryParentAccountFCMTokens(
           targetId: target,
           accountFound: true,
           fcmToken: rawToken,
-          parentPhone: matchedRow.parent_phone,
-          studentBarcodes: matchedRow.linked_student_barcodes,
+          parentPhone: matchedRow.parent_phone || associatedPhone,
+          studentBarcodes: matchedRow.linked_student_barcodes || (associatedBarcode ? [associatedBarcode] : []),
           status,
         });
       } else {
-        const msg = `[FCM Parent Dispatcher ERROR] Missing active fcm_token for student/parent target ID: "${target}" in 'parent_accounts' table (token is empty or unset). Push notification dropped for this recipient.`;
+        const msg = `[FCM Parent Dispatcher Notice] Missing active fcm_token for student/parent target ID: "${target}" in 'parent_accounts' table (token is empty or unset). Push notification dropped for this recipient.`;
         logs.push(msg);
-        console.error(msg);
+        console.info(msg);
         tokenMap.set(target, {
           targetId: target,
           accountFound: true,
           fcmToken: null,
+          parentPhone: matchedRow.parent_phone || associatedPhone,
+          studentBarcodes: matchedRow.linked_student_barcodes || (associatedBarcode ? [associatedBarcode] : []),
           status,
         });
       }
     } else {
-      const msg = `[FCM Parent Dispatcher ERROR] No parent account record found in 'parent_accounts' for student/parent target ID: "${target}". Cannot deliver FCM push notification.`;
+      const msg = `[FCM Parent Dispatcher Notice] No parent account record found in 'parent_accounts' for student/parent target ID: "${target}". Cannot deliver FCM push notification.`;
       logs.push(msg);
-      console.error(msg);
+      console.info(msg);
       tokenMap.set(target, {
         targetId: target,
         accountFound: false,
@@ -420,10 +445,10 @@ export async function dispatchReliableParentPush(
             logs.push(`[FCM Parent Dispatcher] FCM HTTP v1 dispatch OK for target "${item.targetId}".`);
           } else {
             const errText = await res.text();
-            console.error(`[FCM Parent Dispatcher ERROR] FCM HTTP v1 rejected token for target "${item.targetId}" (${res.status}):`, errText);
+            console.warn(`[FCM Parent Dispatcher] FCM HTTP v1 notice for target "${item.targetId}" (${res.status}):`, errText);
             // Handle dead token (404/410/UNREGISTERED/INVALID_ARGUMENT)
             if (res.status === 404 || res.status === 410 || errText.includes("UNREGISTERED") || errText.includes("INVALID_ARGUMENT")) {
-              console.error(`[FCM Parent Dispatcher ERROR] Token for target "${item.targetId}" is EXPIRED or INVALID. Pruning dead token from database.`);
+              console.info(`[FCM Parent Dispatcher] Token for target "${item.targetId}" expired or unregistered. Pruning token from database.`);
               invalidateDeadFCMToken(item.targetId, item.token);
             }
             fcmFailed++;
@@ -454,7 +479,7 @@ export async function dispatchReliableParentPush(
       fcmFailed++;
       const errMsg = `[FCM Parent Dispatcher] Exception dispatching to target "${item.targetId}": ${err?.message || err}`;
       logs.push(errMsg);
-      console.error(errMsg);
+      console.warn(errMsg);
       failureDetails.push({
         targetId: item.targetId,
         error: err?.message || String(err),

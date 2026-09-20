@@ -1595,13 +1595,13 @@ app.post("/api/send-push", async (req, res) => {
     const totalDelivered = dispatchReport.fcmDispatched + dispatchReport.webPushDispatched;
 
     if (dispatchReport.missingTokens.length > 0) {
-      console.error(
-        `[SendPush Dispatcher ERROR] Missing active fcm_token in parent_accounts for recipient target(s): ${dispatchReport.missingTokens.join(", ")}`
+      console.info(
+        `[SendPush Dispatcher] Recipients pending active fcm_token registration: ${dispatchReport.missingTokens.join(", ")} (WebPush fallback applied if registered)`
       );
     }
     if (dispatchReport.failureDetails.length > 0) {
-      console.error(
-        `[SendPush Dispatcher ERROR] Delivery failure details for recipient(s):`,
+      console.warn(
+        `[SendPush Dispatcher] Delivery notices for recipient(s):`,
         JSON.stringify(dispatchReport.failureDetails)
       );
     }

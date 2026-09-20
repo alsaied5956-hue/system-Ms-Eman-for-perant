@@ -792,6 +792,9 @@ function withLocalTimeout<T>(promise: Promise<T>, ms: number, errorMsg = "Databa
   });
 }
 
+let activeSupabaseQueriesCount = 0;
+const MAX_CONCURRENT_SUPABASE_QUERIES = 10;
+
 async function fetchStudentPortalDataInternal(
   cleanBarcode: string,
   cleanPhone: string
@@ -818,8 +821,9 @@ async function fetchStudentPortalDataInternal(
 }> {
   const todayKey = getTodayKey();
 
-  // 1. Primary Source of Truth: Direct Supabase Authoritative Query (with 2500ms timeout guard)
-  if (supabaseServer) {
+  // 1. Primary Source of Truth: Direct Supabase Authoritative Query (with concurrency surge limiter & 2500ms timeout guard)
+  if (supabaseServer && activeSupabaseQueriesCount < MAX_CONCURRENT_SUPABASE_QUERIES) {
+    activeSupabaseQueriesCount++;
     try {
       const supabaseFetchOp = async () => {
         let studentRow: any = null;
@@ -1099,6 +1103,8 @@ async function fetchStudentPortalDataInternal(
       }
     } catch (err) {
       console.warn("[portalStore] Supabase surge notice, falling back seamlessly to authentic cache:", err);
+    } finally {
+      activeSupabaseQueriesCount--;
     }
   }
 
@@ -1122,20 +1128,60 @@ async function fetchStudentPortalDataInternal(
   }
 
   const bCode = String(student.barcode).trim();
+  const normBCode = normalizeBarcode(bCode);
 
   // Collect student-specific attendance history
   const studentHistory: Record<string, string> = {};
   for (const [date, rec] of Object.entries(systemDataCache.attendanceHistory || {})) {
-    if (rec && rec[bCode]) {
-      studentHistory[date] = rec[bCode];
+    if (rec && typeof rec === "object") {
+      let val = rec[bCode] ?? rec[normBCode];
+      if (val === undefined) {
+        for (const [k, v] of Object.entries(rec)) {
+          if (normalizeBarcode(k) === normBCode || String(k).trim() === bCode) {
+            val = v;
+            break;
+          }
+        }
+      }
+      if (val !== undefined && val !== null) {
+        studentHistory[date] = (typeof val === "object" && val !== null) ? ((val as any).status || (val as any).state || "حضور") : String(val);
+      }
+    }
+  }
+
+  // Also include today's live scan if active
+  let todayVal = systemDataCache.attendanceToday[bCode] ?? systemDataCache.attendanceToday[normBCode];
+  if (todayVal === undefined) {
+    for (const [k, v] of Object.entries(systemDataCache.attendanceToday || {})) {
+      if (normalizeBarcode(k) === normBCode || String(k).trim() === bCode) {
+        todayVal = v;
+        break;
+      }
+    }
+  }
+  if (todayVal) {
+    const todayKey = getTodayKey();
+    if (!studentHistory[todayKey]) {
+      studentHistory[todayKey] = (typeof todayVal === "object" && todayVal !== null) ? ((todayVal as any).status || "حضور") : String(todayVal);
     }
   }
 
   // Collect student-specific payments
   const studentPayments: Record<string, any> = {};
   for (const [mKey, pMap] of Object.entries(systemDataCache.payments || {})) {
-    if (pMap && pMap[bCode]) {
-      studentPayments[mKey] = pMap[bCode];
+    if (pMap && typeof pMap === "object") {
+      let pVal = pMap[bCode] ?? pMap[normBCode];
+      if (!pVal) {
+        for (const [k, v] of Object.entries(pMap)) {
+          if (normalizeBarcode(k) === normBCode || String(k).trim() === bCode) {
+            pVal = v;
+            break;
+          }
+        }
+      }
+      if (pVal) {
+        studentPayments[mKey] = pVal;
+      }
     }
   }
 
@@ -1153,7 +1199,7 @@ async function fetchStudentPortalDataInternal(
   // Build authentic paymentsList from payments
   const paymentsList = Object.entries(studentPayments)
     .map(([mKey, p]) => {
-      const pRec = p && p[bCode] ? p[bCode] : p;
+      const pRec = (p && typeof p === "object" && (p[bCode] ?? p[normBCode])) ? (p[bCode] ?? p[normBCode]) : p;
       return {
         student_id: student.id,
         barcode: bCode,

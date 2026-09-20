@@ -742,21 +742,130 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     return baseActiveStudent;
   }, [baseActiveStudent, supabasePortalData, selectedStudentBarcode, account]);
 
+// Helper: Flexible barcode key lookup that handles trimming, string/number variations, and whitespace
+function getFlexBarcodeVal<T = any>(obj: Record<string, T> | undefined | null, barcode: string): T | undefined {
+  if (!obj || typeof obj !== "object") return undefined;
+  const clean = String(barcode || "").trim();
+  if (!clean) return undefined;
+  if (obj[clean] !== undefined) return obj[clean];
+  if (obj[barcode] !== undefined) return obj[barcode];
+  for (const [k, v] of Object.entries(obj)) {
+    if (String(k).trim() === clean) return v;
+  }
+  return undefined;
+}
+
+function normalizeAttendanceStatus(raw: any): "حضور" | "تأخير" | "غائب" | "إذن" {
+  const str = String(raw || "").trim();
+  if (str === "حاضر" || str === "حضور" || str === "present") return "حضور";
+  if (str === "تأخير" || str === "late") return "تأخير";
+  if (str === "غائب" || str === "غياب" || str === "absent") return "غائب";
+  if (str === "إذن" || str === "excused") return "إذن";
+  return "حضور";
+}
+
   // Live Authoritative Payments Map (Single Source Hydration Lock)
   const effectivePayments = useMemo(() => {
     const targetBarcode = String(activeStudent?.barcode || selectedStudentBarcode || account.studentBarcode).trim();
     if (!targetBarcode) return payments || {};
 
-    if (supabasePortalData && supabasePortalData.payments !== undefined) {
-      return supabasePortalData.payments || {};
+    const merged: Record<string, any> = {};
+
+    // 1. Copy over payments prop
+    if (payments && typeof payments === "object") {
+      Object.entries(payments).forEach(([mKey, monthObj]) => {
+        if (monthObj && typeof monthObj === "object") {
+          merged[mKey] = { ...monthObj };
+        }
+      });
     }
-    return payments || {};
+
+    // 2. Merge supabasePortalData.payments
+    if (supabasePortalData?.payments && typeof supabasePortalData.payments === "object") {
+      Object.entries(supabasePortalData.payments).forEach(([mKey, pVal]) => {
+        if (!merged[mKey]) merged[mKey] = {};
+        if (typeof pVal === "object" && pVal !== null) {
+          const innerVal = getFlexBarcodeVal(pVal, targetBarcode);
+          if (innerVal !== undefined) {
+            merged[mKey][targetBarcode] = innerVal;
+          } else {
+            merged[mKey][targetBarcode] = pVal;
+          }
+        }
+      });
+    }
+
+    // 3. Merge from supabasePortalData.paymentsList
+    if (Array.isArray(supabasePortalData?.paymentsList)) {
+      supabasePortalData.paymentsList.forEach((p: any) => {
+        const mKey = p.month_key || p.monthKey || p.month;
+        if (mKey) {
+          if (!merged[mKey]) merged[mKey] = {};
+          const pRec = {
+            barcode: targetBarcode,
+            monthKey: mKey,
+            amount: Number(p.amount_paid ?? p.amount ?? p.paidAmount ?? 0),
+            paidAmount: Number(p.amount_paid ?? p.amount ?? p.paidAmount ?? 0),
+            requiredAmount: Number(p.required_amount ?? 0),
+            discount: Number(p.discount ?? 0),
+            status: p.status || "paid",
+            date: p.payment_date || p.date || "",
+            notes: p.notes || p.note || "",
+            recordedBy: p.received_by || "الإشراف",
+          };
+          merged[mKey][targetBarcode] = pRec;
+        }
+      });
+    }
+
+    return merged;
   }, [payments, supabasePortalData, activeStudent?.barcode, selectedStudentBarcode, account.studentBarcode]);
 
-  // Live Authoritative Attendance History Map (Preserves authentic attendance logs)
+  // Live Authoritative Attendance History Map (Preserves authentic attendance logs from server and props)
   const effectiveAttendanceHistory = useMemo(() => {
-    return attendanceHistory || {};
-  }, [attendanceHistory]);
+    const targetBarcode = String(activeStudent?.barcode || selectedStudentBarcode || account.studentBarcode).trim();
+    const merged: Record<string, Record<string, any>> = {};
+
+    // 1. Start with props attendanceHistory if present
+    if (attendanceHistory && typeof attendanceHistory === "object") {
+      Object.entries(attendanceHistory).forEach(([date, dayMap]) => {
+        if (dayMap && typeof dayMap === "object") {
+          merged[date] = { ...dayMap };
+        }
+      });
+    }
+
+    // 2. Merge from supabasePortalData.attendanceHistory
+    if (supabasePortalData?.attendanceHistory && typeof supabasePortalData.attendanceHistory === "object") {
+      Object.entries(supabasePortalData.attendanceHistory).forEach(([dateKey, val]) => {
+        if (!merged[dateKey]) merged[dateKey] = {};
+        if (typeof val === "object" && val !== null) {
+          const innerVal = targetBarcode ? getFlexBarcodeVal(val as any, targetBarcode) : undefined;
+          if (innerVal !== undefined) {
+            merged[dateKey][targetBarcode] = innerVal;
+          } else {
+            Object.assign(merged[dateKey], val);
+          }
+        } else if (typeof val === "string") {
+          merged[dateKey][targetBarcode] = val;
+        }
+      });
+    }
+
+    // 3. Merge from supabasePortalData.attendanceLogs
+    if (Array.isArray(supabasePortalData?.attendanceLogs)) {
+      supabasePortalData.attendanceLogs.forEach((log: any) => {
+        const d = log.date_key || log.dateKey || (log.created_at ? String(log.created_at).slice(0, 10) : "");
+        const st = log.status || "حضور";
+        if (d && targetBarcode) {
+          if (!merged[d]) merged[d] = {};
+          merged[d][targetBarcode] = st;
+        }
+      });
+    }
+
+    return merged;
+  }, [attendanceHistory, supabasePortalData, activeStudent?.barcode, selectedStudentBarcode, account.studentBarcode]);
 
   // Real-time chat subscription for the active student's thread
   useEffect(() => {
@@ -1354,8 +1463,9 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       let pay: any = undefined;
       const monthData = effectivePayments ? effectivePayments[m.key] : undefined;
       if (monthData) {
-        if (bCode && monthData[bCode]) {
-          pay = monthData[bCode];
+        const flexPay = getFlexBarcodeVal(monthData, bCode);
+        if (flexPay) {
+          pay = flexPay;
         } else if (monthData.amount !== undefined || monthData.paidAmount !== undefined || monthData.monthKey) {
           pay = monthData;
         }
@@ -1415,26 +1525,51 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
   // 6. Attendance & Absence Logs with Dynamic Date Series & Schedule Isolation (Group A: Sat/Mon/Wed, Group B: Sun/Tue/Thu)
   const attendanceScheduleLogs = useMemo(() => {
     if (!activeStudent?.barcode) return [];
+    const studentBarcode = String(activeStudent.barcode || "").trim();
     const studentGroupDays = activeStudent.groupDays || "سبت - إثنين - أربعاء";
     const logs: AttendanceScheduleLog[] = [];
     const todayKey = getTodayKey();
 
     // 1. Gather all real dates where attendance was explicitly recorded in database/history for this student
-    const recordedDatesMap: Record<string, string> = {};
+    const recordedDatesMap: Record<string, { status: string; timeRecorded?: string }> = {};
+
+    // From effectiveAttendanceHistory (already merged from props + Supabase)
     Object.keys(effectiveAttendanceHistory || {}).forEach((dateStr) => {
-      const st = effectiveAttendanceHistory[dateStr]?.[activeStudent.barcode];
-      if (st) {
-        recordedDatesMap[dateStr] = st;
+      const dayRec = effectiveAttendanceHistory[dateStr];
+      const val = getFlexBarcodeVal(dayRec, studentBarcode);
+      if (val !== undefined && val !== null) {
+        if (typeof val === "object") {
+          const st = val.status || val.state || val.attendance || "حضور";
+          const time = val.time || val.timeRecorded || val.scanTime;
+          recordedDatesMap[dateStr] = { status: String(st).trim(), timeRecorded: time };
+        } else {
+          recordedDatesMap[dateStr] = { status: String(val).trim() };
+        }
       }
     });
 
+    // From supabasePortalData?.attendanceLogs if available
+    if (Array.isArray(supabasePortalData?.attendanceLogs)) {
+      supabasePortalData.attendanceLogs.forEach((log: any) => {
+        const d = log.date_key || log.dateKey || (log.created_at ? String(log.created_at).slice(0, 10) : "");
+        if (d && !recordedDatesMap[d]) {
+          recordedDatesMap[d] = {
+            status: String(log.status || "حضور").trim(),
+            timeRecorded: log.time || log.scan_time,
+          };
+        }
+      });
+    }
+
     // Also include today's live scan if active
-    if (activeStudent.barcode && attendanceToday[activeStudent.barcode]) {
-      recordedDatesMap[todayKey] = attendanceToday[activeStudent.barcode];
+    const todayLive = getFlexBarcodeVal(attendanceToday, studentBarcode);
+    if (todayLive !== undefined && todayLive !== null) {
+      const st = typeof todayLive === "object" ? (todayLive.status || "حضور") : String(todayLive).trim();
+      const time = getFlexBarcodeVal(scanLogTimes, studentBarcode);
+      recordedDatesMap[todayKey] = { status: st, timeRecorded: time };
     }
 
     // 2. Determine start date for generating the official schedule series:
-    // Determine the earliest boundary between: student creation, earliest recorded attendance, or current month cycle
     const allMatchingRecordedDates = Object.keys(recordedDatesMap).filter((d) =>
       isOfficialGroupDay(studentGroupDays, d)
     );
@@ -1458,7 +1593,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       startDate = `${curYear}-${curMonth}-01`;
     }
 
-    // 3. Generate unbroken series of scheduled dates matching the student's group schedule (with groupHistory support)
+    // 3. Generate unbroken series of scheduled dates matching the student's group schedule
     const scheduledDates = generateScheduledDateSeries(
       startDate,
       todayKey,
@@ -1466,56 +1601,43 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       activeStudent.groupHistory
     );
 
-    // Combine all unique dates: all scheduled dates + any historical recorded dates that match group schedule
-    const allDatesSet = new Set<string>([...scheduledDates, ...allMatchingRecordedDates]);
-    const sortedDates = Array.from(allDatesSet).sort((a, b) => b.localeCompare(a));
+    const processedDates = new Set<string>();
 
-    sortedDates.forEach((dateStr) => {
-      // Determine what group schedule was active on this specific date (accounts for mid-term transfers)
+    const getArabicDayNameSafe = (dateStr: string) => {
+      const parts = dateStr.split("-").map(Number);
+      if (parts.length === 3) {
+        const safeDate = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
+        const dayNames = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+        return dayNames[safeDate.getDay()];
+      }
+      return getArabicDayName(dateStr);
+    };
+
+    // 4. Process all scheduled dates
+    scheduledDates.forEach((dateStr) => {
+      processedDates.add(dateStr);
       const effectiveGroupOnDate = resolveEffectiveGroupForDate(
         dateStr,
         studentGroupDays,
         activeStudent.groupHistory
       );
 
-      // Secondary safety check: strictly skip any cross-day or off-schedule entries
-      if (!isOfficialGroupDay(effectiveGroupOnDate, dateStr)) {
-        return;
-      }
+      const record = recordedDatesMap[dateStr];
+      const dayName = getArabicDayNameSafe(dateStr);
 
-      const rawStatus = dateStr === todayKey
-        ? (activeStudent.barcode && attendanceToday[activeStudent.barcode] ? attendanceToday[activeStudent.barcode] : recordedDatesMap[dateStr])
-        : recordedDatesMap[dateStr];
-
-      // Timezone-safe Arabic day name calculation
-      const parts = dateStr.split("-").map(Number);
-      let dayName = getArabicDayName(dateStr);
-      if (parts.length === 3) {
-        const safeDate = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
-        const dayNames = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
-        dayName = dayNames[safeDate.getDay()];
-      }
-
-      if (rawStatus) {
-        // Normalize status: "حضور", "حاضر", "تأخير", "غائب", "غياب", "إذن"
-        let finalStatus: "حضور" | "تأخير" | "غائب" | "إذن" = "حضور";
-        if (rawStatus === "حاضر" || rawStatus === "حضور") finalStatus = "حضور";
-        else if (rawStatus === "تأخير") finalStatus = "تأخير";
-        else if (rawStatus === "غائب" || rawStatus === "غياب") finalStatus = "غائب";
-        else if (rawStatus === "إذن") finalStatus = "إذن";
-
+      if (record) {
+        const finalStatus = normalizeAttendanceStatus(record.status);
         logs.push({
           date: dateStr,
           dayName,
           status: finalStatus,
-          timeRecorded: dateStr === todayKey && activeStudent.barcode ? scanLogTimes[activeStudent.barcode] : undefined,
+          timeRecorded: record.timeRecorded || (dateStr === todayKey ? getFlexBarcodeVal(scanLogTimes, studentBarcode) : undefined),
           isOfficialScheduledDay: true,
           isSubstituteDay: false,
           isAutoGenerated: false,
           note: `حصة رسمية مسجلة - ${effectiveGroupOnDate}`,
         });
       } else {
-        // Scheduled day with unrecorded attendance slot (preserves slot and eliminates data gaps)
         const isToday = dateStr === todayKey;
         logs.push({
           date: dateStr,
@@ -1531,20 +1653,20 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
       }
     });
 
-    // Also include any recorded dates from Supabase/history that were outside the standard schedule as substitute sessions:
+    // 5. Process any recorded dates from database that were NOT in scheduledDates (substitute/extra sessions)
+    // CRITICAL: NEVER DROP ANY RECORDED ATTENDANCE!
     Object.keys(recordedDatesMap).forEach((dateStr) => {
-      if (!allDatesSet.has(dateStr)) {
-        const rawStatus = recordedDatesMap[dateStr];
-        let finalStatus: "حضور" | "تأخير" | "غائب" | "إذن" = "حضور";
-        if (rawStatus === "حاضر" || rawStatus === "حضور") finalStatus = "حضور";
-        else if (rawStatus === "تأخير") finalStatus = "تأخير";
-        else if (rawStatus === "غائب" || rawStatus === "غياب") finalStatus = "غائب";
-        else if (rawStatus === "إذن") finalStatus = "إذن";
+      if (!processedDates.has(dateStr)) {
+        processedDates.add(dateStr);
+        const record = recordedDatesMap[dateStr];
+        const dayName = getArabicDayNameSafe(dateStr);
+        const finalStatus = normalizeAttendanceStatus(record.status);
 
         logs.push({
           date: dateStr,
-          dayName: getArabicDayName(dateStr),
+          dayName,
           status: finalStatus,
+          timeRecorded: record.timeRecorded,
           isOfficialScheduledDay: false,
           isSubstituteDay: true,
           isAutoGenerated: false,
@@ -1557,7 +1679,7 @@ export const ParentPortalDashboard: React.FC<ParentPortalDashboardProps> = ({
     logs.sort((a, b) => b.date.localeCompare(a.date));
 
     return logs;
-  }, [activeStudent, effectiveAttendanceHistory, attendanceToday, scanLogTimes]);
+  }, [activeStudent, effectiveAttendanceHistory, attendanceToday, scanLogTimes, supabasePortalData?.attendanceLogs]);
 
   // Filtered attendance logs based on tab selection
   const filteredAttendanceLogs = useMemo(() => {
