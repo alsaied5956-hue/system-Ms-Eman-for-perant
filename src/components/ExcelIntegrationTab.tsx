@@ -43,48 +43,63 @@ export const ExcelIntegrationTab: React.FC<ExcelIntegrationTabProps> = ({
   const handleConfirmImport = () => {
     if (!importPreview || importPreview.length === 0) return;
 
-    // Filter out duplicates with existing barcodes
-    const existingBarcodes = new Set(students.map((s) => String(s.barcode).trim()));
-    const validNewStudents: Student[] = [];
-    let duplicatesCount = 0;
+    // Existing student barcode lookup map to preserve history and exam scores
+    const existingMap = new Map(students.map((s) => [String(s.barcode).trim(), s]));
+    const validStudentsToSave: Student[] = [];
+    let updatedCount = 0;
+    let newCount = 0;
 
     importPreview.forEach((p) => {
       const b = String(p.barcode || "").trim();
-      if (!b || existingBarcodes.has(b)) {
-        duplicatesCount++;
-        return;
-      }
+      if (!b) return;
 
-      existingBarcodes.add(b);
-      validNewStudents.push({
-        barcode: b,
-        name: p.name || "طالب جديد",
-        phone: cleanPhoneNumber(p.phone || ""),
-        parentPhone: cleanPhoneNumber(p.parentPhone || p.phone || ""),
-        groupGrade: (p.groupGrade as GradeName) || "الصف الرابع الابتدائي",
-        groupDays: p.groupDays || "سبت - إثنين - أربعاء",
-        customMonthlyFee: p.customMonthlyFee,
-        discountReason: p.discountReason,
-        points: 0,
-        totalAttendanceDays: 0,
-        totalAbsentDays: 0,
-        totalExamScores: [],
-        createdAt: new Date().toISOString(),
-      });
+      const existing = existingMap.get(b);
+      if (existing) {
+        // Safe update: update contact & group info, but preserve points, attendance, and exam scores
+        updatedCount++;
+        validStudentsToSave.push({
+          ...existing,
+          name: p.name || existing.name,
+          phone: cleanPhoneNumber(p.phone || existing.phone),
+          parentPhone: cleanPhoneNumber(p.parentPhone || existing.parentPhone || p.phone || existing.phone),
+          groupGrade: (p.groupGrade as GradeName) || existing.groupGrade,
+          groupDays: p.groupDays || existing.groupDays,
+          customMonthlyFee: p.customMonthlyFee !== undefined ? p.customMonthlyFee : existing.customMonthlyFee,
+          discountReason: p.discountReason !== undefined ? p.discountReason : existing.discountReason,
+        });
+      } else {
+        // Brand new student
+        newCount++;
+        validStudentsToSave.push({
+          barcode: b,
+          name: p.name || "طالب جديد",
+          phone: cleanPhoneNumber(p.phone || ""),
+          parentPhone: cleanPhoneNumber(p.parentPhone || p.phone || ""),
+          groupGrade: (p.groupGrade as GradeName) || "الصف الرابع الابتدائي",
+          groupDays: p.groupDays || "سبت - إثنين - أربعاء",
+          customMonthlyFee: p.customMonthlyFee,
+          discountReason: p.discountReason,
+          points: 0,
+          totalAttendanceDays: 0,
+          totalAbsentDays: 0,
+          totalExamScores: [],
+          createdAt: new Date().toISOString(),
+        });
+      }
     });
 
-    if (validNewStudents.length === 0) {
-      alert("⚠️ جميع الطلاب الموجودين في الملف مضافون بالفعل في المنظومة (أكواد مكررة)!");
+    if (validStudentsToSave.length === 0) {
+      alert("⚠️ لم يتم العثور على أي بيانات صالحة للاستيراد في الملف!");
       return;
     }
 
     if (onBulkImportStudents) {
-      onBulkImportStudents(validNewStudents);
+      onBulkImportStudents(validStudentsToSave);
     }
     alert(
-      `🎉 تم استيراد (${validNewStudents.length}) طالب جديد بنجاح! ${
-        duplicatesCount > 0 ? `(تم تجاهل ${duplicatesCount} كود مكرر مسبقاً)` : ""
-      }`
+      `🎉 اكتملت العملية بنجاح!\n` +
+      `• تم إضافة: (${newCount}) طالب جديد.\n` +
+      `• تم تحديث بيانات: (${updatedCount}) طالب مسجل مسبقاً (مع الحفاظ الكامل على الدرجات ونقاط الحضور).`
     );
 
     setImportPreview(null);

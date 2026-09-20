@@ -3,6 +3,25 @@ let audioContext: AudioContext | null = null;
 let activeUtterance: SpeechSynthesisUtterance | null = null;
 let speechWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
 
+// Global mobile user-gesture unlock listener
+if (typeof window !== "undefined") {
+  const unlockAudio = () => {
+    try {
+      if (audioContext && audioContext.state === "suspended") {
+        audioContext.resume().catch(() => {});
+      } else if (!audioContext) {
+        getAudioContext();
+      }
+    } catch {}
+    window.removeEventListener("click", unlockAudio);
+    window.removeEventListener("touchstart", unlockAudio);
+    window.removeEventListener("keydown", unlockAudio);
+  };
+  window.addEventListener("click", unlockAudio, { passive: true });
+  window.addEventListener("touchstart", unlockAudio, { passive: true });
+  window.addEventListener("keydown", unlockAudio, { passive: true });
+}
+
 function getAudioContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
   try {
@@ -26,7 +45,15 @@ function getAudioContext(): AudioContext | null {
 export function playBeep(type: "success" | "warning" | "error"): void {
   try {
     const ctx = getAudioContext();
-    if (!ctx) return;
+    if (!ctx || ctx.state === "suspended") {
+      // HTML5 audio fallback if Web Audio is suspended on mobile
+      try {
+        const audio = new Audio(type === "error" ? "/notification.mp3" : "/notification.wav");
+        audio.volume = 0.5;
+        audio.play().catch(() => {});
+      } catch {}
+      if (!ctx) return;
+    }
 
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();

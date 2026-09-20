@@ -428,8 +428,23 @@ export function saveToLocalStorage(data: SystemData, updateTimestamp: boolean = 
   try {
     const serialized = JSON.stringify(clonedData);
     localStorage.setItem(STORAGE_KEY, serialized);
-  } catch (e) {
-    console.error("Local storage synchronous save error:", e);
+  } catch (e: any) {
+    if (e?.name === "QuotaExceededError" || e?.code === 22 || String(e).toLowerCase().includes("quota")) {
+      console.warn("[Storage] LocalStorage quota limit approached. Pruning transient logs to safeguard core student & payment records...");
+      try {
+        // Prune non-critical ephemeral log arrays while leaving students, payments, and attendance intact
+        const prunedData: SystemData = {
+          ...clonedData,
+          scanLogOrder: (clonedData.scanLogOrder || []).slice(0, 60),
+          platformMessages: (clonedData.platformMessages || []).slice(-40),
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(prunedData));
+      } catch (retryErr) {
+        console.error("[Storage] Critical: LocalStorage full even after pruning logs:", retryErr);
+      }
+    } else {
+      console.error("Local storage synchronous save error:", e);
+    }
   }
 
   broadcastLocalChange(clonedData);

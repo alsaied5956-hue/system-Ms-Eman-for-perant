@@ -1142,9 +1142,36 @@ export default function App() {
     saveSingleGradeWhatsAppLink(grade, link.trim());
   }, []);
 
-  // Handler: Bulk Import Students from Excel
+  // Handler: Bulk Import Students from Excel (Non-destructive Upsert)
   const handleBulkImport = useCallback((newStudentsList: Student[]) => {
-    const updated = [...newStudentsList, ...students];
+    const existingMap = new Map<string, Student>(students.map((s) => [String(s.barcode).trim(), s]));
+
+    for (const item of newStudentsList) {
+      const b = String(item.barcode).trim();
+      const existing = existingMap.get(b);
+      if (existing) {
+        existingMap.set(b, {
+          ...existing,
+          name: item.name || existing.name,
+          phone: item.phone || existing.phone,
+          parentPhone: item.parentPhone || existing.parentPhone,
+          groupGrade: item.groupGrade || existing.groupGrade,
+          groupDays: item.groupDays || existing.groupDays,
+          customMonthlyFee: item.customMonthlyFee !== undefined ? item.customMonthlyFee : existing.customMonthlyFee,
+          discountReason: item.discountReason !== undefined ? item.discountReason : existing.discountReason,
+          // Preserve points, totalAttendanceDays, totalAbsentDays, totalExamScores, createdAt
+          points: existing.points ?? item.points ?? 0,
+          totalAttendanceDays: existing.totalAttendanceDays ?? item.totalAttendanceDays ?? 0,
+          totalAbsentDays: existing.totalAbsentDays ?? item.totalAbsentDays ?? 0,
+          totalExamScores: existing.totalExamScores && existing.totalExamScores.length > 0 ? existing.totalExamScores : (item.totalExamScores || []),
+          createdAt: existing.createdAt || item.createdAt || new Date().toISOString(),
+        });
+      } else {
+        existingMap.set(b, item);
+      }
+    }
+
+    const updated = Array.from(existingMap.values());
     setStudents(updated);
     saveStudentsData(updated);
   }, [students]);

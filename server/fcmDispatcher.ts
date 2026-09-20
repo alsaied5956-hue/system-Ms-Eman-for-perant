@@ -87,10 +87,16 @@ export async function queryParentAccountFCMTokens(
       const uuids = cleanTargets.map((t) => barcodeToUUID(normalizeBarcode(t) || t));
       const allSearchIds = Array.from(new Set([...cleanTargets, ...uuids]));
 
-      // Query parent_accounts by id, linked_student_barcodes, or parent_phone
-      const { data, error } = await supabaseServer
+      // Targeted query for parent_accounts by id, linked_student_barcodes, or parent_phone
+      let query = supabaseServer
         .from("parent_accounts")
         .select("id, parent_phone, linked_student_barcodes, fcm_token, status");
+
+      if (allSearchIds.length > 0 && allSearchIds.length <= 50) {
+        query = query.or(allSearchIds.map((id) => `id.eq.${id},parent_phone.eq.${id}`).join(","));
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         const msg = `[FCM Parent Dispatcher] Database query warning: ${error.message}`;

@@ -39,7 +39,9 @@ service cloud.firestore {
 
     // 4. Parents & Admins Portal collections
     match /parent_accounts/{accountId} {
-      allow read, write, delete: if true;
+      allow get: if true;
+      allow list: if request.auth != null;
+      allow write: if true;
     }
 
     match /parent_account_revocations/{accountId} {

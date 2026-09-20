@@ -617,19 +617,10 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
     const cleanStudentId = activeStudentId;
     const linkedList = options?.linkedBarcodes || [];
 
+    const uniqueInstanceId = Math.random().toString(36).slice(2, 9);
     const channelTopic = isGlobalAdmin
-      ? "admin-global-realtime-engine"
-      : getSecureChannelTopic("parent-student-engine", cleanBarcode);
-
-    // Clean up any stale channel with this topic first
-    try {
-      const existing = supabase
-        .getChannels()
-        .find((ch) => ch.topic === `realtime:${channelTopic}` || ch.topic === channelTopic);
-      if (existing) {
-        supabase.removeChannel(existing);
-      }
-    } catch {}
+      ? `admin-global-realtime-${uniqueInstanceId}`
+      : `${getSecureChannelTopic("parent-student-engine", cleanBarcode)}-${uniqueInstanceId}`;
 
     const channel = supabase.channel(channelTopic);
 

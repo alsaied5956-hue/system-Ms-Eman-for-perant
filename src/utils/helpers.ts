@@ -268,30 +268,43 @@ export function openWhatsApp(phone: string, message: string, forceMode?: "web" |
     // Opens WhatsApp Web directly inside a Google Chrome browser tab
     url = `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}`;
   } else {
-    // Opens WhatsApp Desktop application
+    // Opens WhatsApp Desktop application / mobile deep-link
     url = `https://wa.me/${cleanPhone}?text=${encodedMsg}`;
   }
 
-  // Safe opening with popup-blocker fallback
+  // Safe opening with resilient popup-blocker handling
   try {
     const win = window.open(url, "_blank", "noopener,noreferrer");
     if (!win || win.closed || typeof win.closed === "undefined") {
+      // Fallback for popup-blocker: trigger real user-click event or location redirect if in mobile/PWA
       const a = document.createElement("a");
       a.href = url;
       a.target = "_blank";
       a.rel = "noopener noreferrer";
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      setTimeout(() => {
+        try {
+          if (document.body.contains(a)) document.body.removeChild(a);
+        } catch {}
+      }, 300);
     }
   } catch {
-    const a = document.createElement("a");
-    a.href = url;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    try {
+      window.location.href = url;
+    } catch {
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        try {
+          if (document.body.contains(a)) document.body.removeChild(a);
+        } catch {}
+      }, 300);
+    }
   }
 }
 
@@ -510,13 +523,28 @@ export function normalizePaymentMap(
     for (const [rawK, rec] of Object.entries(recMap)) {
       if (!rec) continue;
       const cleanK = normalizeBarcode(rawK);
-      if (cleanK) {
-        normalized[monthKey][cleanK] = {
-          ...rec,
-          barcode: cleanK,
-        };
+      const isCard = isCardFeeRecord(rec, rawK);
+
+      if (isCard) {
+        // Dedicated safe key for card fee
+        if (cleanK) {
+          normalized[monthKey][`card_${cleanK}`] = {
+            ...rec,
+            barcode: cleanK,
+            isCardFee: true,
+          };
+        }
+      } else {
+        // Monthly tuition payment: only store here if not a card fee
+        if (cleanK) {
+          normalized[monthKey][cleanK] = {
+            ...rec,
+            barcode: cleanK,
+          };
+        }
       }
-      if (rawK !== cleanK) {
+      // Retain original raw key for exact match lookups
+      if (rawK !== cleanK && rawK !== `card_${cleanK}`) {
         normalized[monthKey][rawK] = rec;
       }
     }

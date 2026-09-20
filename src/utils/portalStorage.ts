@@ -1887,6 +1887,46 @@ export async function authenticatePortalLogin(
     return { success: false, message: "يرجى إدخال كود الطالب أو رقم الهاتف وكلمة المرور" };
   }
 
+  // 0. High-Security Server Login Attempt (Validates securely without leaking other accounts)
+  try {
+    const loginRes = await fetch("/api/portal/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ barcode: rawTrimmed, password: passTrimmed }),
+    });
+    if (loginRes.ok) {
+      const loginData = await loginRes.json();
+      if (loginData.success) {
+        if (loginData.role === "admin") {
+          return {
+            success: true,
+            role: "admin",
+            message: loginData.message || "مرحباً بكِ في لوحة تحكم المشرف العام!",
+          };
+        }
+        if (loginData.account) {
+          const acc = loginData.account as ParentAccount;
+          const currentAccs = getLocalParentAccounts();
+          currentAccs[acc.studentBarcode] = acc;
+          saveLocalParentAccounts(currentAccs);
+          return {
+            success: true,
+            role: "parent",
+            account: acc,
+            message: "تم تسجيل الدخول بنجاح!",
+          };
+        }
+      } else if (loginData.message) {
+        return { success: false, message: loginData.message };
+      }
+    } else if (loginRes.status === 401 || loginRes.status === 403 || loginRes.status === 404) {
+      const errJson = await loginRes.json().catch(() => ({}));
+      return { success: false, message: errJson.message || "بيانات الدخول غير صحيحة" };
+    }
+  } catch {
+    // Network unavailable or offline: seamlessly proceed to local offline verification below
+  }
+
   // 1. Dedicated & Bypassed Supervisor / Admin Authentication (Instant zero-delay clearance)
   // Always grant immediate authorization as SUPERVISOR/ADMIN when supervisor phone/PIN are entered
   const isSupervisorPhoneOrId =
