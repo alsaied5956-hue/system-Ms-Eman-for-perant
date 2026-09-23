@@ -2221,21 +2221,26 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
         ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode},chat_id.eq.${bCode}`
         : dualKeyFilter;
 
-      // Helper for direct sub-table queries
+      // Helper for direct sub-table queries with schema-exact filters
       const querySubTableDirect = async (
         tableName: string,
-        filter: string,
         orderCol?: string,
         ascending = false
       ): Promise<any[]> => {
         try {
           let q = supabase.from(tableName).select("*");
-          // Keep payments fixed with student_id
-          if (tableName === "payments") {
+          if (tableName === "attendance_logs") {
+            if (sId && bCode) {
+              q = q.or(`student_id.eq.${sId},barcode.eq.${bCode}`);
+            } else if (sId) {
+              q = q.eq("student_id", sId);
+            } else if (bCode) {
+              q = q.eq("barcode", bCode);
+            }
+          } else {
+            // For homework, payments, chat_messages: student_id is the foreign key
             if (!sId) return [];
             q = q.eq("student_id", sId);
-          } else {
-            q = q.or(filter);
           }
 
           if (orderCol) {
@@ -2248,10 +2253,13 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
           if (res.error && orderCol) {
             // Retry without order column if schema does not support orderCol
             let retryQ = supabase.from(tableName).select("*");
-            if (tableName === "payments") {
-              if (sId) retryQ = retryQ.eq("student_id", sId);
+            if (tableName === "attendance_logs") {
+              if (sId && bCode) retryQ = retryQ.or(`student_id.eq.${sId},barcode.eq.${bCode}`);
+              else if (sId) retryQ = retryQ.eq("student_id", sId);
+              else if (bCode) retryQ = retryQ.eq("barcode", bCode);
             } else {
-              retryQ = retryQ.or(filter);
+              if (!sId) return [];
+              retryQ = retryQ.eq("student_id", sId);
             }
             const retryRes = await retryQ;
             if (!retryRes.error && Array.isArray(retryRes.data)) {
@@ -2266,33 +2274,22 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       };
 
       // Parallel direct queries to all sub-tables for authentic sub-second responses
-      const [attendance, homework, payments, grades, chatMessages] = await Promise.all([
-        querySubTableDirect("attendance_logs", dualKeyFilter, "date_key", false),
-        querySubTableDirect("homework", dualKeyFilter, "date_key", false),
-        querySubTableDirect("payments", dualKeyFilter, "month_key", false),
-        querySubTableDirect("exam_grades", dualKeyFilter, "created_at", false).then(async (rows) => {
-          if (!rows || rows.length === 0) {
-            return await querySubTableDirect("evaluations", dualKeyFilter, "created_at", false);
-          }
-          return rows;
-        }),
-        querySubTableDirect("chat_messages", chatDualKeyFilter, "created_at", true).then(async (rows) => {
-          if (!rows || rows.length === 0) {
-            return await querySubTableDirect("messages", chatDualKeyFilter, "created_at", true);
-          }
-          return rows;
-        }),
+      const [attendance, homework, payments, chatMessages] = await Promise.all([
+        querySubTableDirect("attendance_logs", "date_key", false),
+        querySubTableDirect("homework", "date_key", false),
+        querySubTableDirect("payments", "month_key", false),
+        querySubTableDirect("chat_messages", "created_at", true),
       ]);
 
       // Console audit log: exact payload inspection directly from Supabase
-      console.log("Parent Fetch Raw Response:", { attendance, homework, grades, payments, chatMessages });
+      console.log("Parent Fetch Raw Response:", { attendance, homework, payments, chatMessages });
 
       return {
         ...studentData,
         attendance_logs: attendance,
         homework,
         payments,
-        exam_grades: grades,
+        exam_grades: [],
         chat_messages: chatMessages,
       };
     };
@@ -2454,6 +2451,51 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       });
     });
 
+    // B. Parse evaluations from rawHomework (e.g. التقييم الأول، التقييم الثاني، التقييم الثالث)
+    rawHomework.forEach((h: any, idx: number) => {
+      const hasScore = h.score !== null && h.score !== undefined && !isNaN(Number(h.score));
+      const rawTitle = String(h.title || "").trim();
+      const rawNotes = String(h.notes || "").trim();
+      const isEvaluation =
+        hasScore ||
+        rawTitle.includes("تقييم") ||
+        rawTitle.includes("امتحان") ||
+        rawTitle.includes("اختبار") ||
+        rawNotes.includes("درجة") ||
+        rawNotes.includes("امتحان");
+
+      const dateStr = h.date_key || (h.created_at ? String(h.created_at).slice(0, 10) : "");
+      const key = h.id || `${rawTitle}-${dateStr}`;
+
+      if (isEvaluation && !examGradesMap.has(key)) {
+        const score = Number(h.score) || 0;
+        const maxScore = Number(h.max_score) || 20;
+        const pct = maxScore > 0 ? Math.min(100, Math.round((score / maxScore) * 100)) : 100;
+        examGradesMap.set(key, {
+          id: h.id || `eval-${idx}`,
+          studentId: sId,
+          barcode: bCode,
+          examTitle: rawTitle || "تقييم دوري",
+          title: rawTitle || "تقييم دوري",
+          subject: h.subject || "الرياضيات",
+          name: rawTitle || "تقييم دوري",
+          grade: studentRow.grade || "",
+          score,
+          degree: score,
+          maxScore,
+          max_score: maxScore,
+          percentage: pct,
+          teacherNotes: rawNotes,
+          notes: rawNotes,
+          examDate: dateStr,
+          date: dateStr,
+          created_at: h.created_at || dateStr,
+          timestamp: h.created_at ? new Date(h.created_at).getTime() : Date.now(),
+          scoreFormatted: `${score} / ${maxScore} (${pct}%)`,
+        });
+      }
+    });
+
     let examGradesList = Array.from(examGradesMap.values());
 
     // Sort exam grades descending by date/creation
@@ -2463,7 +2505,9 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
 
     // Parse exam scores if stored in student row
     let parsedScores: number[] = [];
-    if (Array.isArray(studentRow.total_exam_scores)) {
+    if (examGradesList.length > 0) {
+      parsedScores = examGradesList.map((g: any) => g.percentage);
+    } else if (Array.isArray(studentRow.total_exam_scores)) {
       parsedScores = studentRow.total_exam_scores;
     } else if (typeof studentRow.total_exam_scores === "string") {
       try {

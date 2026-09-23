@@ -869,8 +869,8 @@ async function fetchStudentPortalDataInternal(
           );
         }
 
-        // Concurrently fetch attendance_logs, payments, homework, exam_grades, and parent_accounts
-        const [attRes, payRes, accRes, examRes, hwRes] = await Promise.allSettled([
+        // Concurrently fetch attendance_logs, payments, homework, exam_grades, chat_messages, and parent_accounts
+        const [attRes, payRes, accRes, examRes, hwRes, chatRes] = await Promise.allSettled([
           supabaseServer
             .from("attendance_logs")
             .select("*")
@@ -896,6 +896,12 @@ async function fetchStudentPortalDataInternal(
             .eq("student_id", sId)
             .order("date_key", { ascending: false })
             .limit(200),
+          supabaseServer
+            .from("chat_messages")
+            .select("*")
+            .eq("student_id", sId)
+            .order("created_at", { ascending: true })
+            .limit(100),
         ]);
 
         const studentHistory: Record<string, string> = {};
@@ -937,9 +943,11 @@ async function fetchStudentPortalDataInternal(
           });
         }
 
-        // Parse exam_grades with unified dual naming
+        // Parse exam_grades with unified dual naming (merging exam_grades table + homework evaluations)
         const examGradesList: any[] = [];
-        if (examRes.status === "fulfilled" && examRes.value.data) {
+        const seenExamKeys = new Set<string>();
+
+        if (examRes.status === "fulfilled" && Array.isArray(examRes.value.data)) {
           examRes.value.data.forEach((g: any, idx: number) => {
             const score = Number(g.score) || 0;
             const maxScore = Number(g.max_score !== undefined ? g.max_score : (g.maxScore !== undefined ? g.maxScore : 10)) || 10;
@@ -947,6 +955,8 @@ async function fetchStudentPortalDataInternal(
             const title = g.exam_title || g.title || "اختبار دوري";
             const date = g.date || g.exam_date || (g.created_at ? String(g.created_at).slice(0, 10) : "");
             const notes = g.teacher_notes || g.notes || "";
+            const key = g.id || `${title}-${date}`;
+            seenExamKeys.add(key);
             examGradesList.push({
               id: g.id || `exam-${idx}`,
               studentId: g.student_id || sId,
@@ -970,17 +980,62 @@ async function fetchStudentPortalDataInternal(
               teacher_notes: notes,
               notes,
               createdAt: g.created_at || new Date().toISOString(),
-              scoreFormatted: `${score} / ${maxScore}`,
-              score_formatted: `${score} / ${maxScore}`,
+              scoreFormatted: `${score} / ${maxScore} (${pct}%)`,
+              score_formatted: `${score} / ${maxScore} (${pct}%)`,
             });
           });
         }
 
-        // Parse homework list
+        // Parse homework list and also extract evaluations (e.g. التقييم الأول، الثاني، الثالث)
         const homeworkList: any[] = [];
-        if (hwRes.status === "fulfilled" && hwRes.value.data) {
+        if (hwRes.status === "fulfilled" && Array.isArray(hwRes.value.data)) {
           hwRes.value.data.forEach((h: any, idx: number) => {
-            const rawGrade = h.grade !== undefined ? h.grade : (h.score !== undefined ? h.score : h.degree);
+            const hasScore = h.score !== null && h.score !== undefined && !isNaN(Number(h.score));
+            const rawTitle = String(h.title || "واجب الحصة").trim();
+            const rawNotes = String(h.notes || "").trim();
+            const isEvaluation =
+              hasScore ||
+              rawTitle.includes("تقييم") ||
+              rawTitle.includes("امتحان") ||
+              rawTitle.includes("اختبار") ||
+              rawNotes.includes("درجة") ||
+              rawNotes.includes("امتحان");
+
+            const dateStr = h.date_key || (h.created_at ? String(h.created_at).slice(0, 10) : "");
+            const examKey = h.id || `${rawTitle}-${dateStr}`;
+
+            if (isEvaluation && !seenExamKeys.has(examKey)) {
+              seenExamKeys.add(examKey);
+              const score = Number(h.score) || 0;
+              const maxScore = Number(h.max_score) || 20;
+              const pct = maxScore > 0 ? Math.min(100, Math.round((score / maxScore) * 100)) : 100;
+              examGradesList.push({
+                id: h.id || `eval-${idx}`,
+                studentId: h.student_id || sId,
+                student_id: h.student_id || sId,
+                barcode: bCode,
+                student_barcode: bCode,
+                studentBarcode: bCode,
+                grade: studentRow.grade || "",
+                score,
+                maxScore,
+                max_score: maxScore,
+                subject: h.subject || "الرياضيات",
+                date: dateStr,
+                examDate: dateStr,
+                exam_date: dateStr,
+                examTitle: rawTitle,
+                exam_title: rawTitle,
+                title: rawTitle,
+                percentage: pct,
+                teacherNotes: rawNotes,
+                teacher_notes: rawNotes,
+                notes: rawNotes,
+                createdAt: h.created_at || new Date().toISOString(),
+                scoreFormatted: `${score} / ${maxScore} (${pct}%)`,
+                score_formatted: `${score} / ${maxScore} (${pct}%)`,
+              });
+            }
 
             homeworkList.push({
               id: h.id || `hw-${idx}`,
@@ -990,14 +1045,14 @@ async function fetchStudentPortalDataInternal(
               student_barcode: bCode,
               dateKey: h.date_key || "",
               date_key: h.date_key || "",
-              date: h.date || h.date_key || "",
-              title: h.title || "واجب الحصة",
+              date: dateStr,
+              title: rawTitle,
               subject: h.subject || "الرياضيات",
               status: h.status || "done",
-              score: h.score !== null && h.score !== undefined ? Number(h.score) : undefined,
+              score: hasScore ? Number(h.score) : undefined,
               maxScore: h.max_score !== null && h.max_score !== undefined ? Number(h.max_score) : undefined,
               max_score: h.max_score !== null && h.max_score !== undefined ? Number(h.max_score) : undefined,
-              notes: h.notes || "",
+              notes: rawNotes,
               createdAt: h.created_at || new Date().toISOString(),
             });
           });
@@ -1032,6 +1087,24 @@ async function fetchStudentPortalDataInternal(
         const latestExamRecord = examGradesList[0];
         const lastTitle = latestExamRecord?.examTitle || studentRow.last_exam_title || "";
         const lastScore = latestExamRecord?.scoreFormatted || studentRow.last_exam_score || "";
+
+        // Parse real 1-on-1 chat messages from Supabase
+        const parsedChatMessages: any[] = [];
+        if (chatRes.status === "fulfilled" && Array.isArray(chatRes.value.data)) {
+          chatRes.value.data.forEach((m: any) => {
+            parsedChatMessages.push({
+              id: m.id,
+              studentId: m.student_id,
+              senderRole: m.sender_role,
+              senderName: m.sender_name,
+              message: m.message,
+              text: m.message,
+              isRead: m.is_read,
+              createdAt: m.created_at,
+              timestamp: m.created_at ? new Date(m.created_at).getTime() : Date.now(),
+            });
+          });
+        }
 
         const student: StudentRecord = {
           id: studentRow.id,
@@ -1089,7 +1162,7 @@ async function fetchStudentPortalDataInternal(
           attendanceLogs: attRes.status === "fulfilled" && attRes.value.data ? attRes.value.data : [],
           paymentsList: payRes.status === "fulfilled" && payRes.value.data ? payRes.value.data : [],
           unreadNotices,
-          messagesList: unreadNotices,
+          messagesList: parsedChatMessages.length > 0 ? parsedChatMessages : unreadNotices,
           lastExamTitle: student.lastExamTitle || "",
           lastExamScore: student.lastExamScore || "",
           account,

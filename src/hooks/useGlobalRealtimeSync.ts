@@ -737,16 +737,39 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
               );
             }
           } else if (newRow) {
+            const hasScore = newRow.score !== null && newRow.score !== undefined && !isNaN(Number(newRow.score));
+            const rawTitle = String(newRow.title || "").trim();
+            const rawNotes = String(newRow.notes || "").trim();
+            const isEvaluation =
+              hasScore ||
+              rawTitle.includes("تقييم") ||
+              rawTitle.includes("امتحان") ||
+              rawTitle.includes("اختبار") ||
+              rawNotes.includes("درجة") ||
+              rawNotes.includes("امتحان");
+
             if (!isGlobalAdmin) {
               updateSessionPortalHomework(rowBarcode, newRow);
-              const title = newRow.title || "الواجب المدرسي";
-              triggerAlertFeedback(
-                "homework",
-                "متابعة الواجب المدرسي",
-                `تم تحديث سجل الواجب: ${title} (${newRow.status || "مكتمل"})`,
-                `hw-${newRow.id || newRow.date_key}`,
-                newRow.created_at || newRow.date
-              );
+              if (isEvaluation) {
+                const score = Number(newRow.score) || 0;
+                const maxScore = Number(newRow.max_score) || 20;
+                triggerAlertFeedback(
+                  "exam",
+                  "رصد تقييم دراسي جديد",
+                  `تم رصد نتيجة ${rawTitle || "التقييم"}: (${score}/${maxScore}) في المنظومة`,
+                  `exam-${newRow.id || Date.now()}`,
+                  newRow.created_at || newRow.date
+                );
+              } else {
+                const title = newRow.title || "الواجب المدرسي";
+                triggerAlertFeedback(
+                  "homework",
+                  "متابعة الواجب المدرسي",
+                  `تم تحديث سجل الواجب: ${title} (${newRow.status || "مكتمل"})`,
+                  `hw-${newRow.id || newRow.date_key}`,
+                  newRow.created_at || newRow.date
+                );
+              }
             }
 
             if (typeof window !== "undefined") {
@@ -755,11 +778,22 @@ export function useGlobalRealtimeSync(options?: UseGlobalRealtimeSyncOptions) {
                   detail: { ...newRow, barcode: rowBarcode },
                 })
               );
+              if (isEvaluation) {
+                window.dispatchEvent(
+                  new CustomEvent("eman_exam_grade_sync", {
+                    detail: { ...newRow, barcode: rowBarcode },
+                  })
+                );
+              }
               window.dispatchEvent(
                 new CustomEvent("eman_realtime_data_update", {
                   detail: change,
                 })
               );
+            }
+
+            if (isEvaluation) {
+              onGradeRef.current?.(change);
             }
           }
 
