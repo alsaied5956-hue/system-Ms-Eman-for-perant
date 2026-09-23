@@ -2172,35 +2172,32 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
 
   try {
     // Direct Supabase Cloud Fetch Engine with Dual-Key matching across all sub-tables:
-    // .or(`student_id.eq.${student.id},student_barcode.eq.${student.barcode},barcode.eq.${student.barcode}`)
     const fetchDirectAggregatedStudent = async () => {
-      // Step A: Fast direct student resolution from students table
+      // Step A: Fast direct student resolution from students table (clean type handling)
       let studentData: any = null;
-      if (isUUID) {
-        const res = await supabase
-          .from("students")
-          .select("*")
-          .or(`id.eq.${cleanInput},barcode.eq.${cleanInput}`)
-          .maybeSingle();
-        studentData = res.data;
-      } else {
-        const uuidFallback = barcodeToUUID(cleanInput);
-        const res = await supabase
-          .from("students")
-          .select("*")
-          .or(`barcode.eq.${cleanInput},id.eq.${uuidFallback},id.eq.${cleanInput}`)
-          .maybeSingle();
-        studentData = res.data;
-      }
+      try {
+        if (isUUID) {
+          const res = await supabase.from("students").select("*").eq("id", cleanInput).maybeSingle();
+          studentData = res.data;
+        } else {
+          // 1. Try by barcode
+          const byBarcode = await supabase.from("students").select("*").eq("barcode", cleanInput).maybeSingle();
+          studentData = byBarcode.data;
 
-      if (!studentData) {
-        const byBarcode = await supabase.from("students").select("*").eq("barcode", cleanInput).maybeSingle();
-        studentData = byBarcode.data;
-      }
-
-      if (!studentData && isUUID) {
-        const byId = await supabase.from("students").select("*").eq("id", cleanInput).maybeSingle();
-        studentData = byId.data;
+          // 2. If not found by barcode, try by parent_phone or phone
+          if (!studentData) {
+            const byPhone = await supabase
+              .from("students")
+              .select("*")
+              .or(`parent_phone.eq.${cleanInput},phone.eq.${cleanInput}`)
+              .limit(1);
+            if (byPhone.data && byPhone.data.length > 0) {
+              studentData = byPhone.data[0];
+            }
+          }
+        }
+      } catch (findErr) {
+        console.warn("[Parent Fetch] Notice during student lookup:", findErr);
       }
 
       if (!studentData) {
@@ -2210,18 +2207,7 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       const sId = String(studentData.id || "").trim();
       const bCode = String(studentData.barcode || cleanInput).trim();
 
-      // Step B: Dual-Key matching filter across all sub-tables
-      const dualKeyFilter = bCode && sId
-        ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode}`
-        : sId
-        ? `student_id.eq.${sId}`
-        : `student_barcode.eq.${bCode},barcode.eq.${bCode}`;
-
-      const chatDualKeyFilter = bCode && sId
-        ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode},chat_id.eq.${bCode}`
-        : dualKeyFilter;
-
-      // Helper for direct sub-table queries with schema-exact filters
+      // Helper for direct sub-table queries with schema-exact filters and 4s safety timeout
       const querySubTableDirect = async (
         tableName: string,
         orderCol?: string,
@@ -2246,11 +2232,18 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
           if (orderCol) {
             q = q.order(orderCol, { ascending });
           }
-          const res = await q;
-          if (!res.error && Array.isArray(res.data)) {
+
+          // Per-query 4-second timeout to prevent any table hanging
+          const timeoutPromise = new Promise<{ data: any[]; error: any }>((resolve) =>
+            setTimeout(() => resolve({ data: [], error: "timeout" }), 4000)
+          );
+
+          const res = await Promise.race([q, timeoutPromise]);
+          if (res && !res.error && Array.isArray(res.data)) {
             return res.data;
           }
-          if (res.error && orderCol) {
+
+          if (res && res.error && orderCol && res.error !== "timeout") {
             // Retry without order column if schema does not support orderCol
             let retryQ = supabase.from(tableName).select("*");
             if (tableName === "attendance_logs") {
@@ -2261,14 +2254,14 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
               if (!sId) return [];
               retryQ = retryQ.eq("student_id", sId);
             }
-            const retryRes = await retryQ;
-            if (!retryRes.error && Array.isArray(retryRes.data)) {
+            const retryRes = await Promise.race([retryQ, timeoutPromise]);
+            if (retryRes && !retryRes.error && Array.isArray(retryRes.data)) {
               return retryRes.data;
             }
           }
           return [];
         } catch (err) {
-          console.warn(`[Parent Fetch] Error querying ${tableName}:`, err);
+          console.warn(`[Parent Fetch] Notice querying ${tableName}:`, err);
           return [];
         }
       };
@@ -2281,9 +2274,6 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
         querySubTableDirect("chat_messages", "created_at", true),
       ]);
 
-      // Console audit log: exact payload inspection directly from Supabase
-      console.log("Parent Fetch Raw Response:", { attendance, homework, payments, chatMessages });
-
       return {
         ...studentData,
         attendance_logs: attendance,
@@ -2294,12 +2284,35 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       };
     };
 
-    // Generous 12-Second Response Limit
-    const studentRow = await withTimeout(
-      fetchDirectAggregatedStudent(),
-      12000,
-      "استعلام بيانات الطالب الموحدة من Supabase"
-    );
+    // Resilient aggregated student fetch with 10s timeout
+    let studentRow: any = null;
+    try {
+      studentRow = await withTimeout(
+        fetchDirectAggregatedStudent(),
+        10000,
+        "استعلام بيانات الطالب الموحدة من Supabase"
+      );
+    } catch (timeoutErr: any) {
+      console.warn("[fetchUnifiedStudentPortalDataFromSupabase] Cloud query timeout notice:", timeoutErr?.message);
+      // Try resolving student demographics only if sub-tables timed out
+      try {
+        const directStudent = isUUID
+          ? await supabase.from("students").select("*").eq("id", cleanInput).maybeSingle()
+          : await supabase.from("students").select("*").eq("barcode", cleanInput).maybeSingle();
+        if (directStudent.data) {
+          studentRow = {
+            ...directStudent.data,
+            attendance_logs: [],
+            homework: [],
+            payments: [],
+            exam_grades: [],
+            chat_messages: [],
+          };
+        }
+      } catch (fallbackErr) {
+        console.warn("[fetchUnifiedStudentPortalDataFromSupabase] Demographics fallback notice:", fallbackErr);
+      }
+    }
 
     if (!studentRow) {
       return {
@@ -2591,7 +2604,7 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       account: null,
     };
   } catch (err: any) {
-    console.error("[fetchUnifiedStudentPortalDataFromSupabase] Error:", err);
+    console.warn("[fetchUnifiedStudentPortalDataFromSupabase] Handled notice:", err?.message || err);
     return {
       success: false,
       student: null,

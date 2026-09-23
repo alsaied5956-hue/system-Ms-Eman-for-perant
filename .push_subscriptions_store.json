@@ -47,21 +47,18 @@
     "updatedAt": 1789486418646
   },
   {
-    "userId": "101860",
+    "userId": "1",
     "aliases": [
-      "101860",
-      "101860",
-      "01286767390",
-      "101860"
+      "1"
     ],
-    "userRole": "parent",
+    "userRole": "admin",
     "endpoint": "https://wns2-par02p.notify.windows.com/w/?token=BQYAAABBPvQ8v%2bv9Hh6ZlLCMULCf14cVYHw7kWCNx5VVpr8IggIfD462Sj9XNdaW2zA4648M%2bOkcIWQ09LGsThDMFBaQh%2fE%2b5YIrP3tLk7JdKiTpCB%2faqqBy6KOhy%2fTsxshPTv6ewYQq0HhZrV37odMN0AvbK5wtC%2ftOwTOBqoGnKCWLSTIBrzzqDfelrNOWF5dSzLGICI%2bCHGAQb3vIBu%2fDTGbmTjXTVPR7Y1ICn6IOJqr5omuW6O7VJ2DogjaV5bOICIPEAUn5tdg9SCjfk8RtsCDVvw0mjby%2fZGteGnEq2HEozeVKjWmE0y2ssh%2f57eTMmNHsHOp1K42VVa891LTwqWEKR5T4w0QdC2lI48%2fpPp3Y2A%3d%3d",
     "keys": {
       "p256dh": "BFyO8N06e1R6-xWmw0fPu45OfktFansI6-auL2YK64q-AJ5yxeZDDMvMcJq7KN-HcuUQtWKAlQKBc9AiCy5Y6tQ",
       "auth": "foCtaD9r1u-ZNCwgjyKS6w"
     },
     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0",
-    "updatedAt": 1789553232194
+    "updatedAt": 1789609948602
   },
   {
     "userId": "101860",
@@ -93,5 +90,4234 @@
     },
     "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
     "updatedAt": 1789551249056
+  },
+  {
+    "userId": "101190",
+    "aliases": [
+      "101190",
+      "101190",
+      "01285353118",
+      "101190"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/f0xtxG76gBI:APA91bG-UXH5TMt742Vm9z4SGhFbeBBd7tSZhMGmQB8Xk03zplqREQN5XBpq-B09I-2CeATkPkEoFEcTJGOUpokJ2uwVafImC8LSwzTnTineLNnj-8SDiddAXhIwUSNNjdB1Pn3Lepz7",
+    "keys": {
+      "p256dh": "BHJUGwKqA1Znm5SuYNvPZZ0j79iegN5H0Zo6piXkpgU-vNn3WkhxGcBZF2YKPjF5Gi-kJcOwYxqIAdYSBb0GG2Q",
+      "auth": "qGmenmE9gTFU7j5CWcEbgA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789924502639
+  },
+  {
+    "userId": "101667",
+    "aliases": [
+      "101667",
+      "101740",
+      "01228140375",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/ebr3yPOapEo:APA91bFqfH5bGOxrw8SCc0bybcCRK9OisRlxxImjfbJMB90UMpofmVnMdRzA-YY0YYrrRv6ESsnHQrKhi12D_iSS87xkaPkKUGHEVV-5gPPG5cFE1096hGiQlmxTmsZQdw-2jETc0KRb",
+    "keys": {
+      "p256dh": "BISRImujnOM4lubkHtiu5FGt2KJHJ_wFyU7oaLRy3VEiy7OG52afsM0Snt28KA6MDxworruygoWXPcJnvEyWWN8",
+      "auth": "OABhf7GDiWY4px6ioD-lBA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789904178638
+  },
+  {
+    "userId": "101068",
+    "aliases": [
+      "101068",
+      "101068",
+      "01279200072",
+      "101068",
+      "101355"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cujlAuc-5TU:APA91bHn8Mc1lcKjihJKknAvQkDxsJqkD7cYQxyxXUm_MKwnYM1552YM1IZB-iWLAa2Ba9nuWOPAJXbEpNYm88eTOYZnToLdCz2L3d8t6y0pnhPe0E9UUYpO9rLaRrRSQWcYBrgGteaY",
+    "keys": {
+      "p256dh": "BLpXdVHg0UQg9LKLG2bi_kMlXx36aMOyvCXsmLMXPXc9zZ5JkrxKzLOkfL-H_7EFm5cmnOMmxqbYlpKECjOE6CA",
+      "auth": "uyQOYGYBACStOEeeIT4j2A"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789962334359
+  },
+  {
+    "userId": "101309",
+    "aliases": [
+      "101309",
+      "101309",
+      "01225010881",
+      "101309"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/c4vS1cv55XU:APA91bG96aXCiae5gcrufAVcacOdUkPPRhbgxJG1WpXZ9jynUP1fFJ_oQQt70-5CFqeiF9_vIvwPmzr6sYuZRp9rlkTdthPCcTFNran-ziJsOP6Eq2x2vQQQUqrvT1rvqrl-l1n0tihk",
+    "keys": {
+      "p256dh": "BI3T46OxT093cKhfmbuYDlGJLg6bMkfNHfWUBB0G_oPex1KfQ7-QsiBIOU4yUh3yfgIhJl46sgF4iOEuO9fZNjQ",
+      "auth": "xVHY9mA5z0a2z5ySqvs9dg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789982497320
+  },
+  {
+    "userId": "101119",
+    "aliases": [
+      "101119",
+      "101119",
+      "01220357378",
+      "101119",
+      "101768"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cCWoUVOOmSE:APA91bHO9TqsXfNhOfyFnatGytpZV5X7W7kFrTqadZC6cu2WXIq0vv0qhUiL018DGhNoOwsCoN4NXV5JgWiNspWfcwRD0shHI9LfM8dbiuLYmqtIkxNPtWt6W3p9FbdPHBcjYQCZqdth",
+    "keys": {
+      "p256dh": "BEHJv0oISy1SYH1W8JUooax-5DAjiysdUbZ3JJnIYiso7UHhJ_IRwPdFWQXD_j0sF-ONbC3ol1VuKoLNfrQS2nU",
+      "auth": "nqagPIb0LZP2XxTsVl5OqA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790099358583
+  },
+  {
+    "userId": "101355",
+    "aliases": [
+      "101068",
+      "101355",
+      "01279200072",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/e4jwxNVcG4o:APA91bGylt0MYgmAW0WEv7M64jFV6y93gjMWjOWodcVbal3gTBRWzepYfUWG01euNL6YhggNsM88DUkBPqTLAhHKxqvvClDQk7cS7_NrH829bLaBACT5vS_xUEHgX7PbV-UAejW-E01L",
+    "keys": {
+      "p256dh": "BE7zNqKELJ0zMGu-IRSIU6ckspcQrVjxw5wpQDnUGINB2nr1UvjuawrrsoR2-Ijn1szPLvIYQgqKHKt1Xz7vQaw",
+      "auth": "EiQG_Z-WcwPqQpjZrPBZiw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789809693010
+  },
+  {
+    "userId": "101906",
+    "aliases": [
+      "101906",
+      "101906",
+      "01212573762",
+      "101906"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/ewnnj9DlTrM:APA91bHAOAQrE9YBI0pVynXHIAn1bDvoRCVTQiYHv_ZnA-9-_ObbjPquzTYI02yNTGkxx0XpQQo6SJf5tPX2T6fIX96ilMSQdHg0exNr6fVrMxtjqtVAFxBiwTVibKUfaYSg995G10uC",
+    "keys": {
+      "p256dh": "BIYGpWsjVWEQmsRbY0i-S5BMk9GK8Fb875PiHSbC2jJksUqDirhGoFmNpnsW1c1deWhI8-XlwfxTobKtTH6CRHk",
+      "auth": "ED-yOqFb1lkWEZ1PaAYj8Q"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790094077731
+  },
+  {
+    "userId": "101165",
+    "aliases": [
+      "101165",
+      "101165",
+      "01283282831",
+      "101165"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cb_nU_NXmx8:APA91bHlmtvHCAh4DMMFvDdk_funmCO8Yp_I8RzOnelJCSIwbW-KWUla2iSJ09aU4STgR3722Tfb4ijrHVW0in6-9thVB78DoRVV49D_-D9LZIwaoqqbfoA4GH1bneI5rWrgqAQ2YFCH",
+    "keys": {
+      "p256dh": "BMXt06U5Hbvps95Qlp25aPIhW_Pwd9olvhjPIXR6hhlSYGjEtQB9lt4L0AyhjMSfXvzMfgQgGSnGeSM75SPLsw0",
+      "auth": "VXZyHGuxSCmyicr_UIufew"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790149263184
+  },
+  {
+    "userId": "101730",
+    "aliases": [
+      "101730",
+      "101730",
+      "01212878559",
+      "101730"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cNHDQ5kSGM8:APA91bET9ya8IVdQC-cV9y7zw_evGydYNtNzw2AUGBbmBdFguByPLfMBXDOe0WASQk_rjADwmtUvXTr7v95Fvhw8RsVF4h2ha1lMpK_5TMszQII7pLj8LOJi_u6ueKVG5NUTi81SrOfI",
+    "keys": {
+      "p256dh": "BNxfJaHfUyoscx4ZDWRusrlvaW-m5AOtXOYL_FIwjrr8twD1DXxK56tNyM2XLhqzwPHq6sXBE_slQdblqw5unYo",
+      "auth": "gKBY-P7q__jzQel0ejhZ9Q"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+    "updatedAt": 1790080037331
+  },
+  {
+    "userId": "101099",
+    "aliases": [
+      "101099",
+      "101099",
+      "01221807958",
+      "101099"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/deUDL3P36mQ:APA91bGpNpsveXdYw145X25YF4z6x6CdYr7oBhHDTsyKuQJj23jvLkVpuo000WLYM7oo67z3G2EREaCh803-lQqjvyLu5IEBWn8Hcwijg0Kg9uEYuu6RLiZ8UUXEs9W4AJY7Xx-S952u",
+    "keys": {
+      "p256dh": "BGLTzgb578d3beUdqzNo4gnj1jUYp6MKJynpyaQZUfN1qQnf8tmro0g3zLgtpTN4dkRooCSkKeBc5JWuYiX-rTQ",
+      "auth": "8JsI_VqvxoJTaFM_FlhmJA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789992923786
+  },
+  {
+    "userId": "101752",
+    "aliases": [
+      "101752",
+      "101752",
+      "01279780176",
+      "101752"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dAhA1UfvBGE:APA91bFr6g0ntwFtUUzyGYqxMUIDKh64DuVC388CuUQxN6XX3uq4qvHx-icR0swfwxQOa50cpwNGr5ngwzBB_5RLf7nWAGYOD7kjwOp3jg4-Zh0G28Uv_QPvAwMqekxQpDCDRiQZ4eID",
+    "keys": {
+      "p256dh": "BEYns-tGWof8_cOiK13xGoFk8r1f7gfOKhupm84DHL1fibXEOgM4DvJGa-6j8TI_muguSl_x_CWxjm7S2v2KenE",
+      "auth": "1cEmXWun4hwPr-qtRVwjgA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790104402484
+  },
+  {
+    "userId": "101094",
+    "aliases": [
+      "101094",
+      "01222692230",
+      "201222692230"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cLmq4wD_sPg:APA91bEjkUgVt9KnhPQayaWVr1N8EoJrD0GV5Zn_gY2v9j8islDDB4-t9lCK0xdPkmf0Ju48opdr6sBBBwJepJARV80ulsBN7InKfM13OSAkItR1L0zpcnD9YxzBhlbxHBUvPBCbuQII",
+    "keys": {
+      "p256dh": "BFKmbtVHZDyozOx5DmG_xcw8TnfZIVBPrJqP7Tygp2UQc-b1kAMlUL4O3dHiY3kJcY4g4NzkERPipS5bXxJWFto",
+      "auth": "qKB6P8GacbgaA5Mbk5E3_A"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789930180916
+  },
+  {
+    "userId": "101874",
+    "aliases": [
+      "101874",
+      "101874",
+      "01201161568",
+      "101874"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/chV6iM6RpHc:APA91bFgkzoj57Ir7yOciigbPzhhKpGFjkYZwaa_GrMqsQBatKizVuzYjDC91WBE5pcaPGettSs51OmJ5lAdgx1fr4-Hee5krMcAFJBhwlQqMtOPrCkp59uD2nZu0sMfTjZsVSNpyPjg",
+    "keys": {
+      "p256dh": "BAoRpEN15W8NvZOkuCOQqugVOV4xPtBxTsDyCYdxqnlWeN1DY9fwRo3CWNXuD6l3qpnu7_dhY9k0ZxrBs4KPk7I",
+      "auth": "wGQn6YM0JPLIERn7b4ouXA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790100605139
+  },
+  {
+    "userId": "101715",
+    "aliases": [
+      "101715",
+      "101715",
+      "01147648526",
+      "101715"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fMJiE3pQtmg:APA91bGZ1RFsoy5Bmx6pUoF5K4AIWSRnJWuhniDNNQMsVHjAIJ7cECyxEaP01YK6n0e6RgTpISKRphUyQ_gckBDMShcd0onJH7eekvpHaAy1YA_mYTMgSutsuuGfyJKE9wW8faHJfZ-W",
+    "keys": {
+      "p256dh": "BEwF7yn5fCmx-XHswECwLvvn9Mt8-tyBvUIGYhL-0TPpAOrQsaCnCD_AIRQjCv0vjFvPW50-zURI4ODLnwykUzg",
+      "auth": "SXHxOpgos4SPcfEWuvPnVw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790040018458
+  },
+  {
+    "userId": "101019",
+    "aliases": [
+      "101019",
+      "101019",
+      "01152773742",
+      "101019"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fy0AB-IzSrw:APA91bFz4vHjX47avkuAHVXWwTwnVvi6LGGRoh0FvaKIcAoVzT1c_W2IQkoy1sKgCKfB-WTlHINf067H1MAVbdoG8r3I-TD0Vku1Tik-2DE3zFwU6PGw9zzqYXU3LDoC7sRhEgbBWDT3",
+    "keys": {
+      "p256dh": "BF0kmqZ74LihunvXJrWER23-am73hnB-wLtdpP0GO6Ou-NYCbx7snE1FsKeJpiFOaFOuWQ4S9xPXiM1X9vBr4mA",
+      "auth": "Yi63_hpXip88vWlnq0bhnQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790107014161
+  },
+  {
+    "userId": "101883",
+    "aliases": [
+      "101883",
+      "101883",
+      "01287217492",
+      "101883"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cccQAaP8jBs:APA91bEfeGs_DDuIUWoDAYx3InmiCVC3d54Xdz6zCQE8uzi7iCcWBIdhUCKr20TegkLKV8Qj8WKnKztwbRv194iJuu7Q9aV9Ny1_Hn6w7FGXV4cjOYrlJiHUhZAal7wOpAiJnnz7im3V",
+    "keys": {
+      "p256dh": "BG_PVro_6M9Rnhoy50G-pzKm8N10ltE1xBotbKejKESK8cGaXpN2i4grnqSBnXvgSAqlimvwVhgRhkl6zONOQho",
+      "auth": "pNMyAU5-gItrjdHXmICRBw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790018343936
+  },
+  {
+    "userId": "101382",
+    "aliases": [
+      "101382",
+      "01141262715",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dbBWUW4zuyw:APA91bFGblKAe_gT7hioliS0bDdmCWcL7rpWm0RFqc_pWdi96-y1CjQTodSd210r9mZ6yE0E9ip8lEIsMJSlvwzMp_FUz3Du8rc28u3nT8KEJuf6SVigpOviw3MK3PEtbfXn2nN_Vfth",
+    "keys": {
+      "p256dh": "BAkXoG3gxOmp9ccLqrYfSN2Gen2GTmZ5LXdiiKDCrOPjmJd8z1vGy-SzOfnqgnetifRYU-UjK4zR4URR1-tBVuE",
+      "auth": "GpYfBPgq8GgWdCqrub-KyA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789714913085
+  },
+  {
+    "userId": "101663",
+    "aliases": [
+      "101663",
+      "101663",
+      "01277866305",
+      "101663"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/efcT52QIh2M:APA91bFWqyLOEN4httm0KRtdrWu4S_MW_tvhV5zgY812kboxYj81KWdpEWYH2X3LDm0ms824vf9f2Kkpqwwqur3g9h_okTS_R5AJjclPN7vr-x0Aa1SS9QAgWuOu6n3UcidqPK7sMn9Y",
+    "keys": {
+      "p256dh": "BAirvpN5Wi64UGAlH87Jr_SNrUvLSzR_35fqm61PiftPt4AoAhRmj1AUp25_ZH4cRAOnvkidaCV6ewevvxM-G5c",
+      "auth": "p_Qf9wkPDMBr5PHXQKAv3A"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790016100717
+  },
+  {
+    "userId": "101171",
+    "aliases": [
+      "101171",
+      "101171",
+      "01208642266",
+      "101171"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eiyhcNGUEKo:APA91bFUSv80ldDCpIj7_Z9A5Fb4Xb9EHzbshH90-5ftQzLfj09MVviovB1U2cqiumpESudfy5Hl6LlTsQ3yAR5AR5IPSEIdJBgTWKdp1NMhRTihg4afkNwhPEHHH3A1Vn4TcUQo-3W-",
+    "keys": {
+      "p256dh": "BObrgm_tvjm2rn1ftxNmBfBu2m69XO4tMoL2L0qjWA95QGWFOI8TLHh9B847ZdeyPslm6KU4Os6N5JMqtdEttPY",
+      "auth": "bNtCxYQdkSSdsTDIUiiuHQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790121260979
+  },
+  {
+    "userId": "101990",
+    "aliases": [
+      "101990",
+      "101990",
+      "01283523919",
+      "101990"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://web.push.apple.com/QNJYgME2jymW2p5VAClQVdF16xG04Ur0vITA5L27gMdv2-ylIBcjVq7FFee6tX_DTT_n9OJ5DihJ9A3xCWvHuitUVz72dr738OlhGIU5vRpUL93Te3webbUvme9IOi5eKGkOkUw7WWxi6sShKdb_0ZaVev5ZIBgtZgetirDIqn8",
+    "keys": {
+      "p256dh": "BBWPv3JcXgZciZKFIeEC-JTQHn3aSxNx4_JiUdyvupP9v1AABs0432EX5_3lgyQap3d5KucX_hb1Egq026-dyv8",
+      "auth": "1JOlehzh_WphUJusUmGWtg"
+    },
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6.1 Mobile/15E148 Safari/604.1",
+    "updatedAt": 1789901675776
+  },
+  {
+    "userId": "101353",
+    "aliases": [
+      "101353",
+      "101353",
+      "01150946770",
+      "101353"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fTsP4kavSI4:APA91bGC2ojs2FsFJA_0hHQRQyzRjGhDWX9PX5l1DCHPz8gx_ZPZp7RTIkwa2rRx31ZB2O1aECdMHaV0vAFZ5VyXt5LSPgRDQHl4zupKsMNuPx69eXogD7gMP54tH0yU6PRV-S1R3lgJ",
+    "keys": {
+      "p256dh": "BPueG93nbvxpId4WJ9K04beHWtr5kPq-hJCEzGwSTv3xXSuYmWEl0dGwfsMNs0_Xlle_90es1ENaDy0B0EzIJ8g",
+      "auth": "GNlPhR8_Yt2LUG4lyY2ujw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790152944657
+  },
+  {
+    "userId": "101013",
+    "aliases": [
+      "101013",
+      "101013",
+      "01220129782",
+      "101013"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/e4_H5_vFys0:APA91bHwLQ99clFre9bzfYF7X6voKPMgDyZnEcMo8QTeJguuT5sg9aZKzPM_2zTzLurai6uXI0iL_Puor8DvSzBqfrgkV54Z1U2S3zjUyBL2o1nj1ZgrBKPRDFG8Dadom5jsADFp5qHX",
+    "keys": {
+      "p256dh": "BH-i_gjZPv6ZT6R64GQ87b2Vv6A2FLe9t49i7wiIb3wwV8A6QqS_uo9GoFWPQakP-Fs4cF7mdRBfhhHm-qo6k4I",
+      "auth": "d9NOc5WmKGgYqWf5wZlEUw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789993819567
+  },
+  {
+    "userId": "101146",
+    "aliases": [
+      "101146",
+      "101146",
+      "01287228278",
+      "101146"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/elKdM2OminQ:APA91bFgKkBi4FeN07FVdS2i26Zffy1gh8k8cokrZGA_G6Kba7wbxjYyn1AD3-6CUkWn9Cir6GYmcnzpUePFZeV3tR9sPui3jPROV0mVxas0YJ1JJvr_vT_CePwpwl6wbs3Iutlpd56m",
+    "keys": {
+      "p256dh": "BFbcK1-GKDjy5DVwlAq3HchNL2CQS9DR-tLINPuotovnkY0-rzGscSnE3Y4naWRzqGErno6GbOWuCn1FnIziOOs",
+      "auth": "7qgLxEEZPkxsogiPaHWNJg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790013261246
+  },
+  {
+    "userId": "101716",
+    "aliases": [
+      "101716",
+      "101716",
+      "01207994363",
+      "101716"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fC9-MwdCSkw:APA91bHkOCx6_Um4tchjMTRXluMsK8CfFwCZsAbEW3JQ2JFl1dv8Cpc9g59T3TSTft_qYXRhD_3JOpDtQTKk8fO3Bu4jf2lMSCgHuTMLC4mw6srKKnn4-YAy0v4n5u3KNCqwZbYKUn9I",
+    "keys": {
+      "p256dh": "BBNCzNWotMGj1lUeE3_AaYR7JwH6k_Gg7ORNmi66NjHs6LNlgzVjM6MwYqU4gSxBs7_Hd1dD13ou-_ecvWtJdmw",
+      "auth": "TauQPu-nAgLwgkd71kEzhQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790105396029
+  },
+  {
+    "userId": "101710",
+    "aliases": [
+      "101710",
+      "01029461016",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dOYF8avFPPk:APA91bGBjUNAxHWUVsRSorVf6bn_eTdCcf6WZe9iQQzGibkjDBYG3YGg36km3lINKD5GqGCcXu2hXSPVUmFEWOXW5LuyKZL1RHlxsdYDZI0qVEKjb3k-hH27-sHXbUfOKDFEYgw_t-ln",
+    "keys": {
+      "p256dh": "BJ6RpRPn57T7FfoJDRx-9g7Vwm5zl2GWlG7EH8TgBDjuCoYUqlLT0fLF9cfbL3yVc12bF9n9VvIREbOX-SdGtk8",
+      "auth": "KvZc7MTpcq1U1zZzkvelbg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789843663565
+  },
+  {
+    "userId": "101238",
+    "aliases": [
+      "101238",
+      "101238",
+      "01221770910",
+      "101238"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dsXXyy4MDx8:APA91bEF158G40AtnSRbbdLvXnC72zKfmJ76ryT4d0ROE8M6atXKN2AlPZHt3xmGNidhNOQkGQgezJINSNRDGGsvHOp0CM4i7RVSFO0qFhgJ_rlGZZRXwI3kNlWbdsgw48Xx0TncmxRh",
+    "keys": {
+      "p256dh": "BH0INKWihKph33nJs0jSv6KmxKbdkMj7SQC3Rvb6mv5acYI_7C4eQ4RmofNOHmjYfIkPu6anQo1wOYr16X1Pv7Y",
+      "auth": "awIScSsTt4R-z-_-xZzYcA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790004264109
+  },
+  {
+    "userId": "101649",
+    "aliases": [
+      "101649",
+      "101649",
+      "01212202672",
+      "101649"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/d5aVuI4lvws:APA91bGZvHVn-1R4DeHiBJdcFTFjkkGgD29vUkkA1cOiy8kvqhB36P-xuq5744cnVpjEOjMvR58gO6HfLXUn39NcELMpoOfAaf6lfHTwU9B8Xg0COf-r4btGx_s4bYr3MqrhE0svStGg",
+    "keys": {
+      "p256dh": "BLbzkgd7E_LuZQquFaUJZpayRutZoKLKAUFQQshzmfIfaZNjGx3b7FHWuKaFV0-eVh87rl_43XM7GKcGzDnGwyE",
+      "auth": "ZLSaG7Gz6NCC2lE2fKh5eQ"
+    },
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+    "updatedAt": 1790094626181
+  },
+  {
+    "userId": "101383",
+    "aliases": [
+      "101383",
+      "101383",
+      "01042573317",
+      "101383"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dqhH7o3WzlQ:APA91bFThWwi0A7X9n0EbaDD1XBEZvY5uw_SC9_BDQkziBJZ88RHoQyEtdBm4AN9Q14hEgUes7v4555n-0G_Dp6LD5JZ2RQgDkNpdbQglpYCU8Zo9gS1_NdwzW-E31Dz0tVUwIyMZ3wh",
+    "keys": {
+      "p256dh": "BP6lzDKEwbQptd725xo1OfVfMZu8-o0g6BjDZcjADjHJjfO0y--YWZYEi72kAyfpN6jkvxXE7aY-VNuIY1z47mU",
+      "auth": "e3kUpXAKNFZN9EnJjaR8Sg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790034159424
+  },
+  {
+    "userId": "101077",
+    "aliases": [
+      "101077",
+      "101077",
+      "01228676657",
+      "101077"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/d1JIwO9D9UY:APA91bFPReQF5pnxEjt5eD3yozxk1MionYfwn4CjE83r1OEggsZm2HJKLaOf4UX5aKaIF6WhjULPYTeioDybxtwgMn9mIIKiL4oaC9eKbCH_R7ipRaab67zLCzN_8PuJhnYySiL1vr2o",
+    "keys": {
+      "p256dh": "BBJ_R3VeH3JqG555MLoceru0zLV4wF3DTiEx9j24oM1lItjn7K6ydG5PzyX3AVx99TlHUItSsfrTBo3Y4reTp5E",
+      "auth": "s5Mbih-HiqAoVgtpbyCTgw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789839005689
+  },
+  {
+    "userId": "101304",
+    "aliases": [
+      "101304",
+      "101304",
+      "01113306452",
+      "101304"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eaPjI6cKoTQ:APA91bH-TXmYsiC2xbfklLNfRVR0afSiwcc_XJY7Vhxy7V2JR_OtAErGetbv4j3WddKnrvkjBqDh_bb5STKsafbpLRycWho_1QyaCZTee89uEXzkFid5jDtCfJkG6IikDQLPdEIhUIAr",
+    "keys": {
+      "p256dh": "BBv8zatqj2f_jy9NH55D_eViQib5Rf84i-noaahmM55yGKuHAu-nghixZdCJiIiKp6lSZkqf6Gin4xId8-tHik4",
+      "auth": "xB7To9c6TQ_c2NMdOAoYJA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789871515030
+  },
+  {
+    "userId": "101343",
+    "aliases": [
+      "101343",
+      "101343",
+      "01277960455",
+      "101343"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fK2B9PoGp2s:APA91bFLdNR5t0N0Z7TGQXtwheoym1wN_AlzF-A0FpwxzXLNRaekCiTrYwf44tHJNc_MyH5fafkmx4WEEN_gNQ0gi5Q7WE1FMlWLMrBvqH_znnv2cVtLZF0qaAAUjFQ6YH_Mwf9F-cKh",
+    "keys": {
+      "p256dh": "BA39surxLo5ouvsJ5ydsOHUWnQEX9VzCt-VVFad_o8SbbwrwQ4laprbqmmO-MmsWbF7Df0Auzmq7K-gqBBqln0I",
+      "auth": "WgE0h1H2s14QLvmmvsmVEw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790016930663
+  },
+  {
+    "userId": "1",
+    "aliases": [
+      "1"
+    ],
+    "userRole": "admin",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cls_pbmOaU8:APA91bFJhaJ5FBbftoU4a0Xt2bh7kjUjP-oz1RXwT0rS5QdNFvp8HzSoAwgb4wrV82GnpBhlB4B-zj4SgjkpGC5wVxgUtbAgapGAVbPXG80Jy_FsbBlyIw3GQKHXhiPlnIZexqFZdeA0",
+    "keys": {
+      "p256dh": "BGb2S6jn0GrajlDVZpQJ7iAM7nqO3uXfSaoh7StNEwY1T4UmxeTgzJcHH-AKNkjPj0UH4GAuP0Cp-b2WChxIDfg",
+      "auth": "Df0HooSpz7k7syj3jjDZiw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789996140001
+  },
+  {
+    "userId": "101051",
+    "aliases": [
+      "101051",
+      "101051",
+      "01275770944",
+      "101051"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cp5D6wUrPww:APA91bEZRRgY3tetC5Yxznt0BIuYFFX5Z2_LNVsc-Wr8jqlI_Brz2T-GwZBh4zbUpHm8JC6v3kNIhyxn0ocZlLvL9pyy_6n1zdhJLf8Um3MNeNDkYajc8Jz0_GJkeAG0OmqeUL9hBuk9",
+    "keys": {
+      "p256dh": "BP13t6w6dQmNxwTzNzQXHXjGDG2_JwDM-kxZiALTnCgH0FgA6cpQDfdj2bn3vwKT7KVxG5-diG4rVcH82wT_ESk",
+      "auth": "qzeJd2Uqm406yEqUptaI1w"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790101066310
+  },
+  {
+    "userId": "101741",
+    "aliases": [
+      "101746",
+      "101799",
+      "101741",
+      "1212208244",
+      "01212208244",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/f-pO1ps0lsI:APA91bGqqjkFC_NsOscZt0xsfwI_rr-wydO0ywd5-JuIIdPZd5XaE9ChAPmE5IBSuYOeNBUJ-56XaqIJ-PrS0IP_tSCBsUo6Cp0z5pWIvNgt2y7ZDqz9ou9fb1zIYFKk91ScT8mIzVRz",
+    "keys": {
+      "p256dh": "BLOZXhux5rgcct44CWLhtHhCWGfI5T_be3rrpKl86wq7zCDKmS73LHyWMVVy9fiPh-4O1FWtVobUfiZuILe0LLs",
+      "auth": "MsCV-upYZ1hDRigTNEN9PQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789876527358
+  },
+  {
+    "userId": "101097",
+    "aliases": [
+      "101097",
+      "101097",
+      "01212601742",
+      "101097"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cVIWf92jzTQ:APA91bHxBkSWGRsKHY4YFjJpRFnsjYhIJdVnIgBl0jIgMn_bVAzlzEsdYsR05MXTEpXYUD-hoPJsxqzWyoxm_NKot8ZoNqmoTMmanYwGBSaDNYjQ7wjxB9RlGJpbfn_NdWdlZpDJHrKr",
+    "keys": {
+      "p256dh": "BCRTrKWN-ZWKUtTPfWesa0SJ1RqaAl9lI5U3dVW1ieAqul1HyOZQp_GGpEwFAu93omV_Pqj0ytQqX17-grL6tao",
+      "auth": "38eNlEuOsD-_llFAJWoTCA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789930868848
+  },
+  {
+    "userId": "101239",
+    "aliases": [
+      "101239",
+      "101239",
+      "01275464557",
+      "101239"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dDyl9yFlUPo:APA91bGttEhYcwGdbvq-6a7T6Ao7W_d6YTC06aXJdAY70Wk_Avl9-3JZPcy85Nh18z_nwTtgZ_zITKeh662t7eiFIeWSwhHDMx7ZeQj5Zg5ofyA9TNEQKLgLHiTj5c40qm4aJm34ZBCI",
+    "keys": {
+      "p256dh": "BAEOJEieAco3oFR7IYfrIUy5vi8KbSrJwC50hNo9mIliwGhpsAMuoGeRV0Lz5_x0Ue6H2VGFoyUaxZi9HHtYDOA",
+      "auth": "mPIGzplW2ABSHQySgnWsgg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789809309678
+  },
+  {
+    "userId": "101290",
+    "aliases": [
+      "101290",
+      "101290",
+      "01030366322",
+      "101290"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cfUp4uWgOi8:APA91bFAWnztmaol8UexZgToOJoNFyEbL9LLgC2DXEVzBLPiUJV4XlMH67gT5PCp6fijFI2iBbNvidoGH9KDwQ5zaDTo23erS6I8sxeCZtzTdGQhnIIS_Xv8cJauNQz_phqwlbTXWKDt",
+    "keys": {
+      "p256dh": "BPMfSQfAFYrpC0Ep6q8uELuIToZNKne0fZv8tIWyatfYA3TArEK98LvWd0cOfnVot-MIog4RgL95IOXI4oMNg3c",
+      "auth": "dzDsiXFxJIBwhR6pzCBtYA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789923450495
+  },
+  {
+    "userId": "101225",
+    "aliases": [
+      "101073",
+      "101225",
+      "01273376230",
+      "201273376230",
+      "20"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fQTdN1LoUyY:APA91bGfl4_gvVPvKS6EL3y41Y279Ohwc5G6VHW-_v4iCj6whx_JnSsDzRui5U4d0MCiHdiSrGV41SL6Wquz3QOU7TJmAftfGcuLrBYE4UGhDPpQyMOXWRTvNN0A4-q5hVnJMEejet4T",
+    "keys": {
+      "p256dh": "BBfWhv348cqRsKFDF1xwb3p0EwGF4AcjLBFI3tx6Yvbbqd724TVeSYMKPyFVXoEFH_vbnMdRnU6lYMm3dNALb6E",
+      "auth": "0Lom4Wu586FHPfHHVs-hvg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790011791075
+  },
+  {
+    "userId": "101953",
+    "aliases": [
+      "101953",
+      "101953",
+      "01280676790",
+      "101953"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/c0z1Uid__ks:APA91bF0aQRumSd5T7t2ikQSFVwE8X2fKnZoYUMLZxRMHIyAqahe0Fu1hx9e5y1BUMuaYwwnzMOyBN3HbOc0WvvaaQwhEm3oEJh1h1JS6Y-q16xY0nAMb-GIQTI5es6PFl8nnDiEj8PI",
+    "keys": {
+      "p256dh": "BNbseRGcnnsVp5mr85SqYmrRsgtzMGzRHT9mCPzG_70o9L8_ORbzwhAII8bXqP14-j_J_0yAqK87f6tIJJQfDKw",
+      "auth": "H6WUxTovIi6canCfJnb4iA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789717551771
+  },
+  {
+    "userId": "101962",
+    "aliases": [
+      "101962",
+      "101962",
+      "01035711343",
+      "101962"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/ee3JhGOCNUY:APA91bHFBtQocaFcN3HhZ1rDElqeaJMloOc1TDeTw3JYFRKQjjQZauVn6ugc6-6HTMvmrnry4WmEdr3gieCn3brmuMeAfEhduRDpoYRZhTFQYzO05hWefIsxSr1pvzRoehmvuabQJ2hq",
+    "keys": {
+      "p256dh": "BLj6l2bT3WqlAd3TwSHxoDIFeCsaJTmKixSRLPHQpZX6BBLjdUD2IiryUOIXxYci13zlNsE7oO7_zFRu6bCw-6U",
+      "auth": "QdDBS63HC5xkd-uKqm2efw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789801671732
+  },
+  {
+    "userId": "101980",
+    "aliases": [
+      "101980",
+      "01220956309",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/f4FyO_ZW2Uc:APA91bGkeRRvEZINfV-kATeaDnjdbnapTkdkN2KamUqtqBFarRlNZhqDt4Cj6I1rM45lq6G8ov_7LPoYzSEj9fR6-VM1lL5hKorP8UFLqchIbdZE8JZ4D3aUFe6ZxLolRdlkpzYEq5-t",
+    "keys": {
+      "p256dh": "BFyMaACm63Y5ofpFmXbtwVZXtUt3BT-3QkmPAD4TnitU39YbAbDOFQy0SOmp_4i_0mu9xwIYlCzOa58njs7Pnj8",
+      "auth": "ZbHUqgCdk-n3WgRmmgsKfQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789918471766
+  },
+  {
+    "userId": "101387",
+    "aliases": [
+      "101387",
+      "101387",
+      "01276584514",
+      "101387"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cgGKnbgcmco:APA91bE9AhGayoA37_Z1cfhxiDxd-Fy0Sm_QPOQ-d6I2f5BVM5H_KMNv4NWw6QssWeaix_jjz1FDOE9hlHVjIWpk_PVoaUeTpV3V--_Cv1XvUMpWCdRjbhxyTp2T7kDOZAoaz5mhtD5M",
+    "keys": {
+      "p256dh": "BEujRYpFXY2BXoXvue875XzzFKn2q_-CNG6Bk74EBC7xSZGw8c4ddv4gDwy9YzNXI8vwMrt1tLj6Yst2Zhwd2T0",
+      "auth": "wtUnjS_dTMNkCSIBC3kI_A"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789894826304
+  },
+  {
+    "userId": "101095",
+    "aliases": [
+      "101095",
+      "101095",
+      "01284500913",
+      "101095"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/ejwLD7ks0SI:APA91bHAqQ9zZuJKdjj3uDOaSugRoU-3WQJloZW-lU2AzGxj18Xfn520SR-u78tku8bV1Dl40bjFZI2g88M-MhRmaUWXe3yEgBV41bFKXML1zaQjEF8eGcjzK0Y7DocfnyCXIr0wcozU",
+    "keys": {
+      "p256dh": "BKhPS48KulNLnTkevJmVYN9nw84wWQlJzNjm8F3SvmSKNzbkuU-GZpE9ver630KzD9Ya0_LhNJcuYJDkVEbK2uk",
+      "auth": "HD9OO-5qNWZSazC6kzHfUw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790091479802
+  },
+  {
+    "userId": "101301",
+    "aliases": [
+      "101301",
+      "101301",
+      "01113306452",
+      "101301"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fN4_1P_aMwQ:APA91bG0mwiH6dKHpNdcKNpt8-WaehaEKVbm4tLHuCMrev4iaPDspva5fesv7KhyaxFR7pasWiXObrWmGQKactndTmWn4NFsIlJE9GIAReX5A5l8Tg4qYh7rbgH8kkeYzxNhkSDlkfTi",
+    "keys": {
+      "p256dh": "BMypiY6X0jrnV0TotIWuybA7amV-OPh2ncWK6QM_mtd9SDiWNXK61RebgD0LPQ3tnEy2E5TrLxTkqAzgOskEzYY",
+      "auth": "J6tJUcjaj-JkQKTqbAuseg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789732105973
+  },
+  {
+    "userId": "101870",
+    "aliases": [
+      "101870",
+      "101870",
+      "01281863588",
+      "101870"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/e1jZclw0-bk:APA91bHZRcbKa_bKOoc7tOY8Th21L0UmL6WXqxHoeQBy7At1MhS7qxTLRhOr7fypNPvNan2tRZA3gxM7dq_QLwkeGRwOkB8jVPfzN1pO3wqyM1581O73WgL9rkJP2auRbd1Gf-WOqqwY",
+    "keys": {
+      "p256dh": "BMC1zcHzFQpaI7202tPGBkBe9HKttCmxu-L-War7YOpRsp2Udn7RM3tBjoujYxckxTPwcWKOaNZoKEfbi7EjVpU",
+      "auth": "gevOU7msV6962k1ea56Yng"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789758361939
+  },
+  {
+    "userId": "101288",
+    "aliases": [
+      "101288",
+      "101288",
+      "01208450337",
+      "101288"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dbb8uz4fOb0:APA91bEU4wnnLOFEpORjXxNnHZKt9rr-fykLpvvlVSN1bkj9x01Itghske5W88UCDNKw2KjhE3u_34OrmbhzUmXlRiGmnPlxj7ocC5ev62WLOxKy-Dbiam1GSm1U7j771zVlFLk7rFEO",
+    "keys": {
+      "p256dh": "BMEdstQHaoLnuFP8nQ1BCOS9WdBKWAJ97jinhQSQV827DjHW9S2kBpdEPIVy5gLcQA0y561RiSDGhoMM8kh4s58",
+      "auth": "8ltU-qxch_BjuMTp02Mc5A"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790109971093
+  },
+  {
+    "userId": "101684",
+    "aliases": [
+      "101684",
+      "101684",
+      "01044526421",
+      "101684"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/ekemoeDN654:APA91bFKtTvE0nW3PlR6cjbm3CmKilkqhufpcSwpWhTvQ-lE-vhtR_S2eElq8SkevtlOqkqYwSVLV5CKnY6yixdaByEGgCtaZcRYYzgxD3p9OFuoe_jaB1mnzJREJcLNQtUk5AvtWnCC",
+    "keys": {
+      "p256dh": "BJEbARAODVNHuMFe4xJXwbCrkZG75OMFYEaw6p3BLLFdNpE-YaBKLXi5XlNPr-f2D0lDOblZ1EI6LZ7tHpVnEv0",
+      "auth": "TaK8SPkvL6ENCCfOAONrzg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789828888670
+  },
+  {
+    "userId": "101093",
+    "aliases": [
+      "101093",
+      "101093",
+      "01281693280",
+      "101093"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/ehzadMSMHCM:APA91bECUJle4dplEK9kbwYISNb5rpvHJgHCdH0tF4sRniBTrM8cor6kFb3Z8huXFCgmFIZBnHagBoKlMXR-YkQCw8MxEyDls5ZoB8e3_XaLuiidoV6SXRpLPq5-QGh9q5agBzf8Y4nK",
+    "keys": {
+      "p256dh": "BFXvoRB3JaNQFdmkQma0eWY6hXCwmESn5S42UNgjRM0nizH93KxvscI-QJQVgqkMTBb1ccbpezqZYEel0-QXr74",
+      "auth": "xiSmYXarehvGX5ImdC6eng"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789729629176
+  },
+  {
+    "userId": "101637",
+    "aliases": [
+      "101637",
+      "101637",
+      "01500470333",
+      "101637"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eny6YdxQaH4:APA91bFece0vaODrkUwn9VJOTDQHf3plQ39sCF4jCJl1ESs7AlwhKQ3MOScm8mxivQYaGNnCHonDnMBSfDQforexOyTKmdbRfXfJtKHX6nKNmKw_l9ukIu_PY5LSdX5uu7omMNHp_M95",
+    "keys": {
+      "p256dh": "BAd-FSc1kXRipXdpqI1fo6rekxS9XiQDSdsqdNGgoqnkER36aTzp2YQ-etTH5hnpxW61cTE5nWIBa7qBYhWL5dc",
+      "auth": "TG-vw4wWO2d_AVzxgHAbOA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789927201905
+  },
+  {
+    "userId": "101221",
+    "aliases": [
+      "101221",
+      "101221",
+      "01287557791",
+      "101221"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/c95jDbT72H0:APA91bEzQjHsOeJygIC-f7lzr4yYfIl2p2jdSMobQZBpshsKhKoVBuL9QsNt9MYEA7T7LwHSStnWKUbPz9cBv00APomfWiAJGyCQlSnqzZ-Jde-NijzWPqTOzcXkLGHdNPNotXmTjc3p",
+    "keys": {
+      "p256dh": "BJlcygk0-15yc4n8OJkhfOvIYVB6ObaRDf14NWvmiAlaG7qid43wrWk2iDS7dDDW6gdWZNyMAAgtDppZiHBVpB8",
+      "auth": "FpPC_3P2MxxO9UpnaOQgZg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789733656388
+  },
+  {
+    "userId": "101645",
+    "aliases": [
+      "101645",
+      "101645",
+      "01505156521",
+      "101645"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/f-46y6dIsdw:APA91bHGkHPaRzugq-ibA5gIreaVVU1-ohTvfpwoOhHFP2upMXYacU1dz52O9TrAviOd1SbNQcs6djQI5jgGGsG1HUZbG8BdR8_xI1jcFQ-qEp6xSLq1bAFk_nT6VhJ8WtIJeu24cMu4",
+    "keys": {
+      "p256dh": "BCRldK4IDypC4JoJq-y2_PIx5gsfvklMCk1PEq63Mtxk6HF_93n6Se8hCcC4PntF602bdmn9iqu50f-9McaSHdY",
+      "auth": "KFfXwIRxjdkPyDfxkYRRjw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789933513600
+  },
+  {
+    "userId": "101726",
+    "aliases": [
+      "101726",
+      "101726",
+      "01124554519",
+      "101726"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fzqC_4zXAWw:APA91bEbIZbMuM7bba8H_6mq8_W3MJJGOwO__bcTGwHex9EjDyDySk5xhgBr9UKoygeQTKY4JKjR4i2DB5y93QtGsaxvhbExLrnD5gbNYHZBZL5817vwirjmQGTWM_4HcRp0cfTrlh5g",
+    "keys": {
+      "p256dh": "BM2aGpDyof3r-ZSu8haycGbUzDvf7gP5dh2NeEAncihGtq9WF3eg2U8ZWiH_VGnuDvAhVumgtQT1XC2tCoc8HrI",
+      "auth": "2bXN53MiDG3trGLjFC2vcA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790092948466
+  },
+  {
+    "userId": "101743",
+    "aliases": [
+      "101743",
+      "101743",
+      "01064321538",
+      "101743",
+      "101742"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/c3ZDKcW8kDQ:APA91bFl1FDNz8lZDcBADlx_2zbwtRJjMETPTD0WocMQtMk0fgyGd61Ob-zz9rdioMY87fAv13-psZo02qobz6ejsgNtsC5V_UDBdn7dt29ecvsT23QUaIbGw8gl6eysOQ79XBQxZaNY",
+    "keys": {
+      "p256dh": "BC3qXkDt9-d8AZ6EdCiQ3j6YGNApXlPqIWvKzaCRVCVuIDMvOISxD91w-p8r6z9u6gXDVLKJhgDmgaQ8ktftCS8",
+      "auth": "wnfXM-Yr_1kbz7B-5vj35w"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790101739945
+  },
+  {
+    "userId": "101396",
+    "aliases": [
+      "101396",
+      "101396",
+      "01279558166",
+      "101396"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fG6EVVt57uE:APA91bG6PGQ_yZV71p45IVvdAY3KnFgzLFzwNRx3caDS8N152nCyCVrJcFcEAEzfbuHyBkKjOte8QTdyP8fvCtXgsMjzuYg42ONhgyM8NK4rR77ZozCaTcEQjJh3F8MXyJLHlZYlZJ-M",
+    "keys": {
+      "p256dh": "BNtCYwEyoWE2ydKRQi6eOsuq8tWPl0R5kT3oBD9KAzVYOozHG2YiywKYYxPNJpCtfsU4l6krOElO02tPjsQCIGE",
+      "auth": "z-4n8Q9ML6M49MKhV_MWMg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790117664677
+  },
+  {
+    "userId": "101974",
+    "aliases": [
+      "101974",
+      "101974",
+      "01203993327",
+      "101974"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fnPr6A5uf-g:APA91bFP5PYgPCJnqXAPEzqkPYi3IBjDvn1T6FO-dGdpHdNez1mILeQEmHHzASVOvow2Wxrkqv-nwbphamXllGyNkZK3bg8tCfWQWB3I3fvHQjuwpRyjWk9_6N97mqyMwVsjDIS7KW7s",
+    "keys": {
+      "p256dh": "BAcXVbfq0dKzKCnUOUKErAJvuv4sRQS1tBQ_ajXYgSCSARVlRi7uWvzhtzk-4HFhYMqG4ltXcTWiZZxdbBFSsC8",
+      "auth": "1DcqJcnCJ-vBGEt2gkv4Zg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790082489388
+  },
+  {
+    "userId": "101073",
+    "aliases": [
+      "101073",
+      "101073",
+      "01273376230",
+      "101073"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fpINOdXNMgg:APA91bF-9vk_STZMH_LDlZqwqt-k5L3MTMmAcIMRgyZiP96x40wFmRvPd26_Ac-IkLE_r2YDQ6g_OTH_15B7wbPkyYwu9Viu3G_uv51cdcWNGfwT-ZQPoWbgCHdnBSMuGNoFM7VTbGOm",
+    "keys": {
+      "p256dh": "BGTOwqhbVERVCebq86jImYKDpGemaDAil_PlcRu54c0ME91TpbWZhhdCcF_4o39P7cTePQYq40n3V1EtNaZnPd0",
+      "auth": "jRuWBbUfmVtOKHaoxsBqVg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789738216225
+  },
+  {
+    "userId": "101726",
+    "aliases": [
+      "101726",
+      "101726",
+      "01124554519",
+      "101726"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dzmpTPLwPE8:APA91bEGDpk7kot4D93cKTCr5eXEpSHOIN3N2H_cUbvUZtw9I29wzCdn1H8AB0NAxlKbZWRyYUQifODJ3Xxu9rjhNDq5Vt34Wakz5eGjWjzNP8XZeOAD0mLIw8BSHT8gfmL3KigtHjQE",
+    "keys": {
+      "p256dh": "BGTkekk1FhknQ_UlXpR_lT-NkXfK9JGUZRfxrtfqzBfInwqjg8uHgGGx54rLS64itCa7cMNX8pAkdCSFTLtAmnM",
+      "auth": "hBl3Yq_hm4DQnklkuwFd0w"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790096036139
+  },
+  {
+    "userId": "101076",
+    "aliases": [
+      "101661",
+      "101076",
+      "01282916049",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cYmXXyGg8W4:APA91bFdDl0OacIl4EuXA2Jpap5lJHMw0UshkzM9FRfHqiAI26wMtI_xvJcDB5k5nFg-4WGdZAwGsHNO3Jca1jjdCMvYsrh01rnNrMgZ3l05n5t580f5jIN9upGtvJI_BmVtGstbTujA",
+    "keys": {
+      "p256dh": "BDIshuhrvscnltAWzdQU5Ix37qJ-_tr5Qfd-4O9sYrAXtQt7xdj6q-BX4xQszITT0orTVMFX5GJJkrGd47uEPsY",
+      "auth": "ONnaj5h8J477T7ZmsYEgLw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790074426004
+  },
+  {
+    "userId": "101050",
+    "aliases": [
+      "101050",
+      "101050",
+      "01202394680",
+      "101050"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fJFFKB_6iuY:APA91bFowWVTxSH9Zs9rCgAWGk0mhDZEF3zRdiMAtiFIu6Hj9kDkoNXSqGlxB7HRlWkeag_sNyQGW0QICWvN3qIU81RhzCGojodUkDB65ipyJCBxZA-X0sQ1-4jPScwnirgpB-soKqCH",
+    "keys": {
+      "p256dh": "BC639NwOYjvXAuOevASrtUlqjgJ3u177LNKM0NJSug15rTbXh3nwx5YrPiPO6NHgXZtRbgCMlnls_1XkaujGVPk",
+      "auth": "Iuba304UVfs7y2qpJ0pqeg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789738025294
+  },
+  {
+    "userId": "101891",
+    "aliases": [
+      "101891",
+      "101891",
+      "01129499484",
+      "101891"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/e8gfUtXlL7U:APA91bE13CnIl3UrQYXq9B6MznAoHP5mqgiw6hd1z4OI3E9cmJpNPoek0BSkBDO1aw6Rdsrh-X5oc6fuFV1TMOWU5A6oQbRQWZ4wS3yaDDU_mF57RONDi3ELTf02LWMxVldHlrRsrlr9",
+    "keys": {
+      "p256dh": "BBYNSIQ2HHTmgs7d3i0byFE6lyptKtMpsvMu2Eg01hGxcmXY6WOe1MjqkTxvgpbVbuq4a62BWkolQK3zarkGu3A",
+      "auth": "cc6PY_wbm_bd-gYZ2LEIdg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789930047182
+  },
+  {
+    "userId": "101395",
+    "aliases": [
+      "101395",
+      "101395",
+      "01284741007",
+      "101395"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eggwVzGM87Y:APA91bFxx50v7ocDzu8FF6RvE_ZBcm1cE8pLEnbu-NifF9RnDZOS203PRD-2BIWIdGDWkbqUrWnpeYdGuzyeDVy2_uowdFXMdFnE4IHaiJCmaYtfLUO__gHnm9qN8_0T8zEAsVD9pzoF",
+    "keys": {
+      "p256dh": "BMWyBsx6zxbpcOHH3tlKc-ejyd5PFZVFksramsLp8nppv9s5qrDnzEO0Y-c8KvrJS4jlGFXPsryb4EifMtQ71Q0",
+      "auth": "uUy8TxUDzbYjYKwPz6akMw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790096114763
+  },
+  {
+    "userId": "101766",
+    "aliases": [
+      "101766",
+      "101766",
+      "01207094585",
+      "101766"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fUcetMCBiFw:APA91bHLM0_PkZYjMxGykWIu2rgHDwKq4ORDGMZ62wuNMsrgKM46Z0GmFxIwBiCYCqdP8Siv335_pdgvN_zB-zso4j3r6y1ZYogsdg5vP85zivaLoaRQ6ajZuyMtVt4LTsCPkoyVCaBt",
+    "keys": {
+      "p256dh": "BHFVzQuRvIYr4tMl58QkK9Kzy7Eml7vCJfsEi0wZYuoMd7nD7vYgGvq8AnkCS4LYkO7hpoeDNA6aA-2wY9-YykQ",
+      "auth": "kTLoTfewOf_w14UE5NWNTQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790105145960
+  },
+  {
+    "userId": "101083",
+    "aliases": [
+      "101083",
+      "101083",
+      "01070633231",
+      "101083"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cB-9G0ZYoxc:APA91bEqitvsSwdBr24NFdWmzLMcKeGSaWc0Jz4RKaj8jtiKWBzCl0f9GjwOBvEhP6ICy6GmqS0EcUUANsqm1GQYF7qPK0T1bvMH0I-nCZCemOrBFaiYSBMpgZ_K2CJq1VjNcSg7yfGo",
+    "keys": {
+      "p256dh": "BE-9p0EPKwL1xtXoG8cEzA23N_eWLfRE_y9GVYTS_UUsGjnE9u6OrJ3strULa9ax9vrBEuXKtXz6zUtyA1c-IUU",
+      "auth": "8YlfpB4RvqjJKPqnpJaIDQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789759106111
+  },
+  {
+    "userId": "101306",
+    "aliases": [
+      "101306",
+      "01277169198",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/f18psiE9cf4:APA91bEOMeX5tex2S84eOVZ7VLM32f9HaUDEMAc3U18VeTcmG0ykzJn-gFn-BzpHk_pQHPDw27e92WE3PpoovnaIFaFh9xhYd6dc7mMTZR2iusilCczViq2LuyIxPal0ZyO79oLsKtOi",
+    "keys": {
+      "p256dh": "BAEiFE5BP4IlAckALL_RjMRuceD9jyBcoqPZRz9_xH29yajt4hXfN4mKL_6E3ZpxemlQj5l3JTJ9fN6_ElDHIDk",
+      "auth": "-TqhiEYcBIi_CmuEJEK1JQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789732842118
+  },
+  {
+    "userId": "101220",
+    "aliases": [
+      "101220",
+      "101220",
+      "01201797287",
+      "101220"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cvbGr_Qk0Lk:APA91bHRn5jR86QZvRdATL2pqzjnbvxI-KHhqP--YhkzT28XAg_ZwvfSGvegCNa--ycT8s3OsyKjRAyw-2V5uu5ntXrXKhX7X4llKxa8d7NK2WI5iqYq8IdqR-vO3-sUi4hfYKtFZ-z6",
+    "keys": {
+      "p256dh": "BDOagyHQ44d8PnIMiG7mLwJnVcKcytNLtdnFiegULtcslK1G6AI5W7m7BOo9eyKXhfLANPpzAu-4ES3eft0rD4k",
+      "auth": "Dsr8st4-refnUGAfCi-mAA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790086405402
+  },
+  {
+    "userId": "101228",
+    "aliases": [
+      "101228",
+      "101228",
+      "01222423380",
+      "101228"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eFpndmvm4gs:APA91bFcTbnj548PSPE6AglZScHzX2vXoAXfQb7csEn9YsIw43BTDMoKc7yqCzHVvCix6dZTt_vQ9ULqp4fpg0J9dI3sQ0kjFSj33WTe2iy2FCjxiAWbwVEcJ6GKhxRrx7sqCaHV6v2M",
+    "keys": {
+      "p256dh": "BMUuPlRjXLQf4Lido17WnjIQXRuhZAon4HEaj00NK1hNpB7q9y-JP0pGbGsxt-bm12QRSVpLRGrVi461goM6Y5A",
+      "auth": "KIeaYXqcCckPkozFsMLiuQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789995050563
+  },
+  {
+    "userId": "101239",
+    "aliases": [
+      "101239",
+      "101239",
+      "01275464557",
+      "101239"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/djttnaCq1P0:APA91bG0r_ksRwdy2H2qJL2W3JELUaHPXWEjtIs9N1UMf2HwckT7lmuonAwKD2c3PQjGH5OwJ6eqBhkjpIc4ApDt-kfYBpZU2oeWORUbHoOTIZCYGYhifRlGDkUP5X31N54rDstRC4OR",
+    "keys": {
+      "p256dh": "BATAJNF5-vM544kr4E8Lg_6ZJwhAidWnsojzsM43YprTpIflViwfpzDzEQVxw6z8mEhK4romCw4ELfJkoXY2waE",
+      "auth": "2VCHNKBYmeIXACL_IlHFeQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789808262105
+  },
+  {
+    "userId": "101360",
+    "aliases": [
+      "101360",
+      "101360",
+      "01273562486",
+      "101360"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/d9v-7bJ9qJc:APA91bEEEyOok1k2SAEr8RzsxP8R0inXg6BqVjuvSVAelmuBO2P7k91VLMwRDBS9Vek3ZKvDgLEjugA74rsD0L3aT96QQEHxBUutdtWOox3_8VM3X5qlV19RMzvQf_aWthu9_aAr3-p3",
+    "keys": {
+      "p256dh": "BMZdcRC0EW_-cKp_QHpyokTiuHfLiqnfROePdoGChfZ4uymQY6UuSabh3BrOg32vdCrDH1jrkHa55JBL4NZOUhU",
+      "auth": "_QfmahAWn-X8oj7z9GGphg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789833259422
+  },
+  {
+    "userId": "101028",
+    "aliases": [
+      "101028",
+      "101028",
+      "01282493382",
+      "101028",
+      "101319"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fSWRVpc_1Fg:APA91bE_2-9VAwjxli8zgmqYULyCSoF7nD_9FsVjZHvmSWF4KLN_AHGOhog0DUFO8n8N6q3iMSCZ-Q5oxf0Yx3AA2zFQ5JxExFOdA8hTjxWQJXKgoCzcwN9TBMLx4LbKdqMk2a23lC1o",
+    "keys": {
+      "p256dh": "BOFKM1oDEmvgWuPfRPqApGoZUSg2ApHKJvspYEbbqZ1eyT8eHqP_w1JGvtB070c5Cmh4OsV8-VtG24lr46cOy_I",
+      "auth": "FFAfpEDyqLkGDRuJgMQfdw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790071735476
+  },
+  {
+    "userId": "101041",
+    "aliases": [
+      "101041",
+      "101041",
+      "01223506683",
+      "101041"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fFGdy8LGUr0:APA91bEvUmRXln-yP5eON0k-TNQW-1U8rxJaMzL7_RlNekKa_sfZF4_lyKo1E86qc1aaWvhVDF77rOA-dRSr328XkCmXW6lHiShiEKWhZEUmCFlQ0phHtQn0PmRrr3YQyrKkiA6_xY6r",
+    "keys": {
+      "p256dh": "BD6e4wjceLhs2yVznXiBNwFhL-TD4jQ1ePWo_q4lMQdGu0iUA8YU7Rx_BDDwE31_PkcgoOLRfwPOp0t-SQRvrv8",
+      "auth": "QDiabqwW0QbTyxUd8zej8w"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790008761827
+  },
+  {
+    "userId": "101735",
+    "aliases": [
+      "101735",
+      "101735",
+      "‏‪01283127875‬‏",
+      "101735"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eBDYuv7gDXs:APA91bFDLLfzXbmnxLQUrzrsn2pgOKwQDLpysEnBfr-RjtwLmynagmUwXhFWEAvDEVmLqyYpy48vjaha1N2MKKjD1eBYB9MltJvcEEbs7AvUExeFANIy7SZRd80y830an9-93tAa1toG",
+    "keys": {
+      "p256dh": "BJbsiCYXcP7q6KD-IK59ke8EkGglV6EJDfrcS0f--UgF-jB-l6aed6zFuBz4b0CtKXxw91TdomJshfVS30IiqJY",
+      "auth": "3wAxfE5buoDDoRXx89EutA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789997652124
+  },
+  {
+    "userId": "101727",
+    "aliases": [
+      "101727",
+      "101727",
+      "01212106141",
+      "101727"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/e2vKXCmtd24:APA91bEFIHgikwupXQ7V39rq8Quchu9AnB7c7rHU4kNsBaRtd_RXFcv2xbkXEKCRUKozJxUaEcQbP_3K_uCPBjoI-wxxsihlrmlqKoYU_gGPz--arG6xbtJ4YtI1Ie50lhyCgrUHN7LY",
+    "keys": {
+      "p256dh": "BKQY3XmOe83b8yobXhaKyAFR-_0E600_0Fi4xsqOcrJJEsDWMXlst4JUHApl3abKXlurPxgVDkZqskHC5pTkBMo",
+      "auth": "1oiUX11hCzpivOQPwQ-3gA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789920529102
+  },
+  {
+    "userId": "101746",
+    "aliases": [
+      "101746",
+      "1212208244",
+      "01212208244",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/ctMlC1dhEyc:APA91bFPeViWHsajGVIz7H3JLlOnBZx9GoAfjuZxsFbfIjTAkamcM_Fm6dtwF1kvjQy4YFGQhrWw7ORBRfw8Zo6NLGqS9fniYSsPvO8OoSq4c5XfLLwvqrqD9omWEVOA_aXPs835Xekk",
+    "keys": {
+      "p256dh": "BMSfZYyIqGWqF59a8R7WPWThryTju9k_doaaaiP4CWyS0XyG4bCitSh5SIIj2bZnwHhIZqrZdI9qQracoCXRJ60",
+      "auth": "0XXwwS17h-x2s7-uEW4opQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789750640649
+  },
+  {
+    "userId": "101381",
+    "aliases": [
+      "101381",
+      "101386",
+      "101356",
+      "01227671539",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cRhZylyaEzc:APA91bF8_OCGNxW61JvbfwyJmKmCSgsLMpa0XxL59uQHVb5tjPJv5RvWkgQIFBBJxEbvRZpSjOTRXU4d_HS4e8R87be2yOj8euR01IP9y_fhgjdDB47w9oAtohYELBNI8dulkpvm-hgk",
+    "keys": {
+      "p256dh": "BI5-nAZT60p7suXv6qWgGj8nF1OSce1_D7MmsZvfxxZqpZ5BDSBRdvSj4Pf4uTkLDAwdM3OP0UlZ7NzzL_Gx-J0",
+      "auth": "S52Kn__zNfy45bMpp08x5w"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790089772918
+  },
+  {
+    "userId": "101655",
+    "aliases": [
+      "101655",
+      "101864",
+      "01007790448",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dMJlVtbHjUA:APA91bG38UMejgvjXOgp_gL3cD78xSBEYUgLGDtVVKU0waipXXckJrwEu-ElFN8xeBNgnp9pojvTmv2fb3KMezQP254CXJbX9EjWz372vsL5OTjTgISLjFL8taDLZckgp3f8382faoQw",
+    "keys": {
+      "p256dh": "BBRqcyU7_rPG9M7RNgnaScgoLXwuzcQh8FC9Oas80mTeuuYQX-G9u1f7i3-R1jemDpWBN1UdWlAog6iZpfk8TXA",
+      "auth": "-BZESttNjGYerDR1bqzCfw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+    "updatedAt": 1789752661493
+  },
+  {
+    "userId": "101132",
+    "aliases": [
+      "101132",
+      "101132",
+      "01206629297",
+      "101132"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/foKZ2ArhySg:APA91bGxmBLQnHunUGZFQH5cAxI281bcW0Mm-f6bUJ80J7xsqKSXOMpo08RIFaD3BAhYLPBczZKuoxyRc-ebwTphstdYSIbey2U1FHjO54u7goLMC_hBXdY_t6i5Hs16svOgbRsyQE2w",
+    "keys": {
+      "p256dh": "BIVZA6wcqOcYdSuBezX_i0FSdd3c07sZ_MKsOCsmmWYGHvhYlkrU7A6hcn1xbKqvMvRMrD_K_BIMeTBr8MiB0S8",
+      "auth": "NgnoGovZQOsboaGFGRNeWg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789739904837
+  },
+  {
+    "userId": "101068",
+    "aliases": [
+      "101068",
+      "101068",
+      "01279200072",
+      "101068",
+      "101355"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fySlkzr_6to:APA91bFF0mJW_75m48ohQsNM9eNliVE6q2VnoGYSeDl1VQAQZ-KpqVH1iQm4G7OcLOaTTXEve00MCHGjrKYBgt5hqwOQ7EuZEH9SNxTW1UkF13QqVemQM9KAf7npo_Rajmrw-JCXcBjZ",
+    "keys": {
+      "p256dh": "BMneFub1njRg7JcPq1Kr_DA-lYw27guwnuYGDHDcfoDa7sdP5sbZcUmiirjubostmA4JcXO0zO5FSHluJhQimTU",
+      "auth": "oyOZZJduCkko-mAqXpzS2A"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790004759979
+  },
+  {
+    "userId": "101706",
+    "aliases": [
+      "101706",
+      "101706",
+      "01279143921",
+      "101706"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/e6030MCkdK8:APA91bGRrEuiF_xsrnjlHNH5L6PetzQhcxsHZAo8IXYPOajR4s3KpqiJK6PmHTGrWTco2wCEY2U1wZm0WWVhGq3oUTSWDaylmatd4--WTIoDQE1EaOHChaLMFjDgb1seCIV6_NWssmGR",
+    "keys": {
+      "p256dh": "BFAKmaE1dMtH4_AqWi78ToakS17oMAQey_Sml43Daq1yTy1qbmSUrNB2hZaz60pns8rwn-Q2qaVeaYljvJBwC_o",
+      "auth": "sC-P-3jsHsXIYgpVNSfFFw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789751271560
+  },
+  {
+    "userId": "101140",
+    "aliases": [
+      "101140",
+      "101140",
+      "01227739936",
+      "101140"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eIA7vZ9fCLw:APA91bFNfYuZVrciABHJEvsk-h4d-9LKDyySax9TNHHj3pSUWQMS52gi39t-HU-UqE1QZg6RbQlVeWfXlUz-eXN8HBx90jxosyZEoM6EFXkH7gr9l0ftdEThD0SIAm5cO_7oDbTqZ9tw",
+    "keys": {
+      "p256dh": "BCnRsTqQ-QHL9ks0tKYrqsr3XikuV5t6O_bTXnRISINVD3sIfatQS6VKRvc0pVzcHdn8NcLisPGP2TJooHUhouk",
+      "auth": "uCuFDMp5KQnkn1v1hI1NuQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790110384794
+  },
+  {
+    "userId": "101772",
+    "aliases": [
+      "101772",
+      "101772",
+      "01289063635",
+      "101772"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dz4S43he8Oc:APA91bGAynaynOsG4oG0XF9mo8hhRu4p4y05yMTuG31RvCDNXvpDE4lhyNe4HagWYcGtWAAaGvNHWn8BCHOsKwx4S_ft_2RYR7GmLWMEiFDMqkaemzdUxYwz--Cg-T7-p0VoWFbm4X72",
+    "keys": {
+      "p256dh": "BP0JloxNXXUhWXA566CQgtMfTdAICJ-bq5GB6v_VTWKVD5zqzrupp_PX_EKZRNw7W4ccpdKZ2rHsC-FrbzT6uds",
+      "auth": "9V0mx0d8qiM80n1IZU9OWA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789750473630
+  },
+  {
+    "userId": "101335",
+    "aliases": [
+      "101335",
+      "101335",
+      "01276879162",
+      "101335"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/e3Rv4-Mj6Cw:APA91bEwPhwAIhs0JYdRLu9HDvJH7qsKbXc9Wfuv05pMqePkia0sjgmADnPSHhOponJCRCTVYxuu0UhrpMv16iW8SnB1i2mrJ3fsSSzDtoqcOd5Xt5wu9DemXxITL1-c8UfmvQWaA63W",
+    "keys": {
+      "p256dh": "BMJQ-9FhrM_Fd8sXpPP4dwOzXnJGKe3CXdh7aITyqqAb9_q3pnLwDCTGuO_7EcpZVSN9Kt19RjGusPvmSDAigWU",
+      "auth": "VyQ6Y8xT4C2ErlYHSMvAwQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789936093498
+  },
+  {
+    "userId": "101746",
+    "aliases": [
+      "101746",
+      "1212208244",
+      "01212208244",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fIaCNaGWl9s:APA91bFIWFJ7W3XcjA2xWxKadequS0XndJwokZp9Tsm0_l9nIypr7W6tMG82Hluw_EOfDn2LZWGl1lSHeKfEU8ZCz0yYtBbfiEWwMEiarhotis-JwguMimjOxnN2djiS7dm9YdTQeHDe",
+    "keys": {
+      "p256dh": "BDHx2IKW5_0WvSZXPXu6F-ONvx4FPwa5c5SItAg6Wa39Vb8nOfrlYchOkhojHpiuyo8PUZWoxhbzDN-JG42VZsE",
+      "auth": "61GdLdkt-d5Dr_dhulWO1w"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789750885416
+  },
+  {
+    "userId": "101232",
+    "aliases": [
+      "101232",
+      "101232",
+      "01228623733",
+      "101232"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dEHZuvXY99E:APA91bFJlAU-DhAe23bKpnw0O-nE3-YNSN3PjzJDdq7FTiOLMYHAeZn6wBEnHrW7OBXITQouYkrEz3z_KuX9sr9OjUvI_48WoiKV08-JmsfvM7-Gt_R3F031PXaKLdKgLysfw1GJV4je",
+    "keys": {
+      "p256dh": "BFa-KI7ltZZ8ZViK_XOXBnHf1NPspFatctT1z9l-qBR4yNrsXAodbI7BEDnrEj1q5ZkbJdhcerW-7OBF3VhE8yw",
+      "auth": "U2aBSXaQRmW0FfV-mnRPfg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789923618775
+  },
+  {
+    "userId": "101080",
+    "aliases": [
+      "101080",
+      "101080",
+      "01080779633",
+      "101080"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dahn9b4s6uo:APA91bH8DMKeoEdUqYRe5dgRRmwINyRPMCyhqLbPTsxF8Vp165E-pkIcAgoJIbgyT7BWTJ3wgbtIdYTaEELt_9a-vsANuPuqELA0IHiUN0x8qDHsxZ6IQ0j7EbFKEG5mO_u9PcB9eLvY",
+    "keys": {
+      "p256dh": "BEWjXFDBhiIeQuSMBrgp-SWIbFAqgUFrD_NQbOv1qtxTQIHkoFwrc2Jz46X5QJVCa4sPxSOBFK8cmC8jtf6FsAA",
+      "auth": "3ltCDUfDDHt1jYt33hacmw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789839035840
+  },
+  {
+    "userId": "101975",
+    "aliases": [
+      "101975",
+      "101975",
+      "01151042643",
+      "101975"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eYqjwGvbzLI:APA91bFaNGX6AcvIW5-xJsoSvIA_YwpZAr0X0QvPE8t4cgHHsCfCmsm_EezvIcp-TiKpz0jToix29llCCnpyoitkHFgqEx3Hcfmo7Z9lnDWUTtDq4aAQ6McQyfzUn2DTMIQB_xvo8PM-",
+    "keys": {
+      "p256dh": "BLzyPZ1EtpGUPrqrwi7v5Pmf-T4Hz6b00CZoUS3TBxUt4pkmyzz2_DIN0RvWQGAM2M5SO_EZ16U28C9yIIEmDLw",
+      "auth": "WFqcbF5f5gA1DBOFxZ3AKQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789811492200
+  },
+  {
+    "userId": "101228",
+    "aliases": [
+      "101228",
+      "101228",
+      "01222423380",
+      "101228"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cIJ8sgh59Bc:APA91bF8pzITJwzjg9IO9WjQxKdLpPuc-egabWybyFdUGWW_IvTjMm0Y7mHDIebqIi6FBCTJXY9gHgsXVRrkwSzpYIoY3BotN5C-A0VrBvPrTkoboa3dXVgckh1qherq1qZOAW7N50ef",
+    "keys": {
+      "p256dh": "BMXWrlJkZEIjI8f2USe6eRdyDWqpBYUM8a3mh7Mp7SaFxhDTJaNfbo_57o1iBJVBq-L2-2xHDNSXtP082hloijs",
+      "auth": "jpDZM9pCJ6Q4Yq0Xm0WiFg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790117550259
+  },
+  {
+    "userId": "101701",
+    "aliases": [
+      "101701",
+      "101701",
+      "01225658975",
+      "101701"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eM8zfzFCGRg:APA91bHWKLK5qFgZQ34bfv03He8GNsxKrGAkM_IW97TNmvf-s5rbNZSb7yMWInsN-Rr1xXE-vFG32N15auFZjIc_16ox9COErWpD2abIjhX2dXRj-uvPLV8P0u-3pGopR_mUPoG1lAP5",
+    "keys": {
+      "p256dh": "BEHrOPLRl0E35aGaDbfFYCAfi1IhXHeIMNwwZZvonyDrKko-STokS0oE-Ne2ozUXBnTGvpO3et9cyygkaXedROM",
+      "auth": "iyRNsJDeh_CpQOAqoKtQdg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789997634661
+  },
+  {
+    "userId": "101047",
+    "aliases": [
+      "101047",
+      "101047",
+      "01127180635",
+      "101047"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/em8TC6LgJ4k:APA91bET5eiguTYowoGoihhylww1e_3-GR-4B_4flQt-D6k9KlS-BblGtnqoIsA9_2L2GXRxQNA3JtBMUk-o3t3Tyc1sQK2h4MnK8HDf8vbduH5S4yT4buUK8N7Eou-KT-4lIT5CI2pQ",
+    "keys": {
+      "p256dh": "BOEbugLUv1nKyjS7_ob_GvIbRwU8w2l1WegYb0IObf3_8U7p8vYhEGQRB6wdiGXxk2ZWUUWSOjjhi-dymutut3I",
+      "auth": "KHG054jfmIDDT7yf8U91gQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789792522068
+  },
+  {
+    "userId": "101952",
+    "aliases": [
+      "101952",
+      "101952",
+      "01280449832",
+      "101952"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/emrKxh1jDTE:APA91bFpLSymSdcg-2ZGMpCDBnpcmubPPxVaW-OScnHs3u4fqqXyV-q5JKlLJ83TFITJESi_xSZbOYRK6KezpuNe4JGL7k4UUk9hgZoUbk5ivRxrZqkdSSevQnDNyMtclzJYNwbLvGoS",
+    "keys": {
+      "p256dh": "BI4Ahhxu77Jx9orpRv0fpIpxCMZecpxuBqr_jgMfDjSkmJfAlH0wlE61rx1WGNzIytCXlgSiohdHeP0GaBuWEpc",
+      "auth": "UbJGby3rkSig3toivMjEqw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789840052485
+  },
+  {
+    "userId": "101042",
+    "aliases": [
+      "101042",
+      "101042",
+      "01271757156",
+      "101042"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/ezRLFED21NE:APA91bG27pMbFzMn4m9FNx1cAOef8GORE7dNMCjR4jlup1rTp6YK-Co4MVeYJ8kmoHQ9C_NchRJG9JmvsbnMEMXLpUjMAp3PTg6lsYLU5hczCdzJbu_fv4mZnn4wGb2DJWY_Qcd-4Owd",
+    "keys": {
+      "p256dh": "BA4YMEQh22FP-qTI-_aZNSZiEJFLVAsUcHukjFzh4saSjtpCuFMD_OHAJ29kCAaUKKd8eGt0GAa49cHIlcZigPE",
+      "auth": "QdMbNP1gRgb9PY-7vtzC1Q"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790009123102
+  },
+  {
+    "userId": "101085",
+    "aliases": [
+      "101085",
+      "101085",
+      "01011395565",
+      "101085"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/ecD03tCbO4o:APA91bGcoypaKkfHEcsYgIs-gXcQ1jylYRDAmgfpSXRJ12NbeAP5J73T7OmsJLNYWgh9khRqu-L4KgG0dTmKO6H0mc11A8Ppqlxli4M0862ZtIhD-YufqUqmqg4AYcHDCeCq3r0Iqe_H",
+    "keys": {
+      "p256dh": "BDwZ1j3mhs6yWOVOlAQp673UqWqp7phDsvGbLQQlF5bShTNrAFAIVYvcjxjQ7n3wdPd1nEcnr_0CtkBScck7Dw4",
+      "auth": "CbaHTQuO-GN3jY5d-Q4znQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789976668062
+  },
+  {
+    "userId": "101756",
+    "aliases": [
+      "101756",
+      "101756",
+      "01270553644",
+      "101756"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dxVwaWpDUvw:APA91bGOg64ixHzwCSz3SPy3HDQWrT5c5QobIEKgLkIyPpgXBTSwLkrYUYb3JRfl0dGhVMR9ujtHe8ogjFfwzbGdR5uG9mB1AxSvMiFvgMzwYXjXsZ0HDAaRSMXNRYEYjTEueyVY3Xrs",
+    "keys": {
+      "p256dh": "BOpX4toOm-36NHEB5zolFix8JLv1aN-6EVAFXafVwBmrmJ-HNZWqD6YRj3QDnGsfhR9sT3dmxtaXw4OESt8Sj_c",
+      "auth": "1FTXm9OPA6XFqnPoR80Gkw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789723178303
+  },
+  {
+    "userId": "101685",
+    "aliases": [
+      "101685",
+      "101685",
+      "01281799509",
+      "101685"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eIUJol3ma40:APA91bFY2f-g-J7Yxt7Rs7pLvqs9cI-QQJoj5kcJZMZFhTV8Xrp8wl8aYKJZJZq3D-Huw4Np6_Df3csCjHQPHIij2-27B5ULpI_U0xWIehvNDVwxJig6p8yUY9YUrrRtK40iWTIV2ofG",
+    "keys": {
+      "p256dh": "BA4dNhWx97p5RisRgOFBDO2bN3Ht6JLSyMNzR6OTSXDd7kvGDitAoLxlt6yvm152i4Q-zp_ubRIk0Wln7440OGY",
+      "auth": "C--FF9bO0JMchoENMXbU8Q"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790075532692
+  },
+  {
+    "userId": "101950",
+    "aliases": [
+      "101950",
+      "101950",
+      "01221303536",
+      "101950"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dhgPc-RjS6A:APA91bGyUYmfxdXIRO--PDfeDMjPKmJVuMhEVy2dAZuDbt8lyD899J5yzQAbJwGw8o0G1jUMsQ0XoUziIOj4i60-wh7L-ozsKzmZloSUTVOoycFWuE0EW3jSMlj5Yv1WGAtYX36jTsae",
+    "keys": {
+      "p256dh": "BNnntRzSmDORpP2Q3S-vFo-4-Cw6diZRLHI2ApLGsC2E3aM5OoVDWOXuoi5iPgZ-4n04wYUBRNB4eKDPmZ4pYTs",
+      "auth": "h1Zixnnwf456XJge2MVliQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790076757839
+  },
+  {
+    "userId": "101355",
+    "aliases": [
+      "101068",
+      "101355",
+      "01279200072",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eXqVjDGzgt8:APA91bG1_5VmxsxynBCpoKeXixx7QQUZR1ZuNetct_TvoTfJfYH2at1EWXfgK1wVsH2OR6puajsrkzQdLJpluQVGEyozB36yMBkttsMpPwHsS8UZnX96hN5-CeZdk-C-UFvwGH2gQKMN",
+    "keys": {
+      "p256dh": "BJpG_GcTS_vQFa8pxQFl4sppXTZjXZowM6IH80s_9XVcvR0CWoE-H00LY0-l9mFsBpo_JiMl8uA3Plli20yL3N0",
+      "auth": "rIVpOiKsF5IX5vBGl2PPYw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789814893962
+  },
+  {
+    "userId": "101312",
+    "aliases": [
+      "101312",
+      "101312",
+      "01212301779",
+      "101312"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dOUv36Q_UCI:APA91bGNFAv5di2xhn_hS906dzZevX6Q1SgxmPB2zfTgHguJp9FxYktPxBmGLHMcXFAi8QPu3tSWJ7nNMdJNMguoa3iNv0X0nb6k-3jYpdEUJzhGNsBx20DdMu9ikCiUzc6XxPB_Mr9g",
+    "keys": {
+      "p256dh": "BJ3n1GGA2UAnTuu1xK7d7kiq2kHTAh06CwoHEul1jP2wE0j_JNTmnswGgBqkQm1R64h5zdS6Ds_Wsgvgn-amtrA",
+      "auth": "B__SQdu-yie6px5_dwhIHg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789989493161
+  },
+  {
+    "userId": "101070",
+    "aliases": [
+      "101070",
+      "101070",
+      "01281517590",
+      "101070"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fvxik-COO1Y:APA91bHKAQ0HSymsnhw7vxXTPTgrU_yHK_aGLcXUwsSOfpGMJfGuSMUi7ZD4LLQSxqlWusB4mUfHkkFbKH5KbHrGnZnPNbBa04B_sInjPCKjgA3pLCBHfI3qV8Ek_iX5L_Ena5OBq86a",
+    "keys": {
+      "p256dh": "BNGdJORXNJDx6l0EylpFnj51p8OhtlTxOzpijW0zcbOS0JJo30NbaosDt1K676i8tP6tgmknmwm0YhoA1APBTlY",
+      "auth": "tjtYpZU4qjHSU_xnGsqpyA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789812556069
+  },
+  {
+    "userId": "101280",
+    "aliases": [
+      "101280",
+      "101280",
+      "01158553936",
+      "101280"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fyhLXqLIL2I:APA91bE5fVrUhnDQYoWn2VLcx09LT1t9W9cpidpVkc33A--9kWcwUmfmdFBQLRLuzWvXQ8UvYvaJwQ2BMAYLqlVzPe_rPk0FL5lg79vbzMCrm5KNaByyQY6D92aCewsbKE7iwc61lmDe",
+    "keys": {
+      "p256dh": "BDZLVKM2nPGmDRtg_EYLIFtQcwlqrIbS9mAZK17KyCezazNdw89qfw2xTGyqX_ZI-4aQVLsdmQVqyRK8opMC7QE",
+      "auth": "byuRZmCRIsl6lXt0d153nQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790110469205
+  },
+  {
+    "userId": "101701",
+    "aliases": [
+      "101701",
+      "01225658975",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cGd4lblD6H4:APA91bF5DGqWVi-qAhXS4zU7tkAbWdWddnt5iPfLd6RjM5NUhhVTZHqSoSDqLeI7uEQAcGTGz16Co3lwWaIUnV1pql9SXZEAOdUzNhwMxm6Q1V4aG-j_u3AlrCXBUpkuNvLyy-GQbUr2",
+    "keys": {
+      "p256dh": "BBqF0dQYUc-Gj2gRYR3IMTghY1dqUU5wH6eck9BgUvb3ivn7X7C7MCtvyChd-bwSWjtyWPXvU4AGlbgA2mm9B_Q",
+      "auth": "YNQc9Gzhx_32AAYC0BrF2w"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789900375915
+  },
+  {
+    "userId": "101385",
+    "aliases": [
+      "101385",
+      "101385",
+      "01286180689",
+      "101385",
+      "101671"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/f43NkH95_lc:APA91bFby-oyBAiEbhWRZ-jLZ7S5DeQVbiH3eAkrZGjsX4nhCRbrrOIrlSg2LqE-y8EGvLr6IBHHJxqOCY3AkDK5SL2_PbxxeBosHD9kmothVWXskt8upYpPXd9V_GSFY58Uj16Bswl0",
+    "keys": {
+      "p256dh": "BI-fFCY0O6gJqLBAlHT3C93cKpiSYJ-H-6EnDxm57Ez7MqA0svlS7H0jkPHQMbw8p4-StGg_Bu50jl6CGigvNSs",
+      "auth": "QkRPTmxz0Len_sycNHQNKA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790101814319
+  },
+  {
+    "userId": "101093",
+    "aliases": [
+      "101093",
+      "01281693280",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/e-Jz0J71Spg:APA91bFY6mJQj-UtL8trlr51vPWLHjqJ-E9ynHd_OKom1dMkjhT2Cu-PO3p5LxW3fKhRDM-P0cZOftyP27CFRgQGL2u7xzINGVICPWkM17TQ02Tw7TszcrM4Or-O6WGEs_8omlP3rhbP",
+    "keys": {
+      "p256dh": "BMN2GGFrNvXS5RZtprkONAX9wrUrefh6EjuatO_qQlGoVCp7n_j7W39Kqn_ZxUm1smfWlT_pWc5V-Wt9XnBu8VE",
+      "auth": "bfAA3FKCfl4I-NNSul-peQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789729629430
+  },
+  {
+    "userId": "101732",
+    "aliases": [
+      "101732",
+      "101732",
+      "01226454103",
+      "101732"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eaAJjrevDao:APA91bG02aMCg1CNEa0K0FuYYW4LnwIBdrz5dLkNldEb6nJFb7neYLnARx2dLxbKX-GZy7zz-pDrh5SSxNjkI57bZIu0NwOjo_xL_EyF6Ov5sJec-ve5CGu1bh27ZP4XotTn8MdPxb_u",
+    "keys": {
+      "p256dh": "BE__iaKhLT4FmoJST4OEPuYT4hxf3B35g8PHKoLqivkh9qwlnQOdCeceuon9cKjfD3DAsOoGZndka_1ZaAOo1ow",
+      "auth": "raETwV1U0YuW6paVM1RPAg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789943750532
+  },
+  {
+    "userId": "101166",
+    "aliases": [
+      "101166",
+      "01205060869",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/ddApAk0h_vs:APA91bHeB0lfx6dT8I4aVhurw5cdVkUxhZpArFuOUfIaXF5Nxc9oB3zu5DAQMBNW-6gzp3szz_flxV9dm3PgWLOHBZ4alIyDXl0mBwpATXh5mkmSJnoKP9v6LD00994JtylXWXczJzzI",
+    "keys": {
+      "p256dh": "BCObGO6E7Wommvtv6XtafoG2dt5F9kNK3PUZQJF5qbHG1Lv86ksUwuJ9H0e-bWUUYpZ-JHPlXOtnnEVZZjyJ_pY",
+      "auth": "N2JCjeinH7FPV6gGTw5haQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790103179936
+  },
+  {
+    "userId": "101955",
+    "aliases": [
+      "101955",
+      "101955",
+      "01212935598",
+      "101955"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cyitwCOA30s:APA91bFFowGMw67NmxFzVEiAAMMVJzZHxLDPJ10-NjDJOm7OLXO-y40pvhERMZWDjjkvCB9J8dr5R5t-z9s0yIYIuwTxI0gm9veavwQB4c70HTbHNUz-KqzCO6Of2r3dYh_vPd1pi9d0",
+    "keys": {
+      "p256dh": "BEHUjEasItpsSx9AIT6m8d6-Pr6O-eNPjFxHidJalXmys42w2HQOZqFtFPrJ6zzAP6lfK6dtvoTVp2WdZMCn-s8",
+      "auth": "6gEIcsEJ488HPXNkllY_FA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789924483361
+  },
+  {
+    "userId": "101371",
+    "aliases": [
+      "101371",
+      "101371",
+      "01214116744",
+      "101371"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cZuZBAv-kww:APA91bHPw2QhPi15dYBbn7L_5WiCigvuOgj5cJ9B7q7YIWjyWaV47CN4esSzMo72uhfXLdji9PI2sFmP14CUxHkY9UxPdnM3O1VEZBA86EdHXNvd_DQAgVwhDYJIqOmb-Az4a35tcbNA",
+    "keys": {
+      "p256dh": "BIh1I9nHK_ylzyt8rWIr68FDWHsNB6IwRcseHGsMGXD0LxSx7um8EP7BvD7MNcFdOGkrJpMffZGuUWcVYQ9jCj8",
+      "auth": "mK6KD9mwzhOcbnT20hv6Tw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790091826961
+  },
+  {
+    "userId": "101006",
+    "aliases": [
+      "101006",
+      "101006",
+      "01282820904",
+      "101006"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fN5Sf1-w_50:APA91bF468OAYkYMEQGiI1UGJbRa3lZ_vpNKkWN-stvDNzWpINaQSGnQeYr8N7oOi5lr5dM-2N2grzl0ygWhzsr9os36LzYtrRW1o4t-ADF1a8gdcdXc3HC2WJfYDjUkvj4828ig-Iyy",
+    "keys": {
+      "p256dh": "BE_kUq6nxlLPRb3b5A6S2iHsiYMxJLKA0bc3rVpV7T_X0oxjz9CQf7l42ExDlh4ANff6xepO6pm38Rhnkcd2iy0",
+      "auth": "duOighE6zp7FOZ7dm8-Ttw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789744515194
+  },
+  {
+    "userId": "101373",
+    "aliases": [
+      "101373",
+      "101373",
+      "01508713168",
+      "101373"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/c2RSMi7z4IM:APA91bF1HW-WELIPzGAj8pK7WMsKbS9fl07EAlwop46g7GN0AnBeS93nA08PNTe9L9idMkKXV00tq2_117ImICfBVzWXuD21qoGckns9maZ3jg9CYjmw46x5bRTX_jow5zjG0pW2k9Kh",
+    "keys": {
+      "p256dh": "BAfLov8SIdx2jboyr2a3Vrj8VZ3seN7xqyAr9ithGRt9kTe-pEVGs-HAC-YaOno1KA79o4uTzdqu3Z7kt0De9iQ",
+      "auth": "Hem__-Jlslib3qykvvVc7Q"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+    "updatedAt": 1789900470372
+  },
+  {
+    "userId": "101948",
+    "aliases": [
+      "101948",
+      "101948",
+      "01220049715",
+      "101948",
+      "101947"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eO0ATO25ZdU:APA91bEruxMEHW10mJvXOh8OQpiUKreW-YtmmMP_jojKsidChTCQ6shispjWNVlP-Z-EVqX-0fpEN3nL0vGl5XLg2KePhxJwDVZGHA8O5cUflNk298DVDYt-xiFgQK84coePBKeB_G-G",
+    "keys": {
+      "p256dh": "BBDhkKjS1Rs-D0DlYkp-9zVqUXwSgJkjQ4QbevumJasrrYQCsnvPK5XatDTyIZN4gCm4zKqVHutfLQLc4rIOXkk",
+      "auth": "K7-PEUsYi4k0gar3Xq7olQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790076148850
+  },
+  {
+    "userId": "101046",
+    "aliases": [
+      "101046",
+      "101046",
+      "01226770388",
+      "101046"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/d9jey4M8h6A:APA91bEgwAZwM2u6mZoYLg5gKrraKvD6M1ex4im2OvyPikMdB7XgcupflZdKNZ9uTGvPELG0PqZi6QsSzT1iUaHOzBojwGusdDSDOqvTFphayALwXqlQhRlBHaCxEvAqUFbytZlR187m",
+    "keys": {
+      "p256dh": "BLU3ro_Xig2NCwmtouLuF0H28JHzTztKnU7B0X7m-otImo6WZBXJLjivEnZR4vkMAqN6m28Mzrr4DZFenPD-gZg",
+      "auth": "aKQiwP1yBgcmHPbUO_tjrw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789723268749
+  },
+  {
+    "userId": "101099",
+    "aliases": [
+      "101099",
+      "101099",
+      "01221807958",
+      "101099"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dhZeE8kW-yg:APA91bEVXs1-Es5ao6tBiI_M6sRO7FT6byji7pVmP4VOgRF7esM9hPi9n9WJNcPuR3m4o5Wk_sroq1itfwah6oxj0I_hT6MuQgrJ9JgRbFB4PKH_qmqnNt7fMJbv6ka-WTFyQmy79lz1",
+    "keys": {
+      "p256dh": "BKNtRmoVYn4HbQV9V0jDK6Dv4-QsfaVBh9atQXPw2Lyk7H-vX4fvv83wn7SmLR2xozK5pnp1GLDwhh5PT5EWq9s",
+      "auth": "48XVrCYZfletTdD_ZfezPg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789835504928
+  },
+  {
+    "userId": "101783",
+    "aliases": [
+      "101023",
+      "101783",
+      "01201802946",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dXNONmhWQGo:APA91bH0yYAGXhy6-h1SWUwA_XjJciBYqPenh1UBv_r2cV9Hj_NBceokNookNirGphb-QWWRhJebcmJ95NWs6jiU1pq9kFw593jwwO2jWJYhQDBowMVM2Qw_pit1Sk44XlOfwveeed0y",
+    "keys": {
+      "p256dh": "BEK5xuZvWWvByiWCTkMmMBx6EVY4oNZzOE3cmGsC4NHpPfTiSB9NYQ3v5zk2deRXE_tEo9L7HKWDCT3NHlf7F3I",
+      "auth": "WSAUzxd5aiyGpOoahKHiEg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789904796884
+  },
+  {
+    "userId": "101197",
+    "aliases": [
+      "101197",
+      "101197",
+      "01205912420",
+      "101197"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/conELn75CzU:APA91bHboKWu4mhRA8c1h5puAhNdtB9oNxZfIS9ZacggG2fd_IlPehavNG7oO0eS5c1VKfijf9msvpZyuhlcX9lgvcrz5MCfpoeeUeF6Y_eVFes5dnBPkb5qqL-o-lIu19kK5MlSmj9I",
+    "keys": {
+      "p256dh": "BIGT7JRpQZWCQRcCnoR-Q68uDNaPZzk2Tg15wjark2Yfmht4IFA1w4ki03_KbNXDbqIH-O_cY8UoLMF-Ph30c58",
+      "auth": "dpN-tk95YUVHfw3r5yF4NQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790033624578
+  },
+  {
+    "userId": "101998",
+    "aliases": [
+      "101998",
+      "01284005593",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/foPMt5E19pg:APA91bFzq60YcrP70ydrYuzsL-WeDejsbiuWFaP_wMND6NZmHZhoWCdbeZtHON3d6H3JWAa6SPZFrC46tgOP4mt_lDQgf916QLtJI3_SocKDlYe1q2jOngVEGvupxT3R5RE7UzygrmI1",
+    "keys": {
+      "p256dh": "BJrnEl9sex56nu2FIriCTzfjlO5f4a2ni9uzYnum1ooNAfkHVPkQWtJZxRie8Sw-KXkkwpI0sfjPx6a8jsbHoJg",
+      "auth": "cgfayUis_xOvYNOMoKtg0Q"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790046729004
+  },
+  {
+    "userId": "101342",
+    "aliases": [
+      "101342",
+      "101012",
+      "01276596990",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/d5mWBX-vICE:APA91bGmkqzEfzCseGCCXIB__vl89xOe0Rbr6GQouX4O8sohfIeEaph5I3uwOeZYPQL9CFu-fYvsdG8Fw6CelAvy1zmcyJ8ow79UkUaxsL_Z3x-fsmsidJ9jCsFpy_RZHMgSxqK5UGTX",
+    "keys": {
+      "p256dh": "BH-jHNGUGySH3NPZtNoVbZ96v44c7e61a1ST7T_JdTN7euZiP4qp3gXZSncZD3eFOywvdkcyufuhgX9VtF47TJs",
+      "auth": "E2Hc2wqPtXyzYPhu5ND07A"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "updatedAt": 1790090728066
+  },
+  {
+    "userId": "101129",
+    "aliases": [
+      "101129",
+      "101129",
+      "01228951055",
+      "101129"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/d_JWOaLvxNg:APA91bEzqoxYKMVQb8NppdNbsZGJ26CiRcHLElKlTDnEwSGRAHxGE3L9Jgc8Ot-Pdu7V2r4HQtaNhrzabgatsr4gMXeVdtiP6yNTLyQSQSnJSWWA91SINnsIG2HH7jOcdyv4eAK7g-zS",
+    "keys": {
+      "p256dh": "BPCA0SnsHGJqAx3hVYETEpycriGnqXRodltVO98iNmRmf72Ycf23QxeSUU1KdKXTafoWgEnSrWOZllQqqZDSxa4",
+      "auth": "3j8m04Ko4GJ-JrdevJO0qw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789752566134
+  },
+  {
+    "userId": "101789",
+    "aliases": [
+      "101789",
+      "101789",
+      "01210083769",
+      "101789"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/f9sZurkiwY0:APA91bHHGcOS_UqU40vxJCDJPa2xfVjkVz3wbrg2ga5Cf9X2HT0KlnLyPv5NOyK73lrTgGlrDxp2hgmJRC5xRjgkwj474zm2qqJGqJV95azu1JpnRRIu4WQCDs5otNTjUxcKjFSiH3EA",
+    "keys": {
+      "p256dh": "BI1sdYIwrEbkyFe6LSotU51tl71ObodpCFiCt2b0rGgKSUDz0PmYnK6ZBl-Y7v_awzQ9Wl15OzLyAhQh0nw-yVs",
+      "auth": "c0jNL-OZltTIPSxtUNZ3tA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790135698703
+  },
+  {
+    "userId": "101897",
+    "aliases": [
+      "101897",
+      "101897",
+      "01225491794",
+      "101897"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/ct_x8E0pEbU:APA91bFpo23ryU-P8F9GDVNyP-ridBrkwcpQcHtXOh_oXf_HND6RxFwxVBRGP-InGMRw5jU3JjtuD3sv5yI9B86khTdXllFlRRP6XN5zF2UIy0KUjGK2IxCDY4EztsfXusPxmBq_tm00",
+    "keys": {
+      "p256dh": "BAzXW581ww8zulRjU6bqZ4MM6s4IV_W2v4MswhFvlBqj2tRJqPxwC_f1fJQIU0e5MRPTBgpYQUKSWKNz7M58FmU",
+      "auth": "L89099eQSmANnFaqX1QaMw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789922013119
+  },
+  {
+    "userId": "101903",
+    "aliases": [
+      "101903",
+      "101903",
+      "01207954841",
+      "101903"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/frqquaaVIMo:APA91bEcK13xa8oS8UcKGl32SdEVXmrrx_cfpxXiPUVVCjZKnkTDKyEhUq5BPJi-kBapxDlWaJF92gShyCWum2yysJoMP3TYTRDflJ1--4Vwb12XEZnqgATkRk_tSd_VS6JNzstdUxIE",
+    "keys": {
+      "p256dh": "BERH7GsZnS0C4wZryamTl6jJ2P9Q9_S_w4BGMq19n6v-Eez5n-O23kzCSP2obO3fGsWdJRZDhwGj8gmraHBUgIQ",
+      "auth": "UrvIljytjiyljQu1fAFqrg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790012431690
+  },
+  {
+    "userId": "101378",
+    "aliases": [
+      "101378",
+      "101378",
+      "01212551298",
+      "101378"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fhbmyPOvq38:APA91bEFIAyQwd5dkddWSPASEHB8oMrPJWNa0aZuTmkPDuRqXcQjfUNClOxAPmUmABR3XYN0I9LosLkgi08pUSaarHZ5qcDQnXgj7QaxWi2vhSbd-XGByKAZS93gMXEg-SrZXesaAiIz",
+    "keys": {
+      "p256dh": "BEldAkKDFGoWdoB942p5NaTJU77dJ765rZZ4cn1iFlEq-IsQP5_CqhTEv0jrBtLXYPy-4LMTsEdKWX8gZZgXQ8s",
+      "auth": "al0TWhlzCqk2QxiIYcjDWw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790097550273
+  },
+  {
+    "userId": "101610",
+    "aliases": [
+      "101610",
+      "101610",
+      "01094376904",
+      "101610",
+      "101969"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fD8CvLIxD7s:APA91bE9aFhMC6_2EFg50lwgyql55lNwipyn5Gjds4F_e3w0OizjmQ78UjUHPuuE4C0kZ6s72j7-_zYBxQxx83vQkeYa6KxCdMn1GPxgxETAbuQCCAnpfYN4miyO0OF_21Lqw_1nXBzr",
+    "keys": {
+      "p256dh": "BFVwpbz934ZcnoJDvsyWNb_6-xM1luDru_rj_DuwzwSQSFSxsXzq5T4_Ma6HE7temwilURfJhSgIx9HAytvreQk",
+      "auth": "HMZpZtOatnbWNXc0h8uBMQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790099394690
+  },
+  {
+    "userId": "101635",
+    "aliases": [
+      "101635",
+      "101635",
+      "01145244431",
+      "101635",
+      "101143"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/c7IovQH9a1g:APA91bGSbYKo7CPR2Uu-NrJyDQaOUU8bRkCPSufs1-25HIhvKDNg8GsmpWnoQP0bSxrrVaE1SjuUfv5ccG_fxSrKQslaOuRpdQoWiMS8osk-NW19m5ob5xUvcYM1qQkdglxDqkabp8EC",
+    "keys": {
+      "p256dh": "BH-Z0tDKxHjHxoWmOzNg-qRTwwt2At-0zRPm1tfJ59P7Xp-Mz1Gz43i5omg4wOGLe-c1vsI7jzMnvGT8dJXN7Js",
+      "auth": "MWcM72v1XzAn3yodHv0U5w"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789759234805
+  },
+  {
+    "userId": "101068",
+    "aliases": [
+      "101068",
+      "101068",
+      "01279200072",
+      "101068",
+      "101355"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/deu2u8QvdS8:APA91bGT6r7fGjQ9TRKwulTlEfUAn_FKo3oN9x6wQPLnIbH3EDFSpXb9j03IQPZN56AMSivhea0ju1lIw6DyVesOELw1UtRofVbKbFUGtty3dJglpUf16iRQ5Q4-dYoRokJ2rHvaTTu_",
+    "keys": {
+      "p256dh": "BFFNNMr0N8tIRYX1CuQKfD9LI0mG7TN7Os-Ey0LbBOOVJssJidFdpQzdqJuJLYR0ragshnK5AFVFT5qlcWXBE9A",
+      "auth": "3hLMjlEB6Ag1Uvd-jhvr5g"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789829414272
+  },
+  {
+    "userId": "101383",
+    "aliases": [
+      "101383",
+      "101383",
+      "01042573317",
+      "101383"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/exgSp_w5r-Y:APA91bH64HHrZgKqmnRzc2YtgeW6C2Ils2BA4_2RBrrNSKMZsckvFkyzTHRlQXT3a6QuyjDxOlYCXLgwe13ibKE0JbbL9q58Rne_PpZ0Gb-nJ5z5QhTL8vmnP75mRXvGegUlN4hM6Pwy",
+    "keys": {
+      "p256dh": "BMjP_XC-DE4x_4-WFn8EM0-Umn8owVFzCinTNwiLNKV8IOMMTQkG7XtUbfH-NeWcZ1Gn9sXuj_RzKvhRsp3ajqo",
+      "auth": "doAHV1O4u2IInklBTtYQSw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789857566382
+  },
+  {
+    "userId": "101369",
+    "aliases": [
+      "101688",
+      "101369",
+      "01203395095",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eka5SLrYT2w:APA91bH7XI1yDR9Chal5CMF7Hg0fsRyoRFdzTE4rvqjCa6BSkBhspu-JveQQQXqbaef0fdGjVrUYbx9lsKX4Z3N1yg59srwUuM9b0jqt3tXbVlQBvfUaWb91Hpz3nMWjrRgwTd3l01e4",
+    "keys": {
+      "p256dh": "BCozq4-fj2dELJeYWLBsyb47WWsXMc5-7osx9Jkk1-gF73ozuynITaMJ7LmPCdP5M_duY7yqa8qbO7lKraTTWEc",
+      "auth": "aJtDECkoeiz39sgw-sTVCg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790096842474
+  },
+  {
+    "userId": "101645",
+    "aliases": [
+      "101645",
+      "101645",
+      "01505156521",
+      "101645"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/csmfZldFPPU:APA91bGizA7jS6Ps9kUFf9DVfaVUVNwueHLwn4KBIDB0JAFMtr_pOd409wa6QabPb9UOBreY6mCHUnkDOQvOThBgHdaRC1074RZupd_qqef38vhNXSefOAn6aoss-UbQUPOJL4jv3V32",
+    "keys": {
+      "p256dh": "BAlOJE3qw_9xxMXRRhsyIaRXUnZJ2t4nlMj5cJ9OaHIGmiXzMWQemo4L8hFicTnGNaYkblxxP7d3IOtSvRGLDV8",
+      "auth": "AqK7jMHAYQtdf0vaLVmSfQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789991949577
+  },
+  {
+    "userId": "101364",
+    "aliases": [
+      "101364",
+      "101364",
+      "01288684596",
+      "101364"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cHBneRwyRgQ:APA91bHQRgeGdqBOhst-dO9FEXZuswgbcr38xEOtPQ7HIpxyWchkiOXaFI0zQmCRaS3_vbDpGqCLgpxDdSeNYt5SjSE9ptxZsK6Eo_5J52DMg1hltAEoSxQz6rzKnYQ9sF7-_SVXh79N",
+    "keys": {
+      "p256dh": "BJPOLoxo2V9jSR323hmm6O1OSymQ0tOT4mWE6-oq-7zGn6pwarFTxs5pjssSaSZeO7eZnD-3vXEB_5UNfmCGMhU",
+      "auth": "5HSSRdYBsqm3lBtjlTdB_A"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789928821015
+  },
+  {
+    "userId": "101140",
+    "aliases": [
+      "101140",
+      "101140",
+      "01227739936",
+      "101140"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cHzIQEmHJ38:APA91bHdiXawNy5gbMOSKXEeqcu-Oh6PGY3cH266_YJyRcNFpdDBv9CEJIx6Qz8KffojCsyICu9xzqmtAku_mZK5pC9SUtQik7Ws1oTksElZiuEo4CUgipitNKcIagFQmw8idbw4lS1O",
+    "keys": {
+      "p256dh": "BM_qXn9TaGcC7sNoYLolQGFXU_YsmKrdOD9xiQ2UFilpLri9wrjXWpKjiDsbhyHLiddrLwkOEWYv7dwgUrR1df8",
+      "auth": "Y7oUHRfrVIAwnxzvdYaKCg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790110630182
+  },
+  {
+    "userId": "101335",
+    "aliases": [
+      "101335",
+      "101335",
+      "01276879162",
+      "101335"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cBm9DsqiwRE:APA91bHoXeg_GzDom-70vrkr9TGj4CUQ_CT8XtAJaFF27szaG-ymbmuTv_VBRAxIFRdWFb6QkN082TasMrBgt-PbR-B_ybdVwBnwSfvx_hGS3Eeavr1eBE3C-4y9KL6FSDIK6FuqUHMG",
+    "keys": {
+      "p256dh": "BAPIDPzOVFXxeGQ5eOuIB-z9L8joL1hz7McQbXoaUrS5zLMScCxIo2yhLYAawXsYvGqQYbxpDSLXs0GHS_uzRoI",
+      "auth": "t0HR-iNlnTufBAkXHHI76Q"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789936038984
+  },
+  {
+    "userId": "101736",
+    "aliases": [
+      "101736",
+      "101736",
+      "01224422241",
+      "101736"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cuh8uLgKDC0:APA91bH04M0_2oSRYjp4-3mjDqFKOMtavzG7auR52ozahEEliunT18JwKUD9RoFC-W_oPIbbUKZgoDnbASO1iqa5YSs7t7VpTeNdfkJGyaXk0InBfYO1e0-IEH1zOdI_-UQM6gqL3tUP",
+    "keys": {
+      "p256dh": "BNUL2cl7-xeGOZDMKwDNTuWBv73dLmq3AfGc4CwFCVtolUwsmkoJkK1sfuDE0oNVYaGDm-5nRlVeNZu9Yq3j6eU",
+      "auth": "I0yJc52ePyVJQZ4l47mlPw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790011050400
+  },
+  {
+    "userId": "101379",
+    "aliases": [
+      "101379",
+      "101379",
+      "01207266441",
+      "101379"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/foQLW1d50Lg:APA91bE6hMsiJXOL49K70ZNR-8RSXZLwI4f2n2bN2ywzNeEXciSQjIQSN2-fSEd2ArwYFYcpD0VE_HJSH666-kpYHAlwc4c6v92BHCluwQ6soK-fLEDm8NRjT8JBcPFcwrBYwhqs-mH4",
+    "keys": {
+      "p256dh": "BJD3EkvehD8OivlN2d2iqgFf_Mo6T_B9qapW9M5ZwK6a-cEBLNXlXLVwts1SQDEF5Pkm4khYhdHiMfhBPpKlo5U",
+      "auth": "_XlEYBnvr-a4leVHSNNztA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789822060580
+  },
+  {
+    "userId": "101665",
+    "aliases": [
+      "101665",
+      "101665",
+      "01278872480",
+      "101665"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/er5nSqwi6bI:APA91bH932zRmj0lCyAxyMM-BHVBt-NFtvFgekEX4ltUPhoSaCFuRlXLhykRSRmKUSapaSE6XWzaeK_DzCaia89NhN1_9G4SmFTE9F3FGWeiAqvSs4RqytIb9CMinD2F7WUhVM_J9lc9",
+    "keys": {
+      "p256dh": "BMSIuXxIUFJTaLKDpPc0E2sAzB7-hRANJRgbsrNyhZhJ_P87a-pNlgtTOkS9dqNNPHlUtzuqaYXFL-I2_OY7dd8",
+      "auth": "pHqlLMYMmwTc1rD23jYn9A"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790014354241
+  },
+  {
+    "userId": "101068",
+    "aliases": [
+      "101068",
+      "101068",
+      "01279200072",
+      "101068",
+      "101355"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/duuam5kMDJw:APA91bFLVDWM9dIA7yCwrnqVmM-QqvU18SPgYxRXNJfYDmGn5ZiYFeNjIdk0SW2oeDoP4eTqxSuL9Nkk2mq4p6TLpBjaWMU-mXAC3Kjod16thjeJ69lZAvmPNbIj4txStTKV2-Gnk1Op",
+    "keys": {
+      "p256dh": "BHKkmm3CubUBBwAXJj7i8ZkcRf1vC2FXRvOCUQmtLE9BbUQXcOkNXEbo9gCQX-n96gJIAMK7X1jNcLv082kMEj8",
+      "auth": "g92vk7DUzs3ktJNnpw_ltw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789812357510
+  },
+  {
+    "userId": "101680",
+    "aliases": [
+      "101680",
+      "101680",
+      "01112339455",
+      "101680"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/d9WcReg_unc:APA91bGlai0pyuerRgoLUEgz7XCkvJQkibJ2zosIhplFPHY_PFx254wnRLO4SX7A2VjanHo_VhsOYIkmx5z7FPvGGJjk4vOOf99_hipFMNdUIhlM9VGHZhVLYiHcclFG-DslxgtehD_4",
+    "keys": {
+      "p256dh": "BCOV5h6XdUPQU5hSalNDlqAB6uwTSJ6ExFKW4bHvk7aebLdqGZVe0DXjSVwh4-jh38hBgdoJrK7-ZMZiWcOyvSU",
+      "auth": "b-xxsr3uqQM1zWCONFiIwA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789991875732
+  },
+  {
+    "userId": "101997",
+    "aliases": [
+      "101997",
+      "101997",
+      "01221025886",
+      "101997"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fI1iggjTRgQ:APA91bGX743uhbjnwH13wrLcm7xatsG0T7lnkhijvR02ty4WMu72MA-nwyXXSt845VVN3AcwaQXY6NidYjf0ceG5jEe7RzYM_zjiwbwfPiRzwLbmy1nl1h9Q4WcuerDcXyB_NmJm2tbv",
+    "keys": {
+      "p256dh": "BOLBRAvJJp4gLjP4NkzgRQIw8JE-bwmw0JHGql8Y0MOq-hx5mHs583gA1JEPRbrxhPV9CQE7aFxf9q9tzHiIoRA",
+      "auth": "jaAVYa29TeGyA9Z9S_oHkw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790088706744
+  },
+  {
+    "userId": "101400",
+    "aliases": [
+      "101400",
+      "101400",
+      "01278940136",
+      "101400"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/duHqfivmMDE:APA91bFwKsEBiBU3Sg0ERDBB249Hnihn4xfO37Pli1bBn9-bElOjZCf87OdqT7JKlFHApAZO5ZSKjVzcB_fPOf4m65sy4_O52ubbT7UMiI0ZLDuq9JFBHIINyzVGOCN_6MoMlcsxXIiK",
+    "keys": {
+      "p256dh": "BEhwV-e1A6Z06M45bLGgyNY5bwpLTnf8nzXLYXU7J3gKq0uCpPGz_wTi9v3bs3GPar9wDDqp11wj_SUo3ve5vOY",
+      "auth": "xqTRR0fTfBVNU5UcgL1hLA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789926836063
+  },
+  {
+    "userId": "101079",
+    "aliases": [
+      "101079",
+      "01154292415",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cE6X6Fc6QlU:APA91bENAWWed-08rl3YPNOB05Hg8htFsqvr6JsMQfxW6MMHW5876qT41vyaTMBwROpHkyVZWev3d1Bpcva13roJ1uYlK7xcTDozLRpL2X5NCQcYW5ZdPRcHHTGti0MFOAFlPdKls12U",
+    "keys": {
+      "p256dh": "BKGVFrErt5LuTZm5BPfGSBQFp-Y-OtY1vb0P4AzlSg2odtHhCSa1Lxg_7UiqY97CJvHzAvWncM0nV8d_6HUeAKg",
+      "auth": "0efnOY4N-446KQvgXFPysQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789812643020
+  },
+  {
+    "userId": "101195",
+    "aliases": [
+      "101195",
+      "101195",
+      "01096653629",
+      "101195",
+      "101180",
+      "101194"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fWJQW0yvzlI:APA91bFIHQ4P93q5vmFVQPypPu99MR6n6oh9N7FyVhd8nP2S3hoq0570bx8-TStvK0oUZ0az7k1gHhNtqwQ7ZWhZq1u2_Z-3_8wiqP2EHNLov2DhTcqp4kEu8lZn2EabOr7qMlSOl5w7",
+    "keys": {
+      "p256dh": "BKWB4C9nCI9tUka-X1wjUkokdqm1KVD78Rak3GtszjgvbIgSiTHa5JfCYCif4z-741nDHI1R8ECWmAc_irBw0Wc",
+      "auth": "VzpUi4CuQ8en2P6XzQ-g7Q"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789735950070
+  },
+  {
+    "userId": "101296",
+    "aliases": [
+      "101296",
+      "101296",
+      "01001339005",
+      "101296"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/ekGCWRQWolE:APA91bG8kgYxFcr4BRhbUB_rCdMDDEDZfW7lGzeJ3PMSTZvbu-Pam_Djdr8BTxZhanefHW2-lfOJpM9M5MmSFQYoJ45U4z5M1G4SiUxXjJGZDMcZuNntc-_NZIZNIKu1gCIF-2SFQjgT",
+    "keys": {
+      "p256dh": "BN5mbJVmkBwO2hQwQsbbTmFI38J1MtPAQ1xSKUCvEgYwry3QmZ_kIEgQQSxRyB8Hm40sMWXvhwiAI9RDR8d434w",
+      "auth": "keJziNDhhP-HSao_R9GNHg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790134171495
+  },
+  {
+    "userId": "101960",
+    "aliases": [
+      "101960",
+      "101960",
+      "01228613081",
+      "101960"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cs4LnhVZPxc:APA91bGwV119cZG_Em8hdBz1E62FZCtQt-rDQFpIytX9oGjD0k6F0xobdLCsU4wSo2QVd9dbWXfk-NB22tPl9XVsAvXu5CMkqUpuKM920dZ_Ac2FCLyLT9TnLN_scbnBfd3yBJ4z-_w_",
+    "keys": {
+      "p256dh": "BEdTq0HNvG2X2n0ZFb5xrXreGtWDIaRYhwF5IYs5N8wVwV5A_1RPsH5vWCREO1U7P935U6DtM7v2cd70SR-IlTA",
+      "auth": "3OU-QdyTEXv_o0W0dCa4fA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+    "updatedAt": 1790019573504
+  },
+  {
+    "userId": "101915",
+    "aliases": [
+      "101915",
+      "101915",
+      "01202383116",
+      "101915"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/ddIj1Z8rvTI:APA91bEfeAd8S3yzKK2R_cpk0LclzNVVCdYX94SKRUP8-9xHh8R-XQR3xaf2UHGHkfzeomawDGbBSd7c2dLjtqPJGwrlSqPQHJnJm70zQgYWdHC_2d--ZOVXRyvLrRXwg1wR9uwyowbz",
+    "keys": {
+      "p256dh": "BLurGljywyLdVtTZq1eIekK25fAVN0dol8eKheWKjpOgId7RBmga8DzV78DiI9iUvA5c3cp6JIMcEkVv8pAjI9w",
+      "auth": "NegA5iUajpqZpwRs2V2wmA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789959882876
+  },
+  {
+    "userId": "101016",
+    "aliases": [
+      "101016",
+      "101016",
+      "01211081515",
+      "101016"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fYodaTVxESg:APA91bF8Sr1e_dsZg7VvkvRH6f0gfvaNqfxR-3QHz7ijhIQMLfGjqikdU8eHUKSiQZZr8vDocXxnx1y3w8zz2KaWv7jSOvQd7l5DcszVOC9vMtQlYtMHoHwlqUszYop_7gOoDMIEZaJ1",
+    "keys": {
+      "p256dh": "BEXXWSXIWEw6O0wk5Ryx_oKFBxx4-XOzx0pBr3OxoBmIT0Tx2_BwyPgHnYy4QaAFH8ZY-O60vAneWzY1jlFch9c",
+      "auth": "bikZOKFkm9QjZDVBFVZwCA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+    "updatedAt": 1790086283758
+  },
+  {
+    "userId": "101387",
+    "aliases": [
+      "101387",
+      "101387",
+      "01276584514",
+      "101387"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/c5NAvyLF-Ro:APA91bGnTbu1VliWDDCfQoReQzgWXRwCy508ywRdile9iYg8sp4onXQIpYd_UZb03exLu7QlV90XflvkV6OAs8bLLtUW3s6wzm7inlE4UP2LHV2yqkMwGUxR9ms6p5gcLekFMSdDgp2f",
+    "keys": {
+      "p256dh": "BFFggZ5hqxubaeUx3Xq3fj0n6DVSF5KVQcn9oSRTN0NSUdQXC6ZmAp_Ewfy3E59za_a5YvX8EH-TYoWTAEgXzSQ",
+      "auth": "PIZSWBSW3o5fz3qAPuwkgg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789894826256
+  },
+  {
+    "userId": "101399",
+    "aliases": [
+      "101399",
+      "101399",
+      "01288617737",
+      "101399"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fPggSKSQ-j0:APA91bEers5esoAvEL4b8kJgrOQm5dP7mbWaUdnIh7YFayOsFcrMRaMvJrR_UgiPDl22uaOs7r0ATq5wsL4oOQK5kAOeOLvicabNw4sIkQPLrkhlN0hFTEVhGHx8xULNMXojy0RYx60S",
+    "keys": {
+      "p256dh": "BF9KjDsrLrwV-iqB5sEwBsFFLsgT5hF7Qn19BbGiwAZDkaBrfZxr0KWyzgUBT7ndlwZJxFUUuAHwfp852v7Sjwk",
+      "auth": "v2dtPfys4T-xe13kA6DcCQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790100015710
+  },
+  {
+    "userId": "101676",
+    "aliases": [
+      "101676",
+      "101676",
+      "01203725427",
+      "101676"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cmjAhOrMYDk:APA91bE2Uhyo1tcDPLoNyZO1vo-EOP8s0w158A2GNGQD8Eq4kRii24zvkadCVWv0TGdvZlelRgPla6z9lmzMG0Dxx8mTJi5pf3-GvAZq8khgV-Yd3Q9RhZf-s2LTCj6gFWb8JlJML0SB",
+    "keys": {
+      "p256dh": "BKjHzSjsm0PUbgZQ_69qu-LnoMH9UJK2cQ8Eu169aGdB-QeCWNoSJ-7uLXWK5R5ghisSdFywrbcpqI0VaeoFXmo",
+      "auth": "okoabZkFdYMBi98LKVjZrQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790100970969
+  },
+  {
+    "userId": "101602",
+    "aliases": [
+      "101602",
+      "101924",
+      "01201407121",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fBmLNYk9nqk:APA91bFlooln8fZlZ9fXXkXXnqaaKcCC9tKde3qUpGkbNmeokgpxnEi5C3VoVYS0TJ_xm-NNHIqmGq81IJhE8Y57YJuvGip94xfBcPh6rG93DMRtM6hw5oz9g70u0yT0kv9sZvMNeBFf",
+    "keys": {
+      "p256dh": "BAtLg42_2gYj6FREtu10TgLipxwLJAanUQtdZVP0qsYNmY_iqLQVpDIeO_F9hKP8_StjuhfIlRemSMAZ012iVSo",
+      "auth": "Mlir3lQx8xaLwzf4Qc-yfQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790141294031
+  },
+  {
+    "userId": "101744",
+    "aliases": [
+      "101744",
+      "101744",
+      "01009702881",
+      "101744"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cw5PrI88lZ8:APA91bFnh5StTXx-wQjRPOz_SIFRxHUhn58zJ2Sca6u_l0le9LuEdXMyxnngVreZ9f40HhIrbxPzEbi5OzFzuN520plA0hC5e4j50xz3f0L8WLDh5A14wMJ2gFf81zbXayc8Bg3IBynN",
+    "keys": {
+      "p256dh": "BD0YthgL_rq8u15iewPXPzXkpGIlKoGLIBplsbCaV80hsSQ7E8FJufkag8CYnTKphZyl6gnfA1Xf78lsKxOyTMA",
+      "auth": "Gy7Tfj1DgkGTCudayFhV_Q"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790076283357
+  },
+  {
+    "userId": "101177",
+    "aliases": [
+      "101177",
+      "101177",
+      "01210606368",
+      "101177"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/ca9FFcRtuWg:APA91bGF9mPvegDmMSdIM4YJkgs7aiUZ0InLwkCouQ_7jo4w2WswEw2coiQqW3R3VnPq1AK1UGKC71LNtkSgrqHSU9c085y-EYaUul7dfIO8edX4zYnRTRvLgZnXTvOo7PuQE2fwavho",
+    "keys": {
+      "p256dh": "BPuNEjbHwO9vofXAcryxLRL9a0AnJe64U_hPuYnZVZlP0ZHz9jxzuc4wi_m4xf5b2ODQTJmfisSeBCueLw5Gp2A",
+      "auth": "78pmETJVUi-6BujfvZw-HQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789759269030
+  },
+  {
+    "userId": "101749",
+    "aliases": [
+      "101749",
+      "101749",
+      "01270803828",
+      "101749"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fiWVE6RzT10:APA91bG34YE2b3v_N-6FDStBjnsWfo0DJr85tSJWfft2zKK_--iHw_CyUV7HWAV2zVmhpeUcSL778uoIO6Dh6utxCfn4DQZQ819ZTk4rVmRaIZQ9O1Arf7v8j1-jromIeLlZMPrSBJpc",
+    "keys": {
+      "p256dh": "BLkRZvS3-eBQu-d0de6tSaSbGSoMXRCPF1RA87wq5PEB4Yy7nDnVu6PrxfdqgxyeWn6anJGqeEcX8Y5DPMCcfgA",
+      "auth": "xfzJEsUo6iPy-JfZ8ZmRXQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790121275704
+  },
+  {
+    "userId": "101875",
+    "aliases": [
+      "101875",
+      "101875",
+      "01285334929",
+      "101875"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dUGwwHPn_do:APA91bEUMGOaR0d12PKcUP_iAWsKU5gNiJO8RVFIvbk_3h8AI5AYxVVI90wQX0wcew6TuCaUE88PrWHtmO3xbO3A7uP2Zrbkgr0s7RpIpWr-yfDA3Aom0DdaCoX89RAsenDl4v07xY50",
+    "keys": {
+      "p256dh": "BF8RIt1pHNkgzWqu5_5103f_yWY368RrK0l0eBZBNLogqUT8GY8q06irG0_eeiiBasozZSaFLPl4aUQgd_2fd4c",
+      "auth": "ptZyHm5dTwOmoIUQfb9LcA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790113538432
+  },
+  {
+    "userId": "101787",
+    "aliases": [
+      "101787",
+      "101787",
+      "01094002709",
+      "101787"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dDqHfcj0S00:APA91bFFNBBPj1HnJ3R9WAWXTndU5FRo4MhoqSR96NIQukwAZ9B_eRRSVw9jX4X-yGhwP0c54WpQHdLJgPvkdkg_xT99Aixj-hveappFR4PVkAI-qCnHXufFGZAWcNhc7Fwp4FW8lKgh",
+    "keys": {
+      "p256dh": "BJrNqqEF4VweYJVsJ169AD8SAwzSq_r_wiU9xQDAoq-9Qm5BH_combiopUY6QJy8sDtRGBRotPmdAqTHhG_WAaA",
+      "auth": "rTtY0tZKp-TnbwqLPY1Hrg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "updatedAt": 1789735557230
+  },
+  {
+    "userId": "101189",
+    "aliases": [
+      "101189",
+      "101189",
+      "01276082987",
+      "101189"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cTDITKZao80:APA91bHXz5HQpWQ33G_cIo6sBen6nzgwRWM7BN7qbpVmhQNqWWgetSR_2CqNXZIjQWP8qoFBn3zs5_qDAlvK0cz0n7N-3G4durFjsEBrUTEMeHcZvuYZseIYCBPSSzaXySgyukkdE3Sb",
+    "keys": {
+      "p256dh": "BIocx6TMkQM13JiBkWsUPvw-9Ep39ZQiaLHcmNMuQ18uQ5-H6j4hiI0u91WYU_Cm2TfrEyRV3TbkBHpwT153IXg",
+      "auth": "3tzxikbQ9a4HaILESkHoMA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789727247103
+  },
+  {
+    "userId": "101646",
+    "aliases": [
+      "101646",
+      "01202606762",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eCVTRV7JiWg:APA91bFMZI4wIFzJoTPtHXPlMTyEB6zZgKiorrTDdTYp_M16t881hOJn_Fs9XaBvPveL2sJHkEjGr5BEvowVhCVSaCcUP9dydE1_jeSeSpUPiaxDP24vcooCuJprbIkQsLvyG--zQ8HL",
+    "keys": {
+      "p256dh": "BLvSxoo1Xq-7NyGJ0PeR8QfMPz77KADbuaEfloTgPtFFHP54KPY08Uq-DIi8bU1EmFMqanC2_DEVgbZiXmjNhxE",
+      "auth": "u-E446aki_nu_ie-4I2-pA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789850361065
+  },
+  {
+    "userId": "101087",
+    "aliases": [
+      "101087",
+      "101087",
+      "01275284611",
+      "101087"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eNCyseLOmv8:APA91bHkTISrV2OWrmzRrMTavBXFuP5D1iYAr3qQ6eHSD5WBenladqmIdZBpY6DUs6JNYKXYSDucS9tDazK95-RatGoP89UKOqds_WSNFoWarmGKMFQ7uaHuA1sXZ7PDBtw6UmHRDHMg",
+    "keys": {
+      "p256dh": "BFmjg0p2Wx81opGhk_PKYwdy56TQbGvAoq4ochYWiMRIMQo6GBU5yjgkLsJpdbxkwxMS37ON6xUavngWC8RlFAw",
+      "auth": "I9Gn4UKUi56fXThFJxQgAQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789997453625
+  },
+  {
+    "userId": "101391",
+    "aliases": [
+      "101391",
+      "101391",
+      "01226441175",
+      "101391"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/doU_Ubib_RA:APA91bGnYl5zMFq3tPdlk_tjAtEoDVgTAOgeuEudooudRPq84CsklWnpBCVqYGUA31_7YtSJjXXBPgoC8v3NHTAnqH45DwH-K-y9RrVri5yhh-ZM83P3bUpH6vGJjtioJUIOKmHy_SlZ",
+    "keys": {
+      "p256dh": "BBv16tL3LAuIuQf2-OYPW2m8kwzKekCHtd8f3MxCXbpC8Wp5xNDzrV5XHZdt0hLk96RLwxpEZCjIvRLI7jg248M",
+      "auth": "Eqi2YnHHgFHjDA5X7CUT_Q"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790078645093
+  },
+  {
+    "userId": "101772",
+    "aliases": [
+      "101772",
+      "101772",
+      "01289063635",
+      "101772"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fVTvqvXhEV8:APA91bGyz3L_33ROkP1GL3qSuQ0oq1pqaoKG0LHMIWBJEk9miCz8Z9vtjjtLYYKpwFtXz3YEriI46m7ZIyx_fcgD6KoYWHZe5khXC6lk7CwSYPXSiU0SC_24-VIR5vU318Fhj0n4KCl2",
+    "keys": {
+      "p256dh": "BKy2q2Afc7QUq61NUhaNiPwq_LBqtXuFjFz4VsL6x5XzJqoVjYhot9pZFrtLKWNWCsOeVYgYBIRBLizbI5EsfmU",
+      "auth": "56bLDwfKo7LOPUB8lCzNMQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789931009686
+  },
+  {
+    "userId": "101352",
+    "aliases": [
+      "101352",
+      "101352",
+      "01202881487",
+      "101352"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fZ4kgp69WUo:APA91bHOjXdMmZt3l2B0x_ewPusTezg5yezqhtUnAzFDp1DU1EBz7z7UCw2yYrevt1Nqjf6NEaf1MMCwDWPw6N0Swd5_3KVrK96LybbNaG8QL7fw6ZLg_usZFy4yCJbvpe7IC1OEFsgS",
+    "keys": {
+      "p256dh": "BEjO_2Qpr-aHap5kuD7t23LmiwhPvxDjyDE33wbCbqtbQ9VNLFCUgYgMNXl9glkAilyMVPChkqsr0A7BFu20s3U",
+      "auth": "n0lAEHgZHlHvT1ey3ao1pg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790075355733
+  },
+  {
+    "userId": "101767",
+    "aliases": [
+      "101388",
+      "101767",
+      "01201857847",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/f_fQR8WDkaQ:APA91bEbaA6pyjY8KWLfuCIZxraJ2eJjFi-rkrsrd1fyStu4LiHQm5FHlabjZ7q1m9_bBkNvpxsnzf9k3HwSr9hRJsr20gkfOjVKuaDeIcVvhwUbtXPEXQRQzsRvxCxJRoKWGWaU4wq_",
+    "keys": {
+      "p256dh": "BCguFa4Ril16pgCVsr7f4weycLL0JZjBU5h81ErOluL6j3F3sD_qMTQ44T34e5xDbPBDfn1zyBnt05m6SGRFqVo",
+      "auth": "6_lQ0eQQ5JtdoNS0JXNDKQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789722946872
+  },
+  {
+    "userId": "101291",
+    "aliases": [
+      "101291",
+      "101291",
+      "01270390792",
+      "101291"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dDbRmT1mEJk:APA91bHvgadl4lqzyIvqRUM86Sb2sujdTnCpPoD30LHnQ2FJ9TLmDGmNmSBbZB-xgomREzrJeToM1YbwVJ9WUdp0a00KbaDPG5qlj-35x4GbQ2lX8OODm_oL84PoyOu1r9p7ElAxfSXc",
+    "keys": {
+      "p256dh": "BCkCn-41YPY6NUhHoEOaCz5wsKjGmZzwgK_6r5qzjK0Y6YeZacWGIjYvHOcr70fuFVFFDNJDx217SNCdaQzrr74",
+      "auth": "d2j4cSxlQ6CgEbY3SHq7Ug"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789928442960
+  },
+  {
+    "userId": "101394",
+    "aliases": [
+      "101395",
+      "101394",
+      "01284741007",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/doymlu1BPkE:APA91bGTqhjROIsw_yPje1SEl93WXpIsfqb-CP8asgQ9127F22pGB7UzbQokZKtQPDcsQKn5ZTyrOqVROaM4zaMLiyUuHh0iJZAyHQ8lTBuhsf73keWYS5_PO8y0eEVXeIrzX37eGC3K",
+    "keys": {
+      "p256dh": "BIFxqfEVU0Z4nr3VyrGcuLYpBM9ewPtpP1Jtq_hF-HY72-Fcxah1eYEQn6SNt8onvaGZE-hQgofatNZGoe92wDE",
+      "auth": "H5h4gg96g9SjfxekD6IzKg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790096538335
+  },
+  {
+    "userId": "101618",
+    "aliases": [
+      "101618",
+      "101618",
+      "01128608620",
+      "101618"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eB-GP366C6I:APA91bFa8A7WNvPI29BvTeVwufD9ogy72R-jvKP4-lIS50CUL8MinbvOq-GtZoF4T8V5EiTg9WDn08tP9kxww9184odAcJGkm6ZJWfh0H2wbwqSYvBzzsG-ltQddi90RwLAnleyOKBSX",
+    "keys": {
+      "p256dh": "BOr6NmuRt3MFnD5Urw3p6rjNvZ1oQ93eKjgcsylabhEogSwzpjWFMF1Qg1MxsdqwGV6fbemBSWlQ4Y9TeYyOB8A",
+      "auth": "3A0wwzKzpn98VvP_7NJhMw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790135413067
+  },
+  {
+    "userId": "101070",
+    "aliases": [
+      "101070",
+      "101070",
+      "01281517590",
+      "101070"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eP_pR0dzfWQ:APA91bGJdXPPGq0rWQYFNHJCgQopEtUQnQoUHots3MzUfB7IdcIvAA5GibPT_8qKiKCdwJRPXqmxDar3gV85p9WQdT3VNTSveWhzngLdK_nA4v3w_GIYssLEAOAO8B8qNa2RLGsvdI72",
+    "keys": {
+      "p256dh": "BDQrontjabURyc0TFR-92o0Lk4oXCh8eEU3PoFY50_VF3L5jHrJOExUVGUqdoe8jGSJ82W80gAEP4HUmHV7GdRA",
+      "auth": "gEMIVzYcf4HooisnXMryEA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789812607260
+  },
+  {
+    "userId": "101382",
+    "aliases": [
+      "101382",
+      "101382",
+      "01141262715",
+      "101382"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dYx4sQxlHsw:APA91bFgRfMQsSRcVeQxydqxPSVV8g_XQB7rhFazq1Eq2qOQNJzJdJzNlZzJ_Bnw4KifZpYCLWMwDrTPcV0BloytnbRypKFT_-_5tFTC07PxDh8OBSXlMJ1yjTl1CqfybXutl2wuo6Bm",
+    "keys": {
+      "p256dh": "BFcA41mbvI75ONfXUp-pYD7DsbtXIPqmjruNg_ou7lEpHMXOQSdLay3i7bxHiwmWbwivyTZy1JgFyap5n4TETi4",
+      "auth": "Qj6wkpcpM9AYj-A-DzIH6A"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789992535435
+  },
+  {
+    "userId": "101628",
+    "aliases": [
+      "101628",
+      "101628",
+      "01114210420",
+      "101628"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cG7OmMarLu4:APA91bHBnMH4dJuM-M0coyT37yU8WOPJ5ofxeYXGH_V065ppLzdwjtcgR4ec_HBvMEUGU84csB5qF8XG2zptN7bcLAU6yEnJnEOZMpUIy2jFQ7PMnmAB2M4xSqKniU9zBFINxbb5c8qa",
+    "keys": {
+      "p256dh": "BIK8o_-wgZKqhsLtt1YeCZvBzkb73ht1I7UONq1rxGjEuMOkNMZ5h6mMUQFJ6waM5FxTPuLPu9m_sLNZuuPmNzY",
+      "auth": "cW4qlQsOtNjLRuAEIws7tA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789926772726
+  },
+  {
+    "userId": "101293",
+    "aliases": [
+      "101293",
+      "101293",
+      "01274069018",
+      "101293"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fLwM5i5G2wI:APA91bHbe5QlkOOy5LlnNIRBL0utf8UpMvMkaRlrfmRSfZ-mxJhQAvbiQf7__VkDLW2O387qWzqp3UhrSV4jKtrS6Uorm2fG8MNF0OfZjjiAFNWOzLJYKPe7sU-8VS7pBjs5akuoSuFE",
+    "keys": {
+      "p256dh": "BGwoTUzia-qcLnUwdUNSQiApRxHD1RvuzqDzt6SVGg70gRH4OUfXXWmHPhSk5VAvh3psRrdod9WnNWtApM2QVgc",
+      "auth": "FWyN9_g3pzXL9Un4jGNSbg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790097892834
+  },
+  {
+    "userId": "١٠١٦٣٤",
+    "aliases": [
+      "١٠١٦٣٤",
+      "101634",
+      "01127616960",
+      "101634"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cpDK1z8DRjU:APA91bG5FaYXlGAa1sTokvdMk6Tm9HEMAjXxeG2kFCR1p7rGVd7x_5Yg7Pc5aJ1fSGfK1QFctbL55lZ96VTEoTwBMosblAIXqVJcQSYydDvpO5R9mDKbFhm0qatysWNAf98kUXHqX_Sy",
+    "keys": {
+      "p256dh": "BPTYyBExN-JsYZHIZ6Q06ZWeSb5DJ8ZtYACSTwcL2bzRqfmbOle51xciR_5rKsFsmUSdzo-Rm7Vyh0aoafqjGvA",
+      "auth": "xkysf30Ba2zMR6MFxw1IzQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790103581156
+  },
+  {
+    "userId": "101119",
+    "aliases": [
+      "101119",
+      "01220357378",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fwnxu_w5hfk:APA91bHhcTLYHTnRq0JhR0ovBmAorSvoFs5W_TRPBgXa6H2eGdAxdNz6ojU5aQJfwoFbaqfHbuj5WKZgtZNbNFjoqu2PDaufGjN8qr3ukPzrnsC__zvrZb7pxrbJ4SgcGsBNB2wyyNaJ",
+    "keys": {
+      "p256dh": "BLfyeiKAMunWm2hIIAiOH8DHUqMkXEevUGI0hFpIQqWeITk7i4QgYl5WxwFQC5mjEqexYzpvYW6-Nz97pUiVD0k",
+      "auth": "cqOmytipD5ygqHUVfxUaRg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789962606729
+  },
+  {
+    "userId": "101625",
+    "aliases": [
+      "101625",
+      "101625",
+      "01097683288",
+      "101625",
+      "101988"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/evDeTyXloKI:APA91bHagGP9-X6fSkkEguJ9Mhauk-aEBdjCgrHC9i5XgW1eEBJ2IK683n8JaXHvp4pno9lvBZvV6ezHVHU2rwHmusyzUw8EChZHyv5vF5J1x118Su1gfBjhpPJ5dwIcLeLq4whwLgbC",
+    "keys": {
+      "p256dh": "BBC6vcHni_PxjcPSVWSpx30DTsnxhZRkGHl7HuYiyKNYe7NkaN51YHDJPe3c4AKtQCMvuADpLAlZGgul5dQ0zKk",
+      "auth": "rt8d3hqKKllFJHDoR3wBLA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+    "updatedAt": 1790091055718
+  },
+  {
+    "userId": "101018",
+    "aliases": [
+      "101018",
+      "101018",
+      "01029743310",
+      "101018"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eBCmyxExhY0:APA91bFs2DTAGPEoWRH5c1hGxRuMWee-VZ5vJ6X7SFiymUvshgWqoZvGPKfNagM8LQjZ7oqQ0r2dX8j_ssZ7G81ay3p-zDHGJpy9d3tfSI1HX3ReEBgBNDox-1L33dVlHk0_-FgV0uvz",
+    "keys": {
+      "p256dh": "BKsfblhcH7PKOGczcKODdkvInMsQwVkDOt0_ceZooSWVjGh3ZNS5Wv9V4JuA-vucyKwE5T9t9373Snw6SBexBgI",
+      "auth": "bp4XjtbLZ_9dhEiWFZsfTA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789715822309
+  },
+  {
+    "userId": "101734",
+    "aliases": [
+      "101734",
+      "101734",
+      "01097951634",
+      "101734"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/f2sAA8zcmf0:APA91bHSKsMDBJE2S4bDZ5J2lEnCiOI8j9qvzPYey9hLXBRvS1rCdK-uGK1Oaoi2eHqgs_2vX5_5RG0CiI-vzQuQyaR9-XOtqNIzrYB7bnbmCcWYUsWWg5jTept_l5wLl1SA-x2YYPGG",
+    "keys": {
+      "p256dh": "BI-5DDIO8XhII84xAtyouk8JnKtN3A6vyBfydZ1B9eHyEr9HberIzCdVk7U0JqEZDCyBBBAzYx5dQ5RVTBUH5Qo",
+      "auth": "5MP2l4wCChDOXJ04uizFFw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789848081153
+  },
+  {
+    "userId": "101956",
+    "aliases": [
+      "101956",
+      "101956",
+      "01284798774",
+      "101956"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/ds1xypAmEKw:APA91bFbyxZz0YXxxlkuvW_LS3y9oYCWeaKHiKGhYw7uTN_QSCu4-r3QRw0ib7xDdl6CYanT-624IRMjL_6OIyClJ-C0TGVy_mHEcRquWC_G-4429xPIUmVbJwmuPUzOhdOIla0EPKaU",
+    "keys": {
+      "p256dh": "BMthadaGMIPutDqHpLFAkUNW9KTIsNgNTD_x97s9hCnTlhjwhZJ6FRTPCYgX_nLii7Wy72XDFv4YuW9wfWdQOP8",
+      "auth": "6xf3_fwiI7M9P5EUqOgCvA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789747539773
+  },
+  {
+    "userId": "101619",
+    "aliases": [
+      "101619",
+      "101619",
+      "01113752446",
+      "101619",
+      "101067"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/ddwCtB0XmdY:APA91bEqM8pFU2XCLEXlbzzi0qXxNiBwtuMSM57vndx6Ocwgk8WShXEldaymb8r-sQTMlh4Z4jSIfof4FYSw7N8mxlNn9ylrOg-KGGQqKbcZAHjZ-R-I4rkDCm5jRDIR6Tfv3qRoET8A",
+    "keys": {
+      "p256dh": "BGZuM6KY7qD1wkwsf0eJORFHfwxz5e_AskT53JhruQv-eF1LCOHloznksngRLtQkxlAhXRmZvQ9GfUgYCKt8i-g",
+      "auth": "5jmzOh8A_QaAPRptWYptiQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790110464397
+  },
+  {
+    "userId": "101026",
+    "aliases": [
+      "101026",
+      "101026",
+      "01202710303",
+      "101026"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eXnNWbWBPDk:APA91bE83pLht_NzT1tHQH6YE-savRmRwBBqyQIbw_dNhiLsgrDL1HLOlboWbRF3NAE-lsrZsLePgGAmJ1lQfr25bI68A9hxP24-Z9YukYH6EqbLC-PatxfbZ4O4yWIWx5ixAm5J8kYS",
+    "keys": {
+      "p256dh": "BHN7XQDnDfi0odXb95XCvG7QCICxXM1_j6pcs3HMrr2pyYdeMvoEDIo8e7kVj0jsw_YMTyEVDco8EZYO9fLwt_8",
+      "auth": "mQ0whkJyzF0WTsWE9z5WuA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789717097153
+  },
+  {
+    "userId": "101735",
+    "aliases": [
+      "101964",
+      "101735",
+      "01283127875",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://web.push.apple.com/QB5TOBDePsiF5PWKH_6rjIa79hce6l5JICckmR6GRw2WZtKDcod1i2a5S5dWYiY1Cc2yfx96kd8AmyWbJDdHYyFpcomc1LeFecUOz0DC0V6rK3u0hoEskc8P90l6Vv7QwhZ_nIV4_m2cEdTsGp3UB1WwhZMngSSKcpewuijj9hE",
+    "keys": {
+      "p256dh": "BDg6C8_Km7WW441oih5jcKwgYDhM7thbW-Vv0iAaQrET_grp1yT-3HRfrsTDpzZx63k1OfR3uU6UtyzoekUUfE8",
+      "auth": "hU2tr2WoUEE3hyqOJ3KfRA"
+    },
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Mobile/15E148 Safari/604.1",
+    "updatedAt": 1790105141257
+  },
+  {
+    "userId": "101217",
+    "aliases": [
+      "101217",
+      "101217",
+      "01202008564",
+      "101217"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/caWYOcMAMSM:APA91bHZ3GcyEVEyN3IiB-zYgbtpPRG8W0ZBMRwmmeD-D9FImlU6ewxm6XXyc967qLqCsbDocARbo_h7wVygCF9b-fQSA6-2o1ko6_b9uDIoIuS1YsAZtohpwr74K3Ji_iTqcu2Gochd",
+    "keys": {
+      "p256dh": "BE789l0eW93TNRpjYIfkacSgAPbVgmExL8eSJfo6H1XroXpWQdqj7umdbRrrTgFoghybfjgmo_OWQcTAyMW5kYI",
+      "auth": "t6V_TLc700Bn7gUYquY69w"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790140719048
+  },
+  {
+    "userId": "101695",
+    "aliases": [
+      "101695",
+      "101695",
+      "01270427503",
+      "101695",
+      "101123"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eCuTDVLUlN4:APA91bGN1LpCs-JoI6B1R6qSUQzoPe9qnbgUeXAQfwF_UG0bZGqX1wbg38uScF1rZkrqSEz2hY1qDJFQfSANcmaqcs9KVfTQoVEVSOXdxsVy7LUWwjrJJJ1jz72ifbZYeKSZjFTmZHyS",
+    "keys": {
+      "p256dh": "BKDz8lImVB2Ie6svfPSoo75SL9wqNBiz1Oab6xU3Gq9IOr1hmKr-mPHFeWIUO7ZHefacoaBoHlRpWefBPg7iXAQ",
+      "auth": "YO8txxvHh5TaI_idrf4c9w"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789713045650
+  },
+  {
+    "userId": "101394",
+    "aliases": [
+      "101394",
+      "101394",
+      "01284741007",
+      "101394"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/c32ATCpYq60:APA91bGQC_e80zuid7MUXGmHWtaCN1z9yYgFNvdbs_ySl-ekVu6hGnyylmdDcOKct4q5zH5QtwUKvkOl4Y0eChkAQpobY1l3VSOPzGiLqF8t_WxWgkWTGlUlqqcosbGD27U4oCHz1IJV",
+    "keys": {
+      "p256dh": "BHW8ZN9EDCuumKRRGpYmJv-HR1OOm6_1m39O-ipYDyo0tuHMHhb-UR67SuroHGI5rzpEugHm3BvJyVK5L6r_-vM",
+      "auth": "xdlajdFzanSR1zuuhL9oAw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790000078140
+  },
+  {
+    "userId": "101365",
+    "aliases": [
+      "101365",
+      "01206301464",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fMyGD69UiXQ:APA91bGuMBk18A7j_u_cB1ALkEsmSIOoWHza0DZH3uUzKL_nAxSScF8wF-0UchUYGogtfO27ZStCWXT9yBQahKr6SbnDwl7NJICF21fcXpZ0huIobFTcan6WaCGDd-Z73ubQ2mLdkX97",
+    "keys": {
+      "p256dh": "BLzVw0Kpt9vdP6bjq1CunE6Tq2Ku35R9eOP98n5rCRHsw5FfJQhNOP4pd1qgQA5ZMOVCE3WWaMytHdeJ2PLKwjo",
+      "auth": "rp6P6pyrhDN3xSKwzTL4CQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790119631965
+  },
+  {
+    "userId": "101692",
+    "aliases": [
+      "101692",
+      "101692",
+      "01281286872",
+      "101692"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eIXc2PBFZ_Q:APA91bEoToyqG4o-237_RFPR9IRCakn4Xx_PcSZfhJl143rd_2wtB0CWM1ELd8pDa4gkHsTmBOrUM43kK1fiB0f17ELfclMpidW0KZhWlFqlJe2dQVkeJhbjfAyFYf5RvF9fosN1YZQw",
+    "keys": {
+      "p256dh": "BLhPkULHd-JeuJTvEb-JT3iS4Wx9bGyd3m5fzbL5_2ufYkZSSuehrScRmKO8jKuu_B_wQrEsq-h7cONZ6vt8nQ0",
+      "auth": "HcpOcDYoIDoMMrW9DN_prQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789811946489
+  },
+  {
+    "userId": "101249",
+    "aliases": [
+      "101250",
+      "101249",
+      "01210380916",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/elX7INMonRw:APA91bFKI1QNLfLuDPqEXXPYU3gBuRVfLa0NA3inFX76--jNEYd7JKyH-kf2dU0NjfUglI7RAwAwnVcgOx7q_N_kysXVa1EFumgmUlLS72xKf_3gtbn4RQB4siCAFj_wemEoJiMC6Wui",
+    "keys": {
+      "p256dh": "BL48Gn6HfLoGOMhhJRsHtzIJk-Y82_QUU5mlJoJ_8GEgqyBTIWyylnB1W6jVyJOJXARyplHfahefSRYYRHhTIy8",
+      "auth": "tP_Gd_tuw8urwqGxv10UOg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789936452551
+  },
+  {
+    "userId": "101126",
+    "aliases": [
+      "101126",
+      "101126",
+      "01220968003",
+      "101126"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cIGAGWJmZFg:APA91bG2K7oTYPVHWPxm2u09C-CfrxkBuTGWtl-KSuXh0ofZ2Nz9Xt1oBOw3e8Q7RGI18Xl1k6wO_Fo-T6HcTx4VSBJ_DTpW_CdXHGo6If2ocNSXbEmzaBf93SwtVu68EOyExOjXSqSH",
+    "keys": {
+      "p256dh": "BPudJ3aYikKLemngqs8DAwWjjOUazEB_0hMNbCl4LqkX1qhsQMaB3qQwZHt-OaIgnbn8jVGW5sjM3sG5lrj4AHU",
+      "auth": "DiHgVX9cLDhObxFftTUAGQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789807945036
+  },
+  {
+    "userId": "101995",
+    "aliases": [
+      "101995",
+      "101995",
+      "01204526516",
+      "101995",
+      "101994"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/etZNBNvs9kA:APA91bGDRHh2rnOo4owsQb8eplCfrDkS83-Gfq8kA8gkhWutg25zWPILL-usfVr5idoOamG_ShAma3N-EvIA6Qd_tsbnrqyJ8vFu7NBNGnkF20UlFQLJhhWl4Rql7zww8OUYA5MPkRc9",
+    "keys": {
+      "p256dh": "BJGX24W1JzbkbKBOF_t1rqKozp2wOeDge7InGX2j_DK1XU6Bq-RvhW6HM4R1Hr1yFkJT8BUiGdjA_ExS05atFfE",
+      "auth": "X_042kWrhigEccY8CpVJxQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789818310839
+  },
+  {
+    "userId": "101317",
+    "aliases": [
+      "101317",
+      "101317",
+      "01062264489",
+      "101317"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cpLGdv04jQE:APA91bG97pN1WjeaUn-V79NelydZ9DTChSCWF99uP91crkOxupfMn-Al6NBhg-Pb3LQFZvh71fmoCHh-y29hwba1S17gX8KYG-EJvzv8WizmMUwb8S8MBaPqZpnyEj01y3jlUdEAnoeW",
+    "keys": {
+      "p256dh": "BHaoyCDzGi-ER_HzX-wr-4wQLn8ulZIwWNYOq5FpX6WPjg-DnW7NLwjvTh2fpI0FKkafkOjRBCylgrksS6tAmUw",
+      "auth": "oybf2u8MMGgzn0c07_Pv8A"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789764646447
+  },
+  {
+    "userId": "101701",
+    "aliases": [
+      "101701",
+      "01225658975",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fy2DmIuFkPs:APA91bHsIKZ9vfHYFwoStdbZ3Xf3X2YNs7NE62SDWNdvwHkdpnBz99NWsC4Jg7zyoMCtVI_ekfgmJBaG9FUOQP86uRLAc-yt3e0apMsD8MIoN9noLvcjrvJvOnJtsV98eFfwSD7r33uZ",
+    "keys": {
+      "p256dh": "BFaowePdNgb6hXM2xIszBWfTmGFOmT2N5pFMkn2742TqIw0HyFz0dOV3o3xJmnROCPZwmiBLiD1h-SNtfnVTyhU",
+      "auth": "soMXh1kDsQa-lreuRAMhXw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789848552147
+  },
+  {
+    "userId": "101315",
+    "aliases": [
+      "101315",
+      "101315",
+      "01201161568",
+      "101315"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fFOysCJ6bAU:APA91bGESN3WXGjed-ZfpiI0ZD3-Zui2qvq42-CVT3hjd3EMOLx3-l7EEKRfg8z_evIv5BfBbC6IcTbD5_8_Itl0kSxhgGmFAzuHH3otH-5zVAFCi4X7jdUR4Ohw3dFKpeJzOEFKf3Nh",
+    "keys": {
+      "p256dh": "BII9ystMWcWTMWjJmndkLxToFPB46WEJX1MbAleicg-4wCk2bWeNOvCDHfeYgsV1we6rHkNjiGcNlaaZ8qoM0X4",
+      "auth": "rNnzoU1VwLE_BWcqidkPMA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790100948836
+  },
+  {
+    "userId": "101641",
+    "aliases": [
+      "101641",
+      "101641",
+      "01203637104",
+      "101641"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dmEMRQ05g1c:APA91bG9Kiel1z1es2jvWGfD2aLWjFNIiWhpSbZcCBe2ZJiQ9NQMwPm3UilPg939W9zRx-bqp1uLhVbEdWhpGQfri9G_cF-9_hqULsgE7Vd4kGfVs7UyczbnZ6cppxOKzCl4cLH4Ecf-",
+    "keys": {
+      "p256dh": "BFv5Ck58oYv7zcD6D6qbe-V57zN6SLX9ERsIrvXMD5bVcp7Li-WDPS-VzfRcYd6Ur5SmB5G5kPpn7ZP7WCA0Hak",
+      "auth": "lorpziDvRX0I8vDFBXcxIg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790005991322
+  },
+  {
+    "userId": "101309",
+    "aliases": [
+      "101309",
+      "101309",
+      "01225010881",
+      "101309"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/e3h18UhNMj8:APA91bEc9yamo5MwzJw9-stWEIdaQrB7Lu-uWwH9aAQrJ5cfCxrUQEmJs2P3gCUR8Gdt39lFkUt2gaFBAx8UFq6B3vM4_mCPKq-Ok39r75eDtUfH0mUy4czvVlgIxDKBPf86G4gv-2_i",
+    "keys": {
+      "p256dh": "BLFmGCPS_0GX3OewAtMqEvXWKlIf5TCLQ50HUlv5seaA6TM_V-TPA6tF70kgnCMEtIMBlHaDJaWsnduqZuFE3yY",
+      "auth": "7Lm9t27onZL_wTieuj0FPg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789757668173
+  },
+  {
+    "userId": "101132",
+    "aliases": [
+      "101132",
+      "101132",
+      "01206629297",
+      "101132"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fMMbHhA7DBs:APA91bF7ravnQmYOZU4EEahVTY4oT72y336E8Q-a9y51mhAwPoxXEIoABsB_gDqg8Fxa9sB195nrqHXUdUcq7v7AHLYdiaQEqQnknIpSO6kSzVVk-kSl9mG-2JjMFl0pC_Q1ERLFkQbd",
+    "keys": {
+      "p256dh": "BK1Yceubmi7NwEvgjuRF1EFJSVd3jpEUy-ZpnASTC5adc5RqyQn180Uk_E2f8rXJxN-ZLTYfE_3lqDcH6gbm-Lw",
+      "auth": "YBtitC4ciI8wMgh8NmBQWQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790013389773
+  },
+  {
+    "userId": "101300",
+    "aliases": [
+      "101300",
+      "101300",
+      "01141872762",
+      "101300"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/et1a38p28DQ:APA91bHD0MuZXho0jh-hOwOEfFWVp8D1nJ2aAXu8UKm8rEJVhWeuwLiQlVXLgW_OvFh_ZWVdKQv14OC3jtI4GoynBRhAFDQrZ0CLJoAUiAIWYhwxEtOoYluh3lrubc0gQyC9rqI0kKZZ",
+    "keys": {
+      "p256dh": "BGx-SWCik4484mHVDlnh7P4om1Bu3SfUqzAc_woGEQiF-xNwjs9x410t6yifcQTeoNgc00g-mcLjsiYRlPCFnUI",
+      "auth": "3WG3HkX_xJqD55LoZ_63jw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789824914946
+  },
+  {
+    "userId": "101196",
+    "aliases": [
+      "101196",
+      "01102633899",
+      "201102633899",
+      "20"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/d8RKxMC9Xdw:APA91bGKuL4VKpqwLeADXun8Zlf1_iLi0FVt5ySuB3l6knaaENykoo8VbtQXgbPEkiFFDLtA_jZwNHlVPOwLxwzf1k0k7FdgwcixAtoFfQ53aIc5ysRI07_dJXfQGuGmUPRWdf925DRB",
+    "keys": {
+      "p256dh": "BD5XMZw_03LTJ5MFyB_ISNYt5s43tOaA-7qkoTlC7eRDeQzPIYQ0lkvvLxNzbuM7wnqt1wBU7IGtsF4sQFU49ps",
+      "auth": "TvBSJdl_LfmbRMzuhMa58g"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790093022284
+  },
+  {
+    "userId": "101164",
+    "aliases": [
+      "101164",
+      "101164",
+      "01034159158",
+      "101164"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eIvrJXU22g8:APA91bF_vuUq976G6gFVdBALjtxXaYCkaT96VE5LNNXOgSse4Nw7GAGhthrIgqeUARe8620Y1Z4raDjv1tfWpZEtvbUfXkUdWzgSmhXm7Rqa8ejRJohzk_fVvy25HQOQdWBQZd3T9DrJ",
+    "keys": {
+      "p256dh": "BIkIFesusTwqDpuj3YaagpuQBxNOnODQzG19cKBdTlDRl6DCP7DUH4sO2pmf-p25JrnUr_hKYyDXt_9sxEXooc4",
+      "auth": "lJtnkTwWmS26e06NGzNmsQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790049256782
+  },
+  {
+    "userId": "101061",
+    "aliases": [
+      "101061",
+      "101061",
+      "01063521020",
+      "101061"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dZ36y34f0Fs:APA91bF8E3qVdz0kJOvlLHNk_BSesqwkVuvugsS8aMfXTSghEK5tdPEz9R9IgwnMVw5feSh6pRl9iB-s3LGaaJb91ONphaOA03SoWTuau6bXMxEQvTOqai09y97yeSKtmCNetBuMPr6l",
+    "keys": {
+      "p256dh": "BFCYNKfiwg3BUGqxYAy34GXFAXBWoIs1B6yhV9UNERZdfu8rCjhsrm9rj5M1G91p4GvIv29i6Brv0SoN7tUy8is",
+      "auth": "ELDsNjLOCBnNR1gK6aUxlw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789747469694
+  },
+  {
+    "userId": "101065",
+    "aliases": [
+      "101065",
+      "101065",
+      "01270417775",
+      "101065"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eNXxxPUjJxQ:APA91bGeh7KamGoNSGy3VCA4R-2ucBYoU5WR1Lv8lnqapJxBLIViEshenMNeh4_zdckarjKyiyWJFBZzkExSzp0gebBG6PYmIXlaFBQsiI0NoIAjbbJ-Jtk6tc013u8YHqoB8C-AJN7s",
+    "keys": {
+      "p256dh": "BPSBKznBKhQ7EuU3cqoq7_OuMRNmGAXT63nFkSg_hzo3O0DbGzuZucNUGmKXX6mof4hk2vLFjpfiW37hypYY8DU",
+      "auth": "4zKaKvbeSNRrP1UNKFTesQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790017148350
+  },
+  {
+    "userId": "101644",
+    "aliases": [
+      "101644",
+      "101644",
+      "01276365393",
+      "101644"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eXSjzm6gRN4:APA91bHcWr5GgGSLe5Q2sOTNIijco9nfZJ9QKsQYlqlwGhWE7iIEbVturNxahPm9FG_ZFBMBOiCXtlVXjJpgT0VsuEMdmqEproX28n5aUxp6Oy6sAIfr8kHOaaOeQnpTDt0xtwtCtY7A",
+    "keys": {
+      "p256dh": "BNIckMApvBA4x9iPG7tQ6vbnthKM9oShgHzuh8Bkg4ZZqXzPI_qsnzrHIgoNWcZZnco7r9fqeIsEiyPBTkIaKsE",
+      "auth": "_hXVVdOPgA0bKVsK-FaYpg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789763685222
+  },
+  {
+    "userId": "101208",
+    "aliases": [
+      "101208",
+      "101208",
+      "01288513062",
+      "101208"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/flno1Do0HcE:APA91bE8HZPGuO2kKYiwZFb-wQJU8DatW-PoANSH614TKjleecMdSS3Ta8yvhVti7pAtKwWPqL1cad_I7AQqN8NNlFd_wXz2781JgQdMPjvbORqYiVMQFNXpeyIfUaDHl7bJcEGYcFkm",
+    "keys": {
+      "p256dh": "BC5177UPFfaP-j8ZhSac-4si_7yeiH2ejwdHn2s2H7YUYRtQeiurYMeKYKBWlKnqi28UFK-GTFbzleWokMt94hs",
+      "auth": "BxGIEe44uwim3xgt0ffCAQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789932998872
+  },
+  {
+    "userId": "101181",
+    "aliases": [
+      "101181",
+      "101181",
+      "01277158132",
+      "101181"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dxy9sWa3mIk:APA91bE20rdSj-OSGsR5Ztm7ywMv7imlaLzviZ8Gg09rojMtJStiPDWm7zsHhcwvVH_dl-Im55-iMys9lvk5uF0JIdtHALzP0kiExVUJ7-zhZljPxaf4wWbqVsjTuaFbLuayJ9_fsc-s",
+    "keys": {
+      "p256dh": "BKFr1X_Wo8Ovc2yurJbX7tFOWDjBUc74atszwRKnAssnQN46c9amA5-rPw2iLA6PnSsVcXtaMsPG24QQUWvQEI0",
+      "auth": "3gTWtKkMH9hfl_0FhrkZOQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789994995815
+  },
+  {
+    "userId": "101608",
+    "aliases": [
+      "101608",
+      "101608",
+      "01024352984",
+      "101608"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eZhAi2WH4ak:APA91bEycXmPUqYkTJAWLhLGwdsr4Rka8Er9zMNr-mcPTAQfISbuqRn5W9yxiLgme8TAxi6UHm7Fh4OTQasRmqtaxMPhXM04awoknRfCM7CcxfqM542LpCoKY8AM46nrKBouPqCHZcG8",
+    "keys": {
+      "p256dh": "BD3B6Q3RVmX48o6H2gzL_BnfYXP5ec7upvZSnBJKR_3NQqUsLX3DbHhySuo30B-yGiE_GE8xtiDWMwckUDw_IbU",
+      "auth": "pU7v7fROYwvNeKcLMfV7Qw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790019983261
+  },
+  {
+    "userId": "101340",
+    "aliases": [
+      "101340",
+      "01223746767",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eErL21MBHyE:APA91bHRuTNN4cA12Wfg8mV02n5X0WHYEgmUY6wnFXhnF1-yc-mNLqtGDh9QiavMD0N8WlOZZNdcPre7jP15QYruIN1G1DElr6_9ITkMCfFEjSmm0Q3Vd51KKqHR9mHXG6g7ALtmRlCS",
+    "keys": {
+      "p256dh": "BDr5lIq2W0cBWLzCgD-ztmCUCWrQjgPoVRFJDLMklzz_otMtYBjZe1mkZ6wVRPneECg2o-rPnyWd-OEk7clw3Ng",
+      "auth": "yBSzNXtkVDbE2OupQvLpHw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790136814038
+  },
+  {
+    "userId": "101166",
+    "aliases": [
+      "101166",
+      "01205060869",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dWmvrZmTbaI:APA91bFlfmWvtc8cp20CoBkVlNcOHQsUsHgTIqkBCyeQw_9KwtuCwqvJ-16uix0XtIxsglG3KxgaT8ROsKpX07L_wUIaCuHk0iYneMcThKWB-a5UCvcrERh0dMrAO4KpdOYkfAQThldx",
+    "keys": {
+      "p256dh": "BGuw_PtBpH6zmkyaKcUqdc9lMDTBXU-zzUPDnOn3K1Rxh3J-zMbL8XCvpzOhVOuZWl9BvC3i1QuEeOtgmvJ-th4",
+      "auth": "y12daB6IZOz2vVo-gk2hKQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790103321217
+  },
+  {
+    "userId": "101991",
+    "aliases": [
+      "101991",
+      "101991",
+      "01273010924",
+      "101991"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dDGcLB7Z7CE:APA91bEXfK36cR_YDh8VYL_rC0zNLQBvKpvZdRRCOg6yt6mECE1a-fPI8eHBix6c7UZqgcqTbwqQZCXoIGxV0ji4IaZMQpyhxTGl0KCN-2aDcgeY0q-t4V56HhZ9PRj9crF2pviudn8x",
+    "keys": {
+      "p256dh": "BKGoVvQjg-r9AB_EG6CtO1233u0RxiQCSV9mEkAscAWnZVZfG8NCWN9dKcDqtKlvYp6IvmvteHUEl-w21offjpU",
+      "auth": "TliHP_Me3QiYSwVnHyg9xw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789752979908
+  },
+  {
+    "userId": "101109",
+    "aliases": [
+      "101109",
+      "101109",
+      "01282977658",
+      "101109"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/d21gtqt_L6w:APA91bHXXWxRMUwFDyzfd0pkdT01HZ_5R5Gb5wpTf3qUcV30kTvkvHJ248QIjfXXmB1SZO_d4MYjLeMoPnNIN4QMQ2kv6IxayzsnpC4lQMVwiCNKlH5aDs1MsC4GqCkprSCLXrNnNGyT",
+    "keys": {
+      "p256dh": "BKg34Dp_9bjDBtayPRXIshisqLeEXr4FKUByU9RgZNJA0XyhwrteHKSASYhK6fG2pogvopxsnfKj-aK3xhq_jTM",
+      "auth": "de_Z0wPGugrfazhOhfE0-Q"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789930540190
+  },
+  {
+    "userId": "101396",
+    "aliases": [
+      "101396",
+      "101396",
+      "0279558166",
+      "101396"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/e-bEw8VoZ6I:APA91bGhJlWLm0AriwzuciaSp7Yk6KwB_guxRuCV06riltS5P01vKmryEHLvjkJ74XNiESIbo66-4zf-Gii_4h7ekdpxFvDC0E1YC6nGqqPgjZRQkCnQiZdvj3PSXSwvYO3Ilo6JzGoH",
+    "keys": {
+      "p256dh": "BNtedFmloPzfqq1hhMqZQw7a6lO-8Q5IUjWAXPdosNoYJaHMd4drMrCw1GMOW7Ii_D4KWzaTuKye2KulDUxooi4",
+      "auth": "Jt8llY1f3caMYfLuL8RPNg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790000379379
+  },
+  {
+    "userId": "101007",
+    "aliases": [
+      "101007",
+      "101007",
+      "01221896008",
+      "101007"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/f48cG4LnLvc:APA91bHoiPpf4y9fRqAcomV2ugtLkBepIAlDfvs0DFUGTGN7fBu2nuEBdQWFjr4-wZQ81wBRg9flTqiYm4G3vqD4WQP4DFYyZy1AOb4ScfUEQZZomx4oAgMuTKsAHnKmwMu-eTG0C5Zc",
+    "keys": {
+      "p256dh": "BA__uyDzG4s906UvWDnlEQv_ed5O2LnD08C5-6J2G0yotZghjA3Ut7apIN4haVw3MkVo0P-QyrmeN1FxGEcpCRQ",
+      "auth": "jfGnwxFzN0UgBMNql6mdpw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790152423332
+  },
+  {
+    "userId": "101009",
+    "aliases": [
+      "101009",
+      "101009",
+      "01094374077",
+      "101009"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/ezBLtI73jy8:APA91bHhYwcSmbzVmCH-yfjEgorU-cyV2reWc1ThDRSVfrwlKdzY7TTh9GSNkCNz2wwlo7wmeClgp7j63-vqIOX0xyverPC9Th7yjXO7FuNkxLNVTGyKEHHLDFgyOgifiqIdMEZlZEc8",
+    "keys": {
+      "p256dh": "BIMQTY0DhLm5wUXReOXb6zYhXQRr9W49JUbq_JPKxl2ziLieTg9G4u6cF8XFXVzHvwWOwx-g_zS7HXwcmLhtffQ",
+      "auth": "Zzd6kG_g4NdGqytE5TrtXQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789735738873
+  },
+  {
+    "userId": "101049",
+    "aliases": [
+      "101049",
+      "101049",
+      "01280907902",
+      "101049"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dna2medSHMM:APA91bHKSvz73DZ9yoETagZ9T8KXzPFz-boi6GIsewiuzvg0e0aVAZ4RnuRdkVBh9N2zZRrwyvlsI_ovqGkzOEM7frRelpPO8Typam23jr5D5T3-u6v-f_T83j9hy1ShMeFAUhMcewGf",
+    "keys": {
+      "p256dh": "BLk7GYpp9_NgiQR-vbP_GtE9OXsy--BW80yFpGW5IlrmuzHTUOdbGeb1TXAC5AbjvtdvgXRG_5SeKFW81kwc7Ts",
+      "auth": "GnaHcCQsP8h-iO42IcPweg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790074215588
+  },
+  {
+    "userId": "101096",
+    "aliases": [
+      "101096",
+      "101096",
+      "01208430454",
+      "101096"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cEaIWLQTCyo:APA91bH-6fzhDdGzs3RduWxq9CtptvXEl0DZqi9qw3BNeYenu7dxLP0yVRuxkmf_NICA2Y-evTfaP8mWvD83GaH_i2rN4Z_Xyrd5Exv4wl1hkfSqhHvDR3b92qTywmVox6g3P6A6v3wt",
+    "keys": {
+      "p256dh": "BO3Rta9-o-47iy9J8oWREH7Ttjn4iWnN6vQCOtnqySgz4UvdkeN1w0jYLRriUFNb7ZI8Xmldm7vroM3LYP6UbWI",
+      "auth": "_NHu2UD03KBZX0h5xf-baw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789763562610
+  },
+  {
+    "userId": "101933",
+    "aliases": [
+      "101933",
+      "101933",
+      "01069546119",
+      "101933"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dgictVuu-No:APA91bFFFRLBgg7THAHEWuyDS24lfYzXIY8sHw3IMYZ-FA_-aqZS3kCoM4zIlHRmE8eV7ZCyBEAQUu5Rb7xpAp0YAMiGi3xbrkV_r05YJv2VvzPrSGltV2uQk9-HPbiu6Ejf790-QrOf",
+    "keys": {
+      "p256dh": "BGhzwQZmi-2TivBE8Yo1tLjrqYhzoCpq-MJ8uAI99LrRvB0XDbOmkD2bOwyyhnvx79r6NK20ZguOv9xaUHdj_W8",
+      "auth": "viCJTfd6hHlVNMNsMjRp0w"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789813885387
+  },
+  {
+    "userId": "101035",
+    "aliases": [
+      "101035",
+      "101035",
+      "1224117647",
+      "101035"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/euc67pH2CHQ:APA91bGZ3N9L8Gzknw12ZMktRNTXHmPRBHunSuqAcS6EfIFfgSEumoVNT8xxlME6tQ8mknsXM3TCX9nWily8cPGvh9Y83CRRXpcXeEbdbG10rQry2AoIL4uB8sPgZCgWmNx9niV4T1gK",
+    "keys": {
+      "p256dh": "BJBpbfyhPWYrATFi46PJQn_fDQdC_UtAdVXhGp1gckVsl-K1s6ldZQPPmeT7RoBXe2oZRkxL9snXH57cFn_l3Ss",
+      "auth": "gNGETQ9AO1mbBtagc1r80A"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789830237085
+  },
+  {
+    "userId": "101771",
+    "aliases": [
+      "101771",
+      "101771",
+      "01279216607",
+      "101771"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cM2xnhUuTL8:APA91bG9aIdCTkRgP0XIE26o18UbJdWNz5_IbeV6Msula_BgaZgk2GCYVmFOlQgOhtLSw9IBqqmaKy72p4aZh3he29q-Bv0koYqJf_4zJmYKmkIaiNtfkXmWendLBVsaQBNwBIBs1mHW",
+    "keys": {
+      "p256dh": "BGlpAaA8WNdG6C9JrFoNmtznOsYUNwlkrnGQBSgplVvuxR3GKh11PUZx_muJZJhkwoR-iu7g6bPBBB_gToKa3NE",
+      "auth": "oyi74GXSOr-glNcrcMxhUg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790090461168
+  },
+  {
+    "userId": "101968",
+    "aliases": [
+      "101968",
+      "101968",
+      "01285801960",
+      "101968"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/f1QHDj43P7c:APA91bEN-p7WUjxiyShWrWCCg-sGUWW7Jy7mk2GXmq9_FhwqFk_50zsUeu5um0fN4Zjl8uShnQAN9AldeCVu4qS-abunbgcTY8uC_VMzSLA6AUhRJ2C2YCIvmzWPVHOpljz3p5AOumsX",
+    "keys": {
+      "p256dh": "BBI_36YT8xZ3aJ49beW6W0iISNaHBWABQ4ycBnAUlnGDf_Suw02MGLKCUr_35j3OyyfhUqaeaCZHDaGqQvyI8f0",
+      "auth": "6sHZ-BoJwJoTusb5NxEuwg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789912592352
+  },
+  {
+    "userId": "101650",
+    "aliases": [
+      "101650",
+      "101721",
+      "01212042093",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/c1YwMBPNGT8:APA91bF5SsrFou9mD2bHzX1Gex5tsDaEsUEcYXTaavaSn15NdnS-TbHyQo5AmKiuOEwqOvjG35NG3lZdj5wslxKTPovcwMBqqvpFm9hyBugEmZQnDibrj8sgJGYdmWoJL8M8qqevcELx",
+    "keys": {
+      "p256dh": "BJGk8UhAuV8VDaUs-BPGwQ8ly2lqzeifJG1_u62MX9zp2ddrqFB5h4avGtrv4tagzecDys6EdjKlkwE2llDoysU",
+      "auth": "oX1HYj-OciB8OqxsT7_vsQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789922376626
+  },
+  {
+    "userId": "101987",
+    "aliases": [
+      "101987",
+      "101987",
+      "01205282234",
+      "101987"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/f3NTPmeJFRM:APA91bFbEfEHzGwX03wRCy3yRtsOm6UXtN4tOEPv_6nKkoXQcObmmCoGzbEknfYVLfIoJ0lxbqM4vg7xtsG3CnVxyn3svSehm4haS_47xElljP1UnCsqsfg35iH_nQvJBMIKvBMUajn4",
+    "keys": {
+      "p256dh": "BIvLxoSCfUcsQZSE3S1Iv_sB1vmccK51plIqnl-nE10WEwbjWAwHWw3yqhDCdhnFNBefi_iLmuObC0eJ7zO2K6k",
+      "auth": "2E3qt9R-bVOv9o0gKdmD5Q"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789935830110
+  },
+  {
+    "userId": "101394",
+    "aliases": [
+      "101394",
+      "101394",
+      "01284741007",
+      "101394"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dzyoKUo_Yoc:APA91bG1IfmqVkkTI9BYOfos5tRDJFWy4Cr5Xpl7c55Fw7fdCJ-5t09hEE4DnjN7UBw3deKLv_JZDLpAik0ERuNNav3pc4pPMszvCyhMsDePVg2pT5R5X_He82Mh6tP1QdsikDg0j3uP",
+    "keys": {
+      "p256dh": "BOaALvBa-8XjHxvvlltNgPRuZKT21I4ShTGNS6aBIrz5ZlFLGYUqp9mhcWnrJqISB90AVMq09jjR8QFNwb8XoKU",
+      "auth": "XWCx1w_oMlJTbse7F6IL_Q"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790000254867
+  },
+  {
+    "userId": "101648",
+    "aliases": [
+      "101648",
+      "101648",
+      "01271262916",
+      "101648"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eAcE1KKjSec:APA91bE7foSqYK66ccaqxAnyzdeKYmzIqdpejwd8R1L1MtP1TW4ByNadKLZ1nnwC1xQA-1pJR1dLHIcZ2D3OWSU4ISqdJ1Iyo9iK8RuhHDE7wKJ2ATa8BSHZhwiPKfoW-B5gKmwyfXrT",
+    "keys": {
+      "p256dh": "BMedOI8M3wgfcn-K_iUpLjEs8QJs0r5gBbiKL88Z4Fujm3Tx9ya6FYQX1Fhhks4281oCWRBiz1yMQpwp082F-98",
+      "auth": "Vj3U0MfdcQLRPeafEA4V7w"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790016238058
+  },
+  {
+    "userId": "101914",
+    "aliases": [
+      "101914",
+      "101914",
+      "01225916341",
+      "101914"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fcgcpXAg-vM:APA91bHSeBlVgbeVSj3RgxvN7qfqLhZnFfnxBzsztVDaG39GVXXkkNnMYIx5nwYRiRPldGn52OsCcBnEWgWFYaCH_bxDXgls0pXuH2DPdObSSw_3h5tCx4o05VfjsIAiHFQwX6-ZNERu",
+    "keys": {
+      "p256dh": "BO7iuEhPRSz6dplLFpnjtDri4dAq-qp83zHlABrW-6twGv1A1E30z1weChE5bjliNzxmLTs-f9YEAgEbhKsHdoI",
+      "auth": "7wdnacc1Li2giUWoFzZCWQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790008459245
+  },
+  {
+    "userId": "101172",
+    "aliases": [
+      "101172",
+      "101172",
+      "01503214163",
+      "101172"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/ckG819Tj61U:APA91bHlYEQkn4zWT0C2VaPBCKebF_HOwg-gH7eTBDTxcW76mSgdGqYTOLRboxSPSaP9kGg2dpogFGdi_rIAd_h58PwK5FNCJTuO8gBKOYKFXAYYiB499_ZK_Qx4BLbSIC7vLmu4NvlK",
+    "keys": {
+      "p256dh": "BLZguPnXYYRvXNhrhU3nKuFcnW5pVySswH563_F6txzijSWWBSuu_OHDP4c4N1v6H6UL21zgaMOrMVbeC6siRvs",
+      "auth": "8yqRTJ561YUUbcu7o_iC-w"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790048234571
+  },
+  {
+    "userId": "101708",
+    "aliases": [
+      "101708",
+      "101708",
+      "01226471473",
+      "101708"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fnp1o-O07C4:APA91bEHuiYWiDDaS0guoTLve9Wt_X3uH_9hwp3oEqidOMMydJskGLH2te_3pDY0DRG25UClWt-VDdyTWUtsGOaTNGvI6yhKmUWBLFhuyELAeggqjFi4a81HTqC5M7V4HxYsZ6EgFJds",
+    "keys": {
+      "p256dh": "BHz5mKdraLNSDmg12Tz_uGcYWuj6QP99H4mBzhRIabC7Hc9ozCOB_3C26FONh9JEUQx0LK_5FV7uA4nsVkSll_8",
+      "auth": "bwZFclym1Q2tIPWI2PHUaA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790133556289
+  },
+  {
+    "userId": "101164",
+    "aliases": [
+      "101164",
+      "01034159158",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fKfwoWEVfKU:APA91bG5Y6GsXkLvoGajZ23-FoS_WwbbND5LGVH2mOYqTCZaRJMLr-0TL7NppMMA53YiU81XrUx9aFono-PnjyTvJH64CTHJm3DFVpoGplC_83DORcI13_nJVI4_RAlOrqsTWedttdFi",
+    "keys": {
+      "p256dh": "BCCgcDHzKEuqfLo9TQn-crUY8DhNGXpevezAToRlfxam8Gf2P5XQnGAGxdFD-lbKWnUjZt8mgCJS1idjB5XUlkY",
+      "auth": "5qfzieZMMr7n0F6nAGZrSQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789829903229
+  },
+  {
+    "userId": "101089",
+    "aliases": [
+      "101089",
+      "101089",
+      "01067847788",
+      "101089"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dPbat4go774:APA91bETRmi-rfZbxiC-mi0hzf3EKpU769YEQoBpn0CWghed23wEz0UpttyGpwtEjifZO4_J7u2W70uGzlUNrzot-j6BN3WH7xTk89a83YE_VdiYBWfZq22Lx1lJH0-wsk9co5Nt6fPF",
+    "keys": {
+      "p256dh": "BMJfUx_-Zw_Y5c6JgIXpqQaTtfdRUqV2z6iKpS2Mfe2kPjSyYo2eLB6k5EcCdmnh-szWzDu0T7P3yyRtJFJqDrM",
+      "auth": "P0FhLfwjOxzISTN_HxP-Gw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+    "updatedAt": 1790111468655
+  },
+  {
+    "userId": "101172",
+    "aliases": [
+      "101172",
+      "101172",
+      "01503214163",
+      "101172"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eG6RVmQHrM4:APA91bGWcI8zfiLbOxW1xzfgskOJzdE3Ie6L3cWeuHSpzKTfy-2Mzq41XDGHpzEZDaMDtzG1zi_z9MU8kSksddcrahWRJQz3ZaWLfX6QEBtGIFVDpPNz0RkfzytqBOhGnOrIl0KVrPj5",
+    "keys": {
+      "p256dh": "BET8hs2A6SAdXGEIo-FFK2Gy49RT2TS48u2_issh9gTHsU-8567SRXpR3qQKPOtO2zC7Bu91WGwmWj1uDe-Wdis",
+      "auth": "tK0CCrG6LshGVyIv05ewhw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789825212354
+  },
+  {
+    "userId": "101769",
+    "aliases": [
+      "101769",
+      "101769",
+      "01093417132",
+      "101769"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cosS-2x7gQo:APA91bEcIVpBdfwKa8wLWzQcW215v-qpBQDgZ4k4kv5fwRpKzrHFDQqUZtaQqe_xwncO3e4B9GpFjHqdYygGB7HUi2Oy-KwUyFAw0Um6Ufn5aVP3H5DxdYo8QsjMYNp7TYgOzcz-7iTd",
+    "keys": {
+      "p256dh": "BECXrl4tU_hbqDsKRDICg2OT6w1BNvWH22lSUee3103m3ozzEXHzONCg2SgZ5Q2N3AWVX3Yev6JMpWpCleL9f9Y",
+      "auth": "Zdetz_HCW1474vDedY5DDA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790015353543
+  },
+  {
+    "userId": "101008",
+    "aliases": [
+      "101008",
+      "101008",
+      "01289514462",
+      "101008"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/f8iHBnTZaLA:APA91bG4NbAF6zIcbRoQXCV2KbU1mTPc6B7EnnP8kVtZyZ_otsGWVfjY3D31sg5M3ceedLtk3X5jOweXqMceU_mE-giOUsi1b04RjL6C74NvmxflECDLks07VqLn5-b9Y3X50DOll_RL",
+    "keys": {
+      "p256dh": "BDAzvg2eSDZKZAPxjt9dRIQ1yzT1XjWcqvrw3hJi4_l1d_TqngkkPmnauQUzsK3zPngzb_GMM5SJzBkAi-Xh9Fk",
+      "auth": "rUALXGr9u4H5cy3GkvASWA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790137949388
+  },
+  {
+    "userId": "101752",
+    "aliases": [
+      "101752",
+      "101752",
+      "01279780176",
+      "101752"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cqRrbvFrmis:APA91bHKK6nU50QF1Yqi9MZHFkWiqdf0HmwPlM9-4wEWsZ6c69WVq1_n6aW1sqngTENg7AYP3JVdrU5bbrHYSUUdyg9fc0P1f6S0rPfgtYe-n8YYD4ZU6ZlOSlvueOCbcVHtrtBvMBkn",
+    "keys": {
+      "p256dh": "BNLrWsP32FC3lEYlSNNFnQxubD_k2PK2xF-FW4H9pAlL7DxmqJTuQ3dUrfGWPyu7PiNnPNDp3KtDbGNMGwtw0F4",
+      "auth": "3SAIGMgEKlWRUP-XsZlg6g"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789812610950
+  },
+  {
+    "userId": "101016",
+    "aliases": [
+      "101016",
+      "101016",
+      "01211081515",
+      "101016"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/f4bILQ08QnI:APA91bGGVkVcPOWFRcOM6tdU5LOHPLlV-mK42BauTPkXp2x887h08GiO3lxitLLaJrhvwtvD03LczdR8qNs-petl2vlgTV3biD5xh0VSgo4qmEKFJOF_q31l661vndqVgZj07pFuG5Ua",
+    "keys": {
+      "p256dh": "BCraEJccwD5_erW80b4CN9-GTLA_Q6S-AoBXbkXjHnaVWzVO2nr0TEro_nMIatWt6SaOjP6HI4TdESBjfVB92LY",
+      "auth": "JsTzTBBwl99__37qLPZHBw"
+    },
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/24.0 Chrome/117.0.0.0 Safari/537.36",
+    "updatedAt": 1789761199536
+  },
+  {
+    "userId": "101945",
+    "aliases": [
+      "101945",
+      "101945",
+      "01508058935",
+      "101945"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dHz8MeA1fFA:APA91bHsRObui2QycMapokEAgjqWsKHzXbiRwXd7sKS2BWtwPsV9ZlbQAyyKtRF6c1FvcoBqJ2buF-RFcyIF_vn5ICUPlzYoam5hlb9Y7u02Gjk98YrwlgLf89EzatvdnO3PCiXB4ytQ",
+    "keys": {
+      "p256dh": "BK1zhFGzxJSvvBjG_PfzVTZx9s52T5uAH9ptAfXOotcQwnjklz_zasbv7-ByNxrwscbNT1MqR1JmE1VbDYQHUGI",
+      "auth": "KQQ8IuBVN1dBuRiPJbYHog"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790010116247
+  },
+  {
+    "userId": "101068",
+    "aliases": [
+      "101068",
+      "101068",
+      "01279200072",
+      "101068"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eRZkhtfQC7k:APA91bFEVTga1Z2Sx5R1gOATnUi-wt3WXOAOfk_I61d1_8VgvlmGE2k9q_lctUcuSC_mEqF8_YoF1MJJL7KTkAZTqKIrsDZ_6rBliL7lnVpVwGp4oTtcTFLM5bWFYMsLOihhBB9p0Akn",
+    "keys": {
+      "p256dh": "BBlrHkbcTq9aCg_4RG678nt00KQQ8yd4PNUaOmoOC0QpE1z89GlIsT_0uVYmYA6Wzfi_mW46Tl_PqZRQR5KD3M4",
+      "auth": "DewDD0LAnlF-sj2G2fGYsw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789808375657
+  },
+  {
+    "userId": "101016",
+    "aliases": [
+      "101016",
+      "01211081515",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fp9QTsw6-yw:APA91bFXtV7VxTnipBYRSdSs9RT3e2nzw7oeQvGcV9cXXHf7cMHw8UValyJ5tXRmid0FqWKow0wuQ7a-VO6bLfTwhCEjglidEtCuOVaJ244ntCT2vGYrv4l7He2rsMNQXDXmxRl1YFEb",
+    "keys": {
+      "p256dh": "BFNLSn2BI35uA57P8_aG1QVJyNajgQJCr2vJ4FnJseFZ9ykq92CsirHBpR1huwfbi3NC4_2IFVPgVaunkv6OjEQ",
+      "auth": "2Jsq0mB5R47TkQLsfAMokw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+    "updatedAt": 1789762267653
+  },
+  {
+    "userId": "101644",
+    "aliases": [
+      "101644",
+      "101644",
+      "01276365393",
+      "101644"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fLtFASsItgo:APA91bHYCXuvOMZZ1rRbkxcgzMyyKsTNuoLVcCyH9OTTu49-kwvN-MJe1fSXtbj8FeHcaRerspO59tXbOB8jGKsMcUM7LVUog2FZeVAt4i4RK8xJtA5Ym7VUS23_Byi2T6wGvRXVO0pG",
+    "keys": {
+      "p256dh": "BN5JdnWtNze9oCc4lmaqQz6U6GVdw0elrztcU7F4PNger66ieSXDOLJRBk2WVemcnlt84OtliWvT1oaCoRGl6UA",
+      "auth": "1oPdJd4ciT9rQraMpcGawQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790136100382
+  },
+  {
+    "userId": "101209",
+    "aliases": [
+      "101209",
+      "101209",
+      "01030410983",
+      "101209"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eGnZQ7mKMKw:APA91bG_pw0dWWsp0c9W9D40rxvL2mE4y81JZIVthYhFO3afJbQSOEndsi2ZtpQtaa5D4zINo0HnZywDmKf_J-HwG6exOlGYAUaV9-MZokmfMasWZ-ec-IpLHmVUykC9FbpIsChxGZgF",
+    "keys": {
+      "p256dh": "BL6XP1dhjqsR9sqee_jtXOsHXBgl82UmMYO1BbZ0lJYuE7Z5X4HAocjZN0_FBphCEAr5Yvfhn_1pvYuAq2gx_g8",
+      "auth": "in8LFeQBvJqUi9m3zX8nVw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789744404200
+  },
+  {
+    "userId": "101709",
+    "aliases": [
+      "101709",
+      "101709",
+      "01280145717",
+      "101709"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fI-oJhWse2A:APA91bFFa2ZpK40xNZOWO4XIUBNDgT8PuhXWsdyNmiAvDn2oesWaY0YHvI45tpcMbw9AVEVAZmMJuuJtUgQmovJEagPlUyT1ACkXIYXbrYj_wQZvyqK44t2_FU5fFlSxTXdFmzWZlnnE",
+    "keys": {
+      "p256dh": "BEDxMxAMcVudrgGrTD0-397D-chxc7gtBex18NuTtu7WN0YtKSWrjIEwmsYX36iCcrfG_x4Z0s4_rBCDBR-xHnQ",
+      "auth": "mhRIDzoscVBUrvK42laHmA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789772394107
+  },
+  {
+    "userId": "101920",
+    "aliases": [
+      "101920",
+      "01211676119",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cCzOkKNx9mY:APA91bFgxGP4o0bp5auBGimr4X10-WDqIY6VIaagAZTNp04GXcT7cpN8uH4Ku213zDS6kbUfdC76k47XT-FXuhvXvGBv43FmqjHAc6a9fp3mEND8YgWjbJD2gBzXQM1ji1DusD5c9DNm",
+    "keys": {
+      "p256dh": "BCCxe8saNFTWdc0_7raTS8-0j5f0hwTMHX1EtE5P3rLYK5Nz-fF3l-vjs-S-epUcs7xKTNl_6dRvDVld659sD5M",
+      "auth": "OiRhdzI1aQQP2R9_c7JhSg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789925093873
+  },
+  {
+    "userId": "101211",
+    "aliases": [
+      "101211",
+      "101211",
+      "01097519212",
+      "101211"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dS4ULv_Zw6s:APA91bGKsFaKqhIcTg_JfE-gmy-Df4j3u5Fp97EXzYpOPXiKz2KGwxRjiAvPuKKNWGx3VqonvRwAvYrha_EfGXIjicmGEJuZZ2AMmh-dKUK2vKOXTwPZqbYNo3t3CKwlYWWbf-LhdXHo",
+    "keys": {
+      "p256dh": "BHKDddHZY4cmrgZoTxgQwD5YvwRy3sIFT2gunliJZ4S7t3LDyl-MmxQo77gTkSytcR3RiT6B46NB2_bUehDpauU",
+      "auth": "iNzZ_eEnVlBBK5MMOZfIMw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789918552619
+  },
+  {
+    "userId": "101640",
+    "aliases": [
+      "101640",
+      "101640",
+      "01212935598",
+      "101640"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dsw6Jjs6zJY:APA91bFErbon6mhf1NJKdH3hiinfJRu0Nt6PzQ1Difro7D-5zgTJSbCiz0B-uYSS5IwcJp-DVTIroXsMk3K24qI5_JdxIveULPJR2F4QJMnM1PT5XjBzIDs0d8T1kPoFQPmRe384-hpF",
+    "keys": {
+      "p256dh": "BMwj756QWaeE5JKcQBI4YSjbV6DnRh9sbk__xlFwapRZaTtq0rv-QAnssSOKxS0vrdh4VLPAcJfyIFO4HnSwRro",
+      "auth": "FLFcbbl-CezemIrEFTJ1FQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789726680134
+  },
+  {
+    "userId": "101166",
+    "aliases": [
+      "101166",
+      "01205060869",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/f9OZVGcFrj8:APA91bGQfL8VjzLdMmBi7JI8IU8AEKx2FZvYvOzZKaMCSuDDmCDe-XjZnAGlv5RlASVNpjwajo4D-7MszTnnXxaQppr0STYLuSb1cRZYkG8F6joEEeAJDOlKPfUr1KwITmS1GVVCDHbx",
+    "keys": {
+      "p256dh": "BLNbN2nG25GNjpy3Ps0vwkWpqCxpW4oXftvOaYPJAHz3aUfHwL54d_-vf74eyDBkneTEtD9aB_soj0vxlkYvRiM",
+      "auth": "uIJE9y-mestK2H9Dxvc8pw"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790103638865
+  },
+  {
+    "userId": "101937",
+    "aliases": [
+      "101937",
+      "101937",
+      "01202946159",
+      "101937"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/ejE6jMOntFg:APA91bGP_Cn8A0W_akH997UWEgF66S9T8RRgExyChWSjc2Qz1XfjSp_Wpt5ov73RHAv4IputEYkT8C9_Nkul_OFXkzDbrOH3zdojOe4K-LXGDjqnpvzYlhFJmJnWD4U75epm47ErmWRM",
+    "keys": {
+      "p256dh": "BKvWpXVN9D0V_Qk320taU-6VU8lnMw1JsNABmplTUE93t4FWHjjbwEV2A3DZXDOtiWSRucjiwTNXVNVU6V3Ytg8",
+      "auth": "6Mg0x9iYL6HHmfmkJLue5g"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790107187695
+  },
+  {
+    "userId": "101787",
+    "aliases": [
+      "101787",
+      "101787",
+      "01094002709",
+      "101787"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fe41DrWrBxg:APA91bHpc2ukXSq6sKq5gaL58bGcWE1ZoEnPNdJdoXPY-50R49E_39pI8MLuw4lEze-0AAPMjIMUHo83cHWHjWwdhUDz6PN7_DAZ1yo1aCW1nemJVUovmJykXwlzUzDxrzXzr1Ar_5Yn",
+    "keys": {
+      "p256dh": "BAl4LjAfWj3LmHLYWBQIknUZ5nUsvbPOrobgVBdUqeNRAWDdYs4b_lE9ijFF2hBWHGuksKMiAsF9z12AsBv5ciU",
+      "auth": "UzkS-RFX7gppDXKvJKxGEg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "updatedAt": 1790093747906
+  },
+  {
+    "userId": "101735",
+    "aliases": [
+      "101964",
+      "101735",
+      "01283127875",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://web.push.apple.com/QJSEFqX6s6GVTuC1OeS4ELq5aBXpUJKWFK01oUzCmquh_Pt-uUusJ4wBVmfSKjy1XQfRXVrIRlJ2epg1CZvafZcft7rwKIevXn8DfdE9331sPimUj_2O-0oQmTeZaygdOws4KE-u-BUaNH8NK3k2sseI86U8lZb0yLpPjGHwi2M",
+    "keys": {
+      "p256dh": "BAI0mpkRvr-rOm1iAldJkgaWR4CbZcyrNSsSlbCBJKihDQdIaIoZgTB7yhav_Vc0ESCgHvml2bVK3TuvmeUCT64",
+      "auth": "JQu0E6x6Jem65ufzij3odg"
+    },
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Mobile/15E148 Safari/604.1",
+    "updatedAt": 1790094132114
+  },
+  {
+    "userId": "101036",
+    "aliases": [
+      "101036",
+      "101036",
+      "01152793710",
+      "101036"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/fh3Y0mPtyus:APA91bEr_afNqpK6-GHDUAsGLxg-AiuC1lftgHlh9Ae_ehwuPBCkRxGOo4fHxzciXZQGYB8dbM3UlAQaTiyw54fTVvdt32OQHUf9chztbkNGVVli3RryXYyA4OfS2jnW5z3qm-vMnMsF",
+    "keys": {
+      "p256dh": "BMrvwcWNG6li08e0eb4YrG6ob5Xz_N8aWGPSuS-guhCeeBxXWrqBt9upMJfxg5jeHyX28VK5rL_W94Hg2Le4Jr0",
+      "auth": "Ij-C3zksCNZoIYa5H64vWQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790096868815
+  },
+  {
+    "userId": "101394",
+    "aliases": [
+      "101394",
+      "01284741007",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eJ_EwnmJEqE:APA91bHLv9tOBjmTfQAYdQgdnzEx_RBs5IDBrEFRUjUYyn8yM2GpqsuPXNSFy1F6znFd2iDu3GfcOd5HB3wAjoK2bdOycxAAzhk7O-IEwGVnpM9LAoEin5Z4R47pumnxUQgIj6oDH44m",
+    "keys": {
+      "p256dh": "BHDDyBMxHrgtuqCScUbatw8zVFdrT7HtiKyf-vaCRtdDN5c64IQ4QVYYm3kuDHzW03_XOFcG4i78jAs0Qskb9Q0",
+      "auth": "NgvYepIb6efL22WQX6aKFQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790000243131
+  },
+  {
+    "userId": "101387",
+    "aliases": [
+      "101387",
+      "101387",
+      "01276584514",
+      "101387"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/dJPGBJ3q41Y:APA91bFAyQwWHzGdRmJCm5C50I6iWG9Zo5RsS2g5MhjJ_oRuu5fVgrBDdafNy3-f_W2c1V-oCi0h4z9Av8ZG5HWSkiY6ScvXx1c9tax_zYvrC-Spw3LSdOLVV6JAoLGR517mF99RjNJq",
+    "keys": {
+      "p256dh": "BKVH23ZSHZm_TcFbY-YZXd-JsQ1f82V4J9NrJmufuSaRvQ4CCCv3dUd-AIDLfYERsIa8XEF6wSkqrR8G-J1QZrI",
+      "auth": "J2fCImNkJWXQ-4Z9x8J9EA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789719780581
+  },
+  {
+    "userId": "101320",
+    "aliases": [
+      "101320",
+      "101320",
+      "01275182646",
+      "101320"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/erPJUljPaoo:APA91bFRL_-h0EgXFsrz0zYHyFZQLBV_-_SHkrXwgIt3XlAepPjbw-c_FyD3y4o0vs2rvDPllag-o8Tl2yB8T3kMImk0T02v3JxaIOdESWb49atzopzNhK5tQJaJ9BVu7bTcbkyPIYex",
+    "keys": {
+      "p256dh": "BJHLmn1g26B6u4YPHYQL6biCLFTuCoqyaxlRlIqugBZKoOke60arME26kIqgDhX0kzcN1sX0uKvqoqVlQ98uebg",
+      "auth": "MNS02ihwKsFRYPWIhJw_3A"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790000432418
+  },
+  {
+    "userId": "101384",
+    "aliases": [
+      "101384",
+      "101384",
+      "01212672650",
+      "101384"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/c38Ew6m11uk:APA91bEsgYoYZzE2Q2B2CbVdBmI8DhOU_SKy5ZpHukqfPQ32R5MCg2rBDNDbyE_vzYWN6BJ0Oqfe1WC4zMtbSfD2FeG4prvkuwJCFovMS2dgMH4C0_SDZA0QuqncLLGMLJCJvPdgO7mS",
+    "keys": {
+      "p256dh": "BMaxBjf9x4NDTXbF2mkgkFkuwXo_OQIer3d2H-mrOsO_5F6m4HqfVSpy0N25KeoQ5QG75tk4KiLjsU5L8y1gEYk",
+      "auth": "jWh3qMfDSMkCf99eWPgrKQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790110741337
+  },
+  {
+    "userId": "101860",
+    "aliases": [
+      "101860",
+      "101860",
+      "01286767390",
+      "101860"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/eAZQ5T6klZ4:APA91bGr3nYLFoAUj4hlG1M4fOKCceBfvXhBukmSaYG7i2K3xMyJLbQN2f_kyQW02rMyfj31afTuB8l4w0dGRU4tCegdbn722yQkjBfSPKSy2Xf0fqKCWBZtaZGAL3lhrNUgCTiqqbFO",
+    "keys": {
+      "p256dh": "BOzNzELfBJVo1-I0d_RqQ7ERcwkLASf5nOISXOBGmyadOXJN_Abo5povcQFNYbbaf4PXMHOU5ghnataOa-W-SKk",
+      "auth": "khrNJi-rkCEC5DKMKCsApA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789642938307
+  },
+  {
+    "userId": "101356",
+    "aliases": [
+      "101356",
+      "101356",
+      "01128169902",
+      "101356"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/f0QrHgI2w_M:APA91bHKOafXgj0C-7xIMCByinUMFQ3alIiioa-bIWTV-SF3fV0vwItFj-WXyRaV8GoYtfOJt4UcsacO9nt43sT0CA_tfsHusC0pHTA2STAsXMjy5Q97vB2VkRI-H75IRaRbwE2nuhml",
+    "keys": {
+      "p256dh": "BO7mvW-lZQ_jWo05Rw0IK-Q90Nujw3uIt-ZzQRzXBD3yDf7QYcNnUodUNU-bHHUeCQHbAnwjS2oTFQpvCR6xlbA",
+      "auth": "kbxF5xiKBCJiyOpD5vFcVA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790095623721
+  },
+  {
+    "userId": "101099",
+    "aliases": [
+      "101099",
+      "101099",
+      "01221807958",
+      "101099"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/f1qcPhw8KF4:APA91bG-ZVeu_xiq1MBSbVik_G2G-bqpqmANVHUTfVEg4oiHvogFtnQBimZ3yWSy6vr_5CWlFrW0fOQUAQtiBwYG8m1_Dr6e47nIjMoKiL9-BH64oWY2n34YJub54qvSqK8WBh2hUHvr",
+    "keys": {
+      "p256dh": "BMSp8v06GxofmxUo6hSUEX_fd298cqeLUMNJRlh4fewLBkM1beauGvvKBrS15KYqHCwlJgYhJBf_liL9WT9sv0o",
+      "auth": "yIh8vNRtPMd9ItlobbPFdg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789990861349
+  },
+  {
+    "userId": "101094",
+    "aliases": [
+      "101094",
+      "101094",
+      "01222692230",
+      "101094"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/e0ZlcMlSP24:APA91bEXIrt5qqFMuHNJus4YcwrCR9un9RqXKNe4nY9kNiKWK_dQdn0hWJHHyfzhQKPSnhhu4Q6BxOilyzLzekJM8UZ6xLMnJp9MqQyqb0Q7jBRuS404f2c6QyI7u7F2oP5thO0zOLWG",
+    "keys": {
+      "p256dh": "BJ1qdwrjDklXOlMEk1b6uvOlIIUhQfWl-JdfHNcnl1UGjFl4U7QtVGCG6W_xQlt1XXEzOM7sXXp35nrjjpLKyeQ",
+      "auth": "tWyGiooxo_CxOntiL8elCg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789930177603
+  },
+  {
+    "userId": "101107",
+    "aliases": [
+      "101107",
+      "01274754347",
+      "0"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/ci1yiLtp5B0:APA91bHqigZ9KKlLqRFjgB9azgwLBcV5t8ay40kfAQw-1h1xVY8aer7dvgrLyvsbcJuj6ScyOovElFgZVSdvWNryDIBg_8GIYrxu8LWAYK6RkK6bITbpCMKHKrUnQs2QTPZ3r_uMkbMN",
+    "keys": {
+      "p256dh": "BI7wnE6UuJOGMdsicHr0zS6WeBPrygXR0iOqtigO_dP3fAv9JtpwqBGEenJiqmPBP0sM-MtKqi9W8o_W7yxnX_U",
+      "auth": "gfTOuF5xg4ctkVes34-7LQ"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/30.0 Chrome/143.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789900573243
+  },
+  {
+    "userId": "101107",
+    "aliases": [
+      "101107",
+      "101107",
+      "01274754347",
+      "101107"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/d99_PBiGSp4:APA91bFF3GD2H5zPpBe0ejUMgUDS7-bgBJIs3sFv-tt4q7y6lepyNeNYOsrYyxdnAVKYeyuxheESUxR4YpanmgWVqawHyPmDVWz-V3wdM8tsPN9U5v8N54OaiGm-pGDkX_0FwsMcGo1A",
+    "keys": {
+      "p256dh": "BEA5NxhM2F6ROMYXNrRbbrdZ4NO3_Th2aMvGG5YKknghFTvh1R_szozlSOYHypoJqFQ6KQKB5j36WHoTK5i8aZ0",
+      "auth": "zH_5kB-A1XJZFhRG9OSBOg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/30.0 Chrome/143.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789900573028
+  },
+  {
+    "userId": "101731",
+    "aliases": [
+      "101731",
+      "101731",
+      "01037315317",
+      "101731"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/e-mgteVwKLY:APA91bEYzShlJ_uBiDmOsoSrfddAlGC5t-eY90wJ1IOPIBfrlpEOoQyIfjtGzCyWpD8oVqo-HnV1YofdjUNBaTvzCDVvZ-4B4Lq8PROIJEF7gZiDjQuuvZdo09gOf-HmzciOo8fEIg8-",
+    "keys": {
+      "p256dh": "BIm-XoLBH_HfT12c21FplW2m0p3V4jQQ90E8yXkPmchtSwDK9vdCEwfVZLnyWNcxXzwPRj0sPOmbchoqvujHjO4",
+      "auth": "6-xypqEZrTwtzm9Ww62uyA"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1789900272820
+  },
+  {
+    "userId": "101938",
+    "aliases": [
+      "101938",
+      "101938",
+      "01025032273",
+      "101938"
+    ],
+    "userRole": "parent",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/cT9fKSb2_sk:APA91bHHbxu31cx4FYbjE47QN2hNXTTMgkfSjQ6X_G_h6AL8mhY-zbr68OdRzX-YTpVhmALfqCpPcqX8kqk8ZDq5hrtkqx5keIE_T6saH4ppqHF0X9-ZhsGAADWNwLHnXa4DoAgX9WU8",
+    "keys": {
+      "p256dh": "BPhmtKEIg--1FdZRt8zQ0UrR6e8xn5aTQVO3_IjPK_szcw8fC-m1-qtoKSJiorF7BmkpGb85BkXOuULzvRAiVyw",
+      "auth": "OLoiuZWdcrethcBSNVbQLg"
+    },
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "updatedAt": 1790136618711
   }
 ]
