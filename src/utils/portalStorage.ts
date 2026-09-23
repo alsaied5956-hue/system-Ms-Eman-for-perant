@@ -399,7 +399,10 @@ export async function syncParentAccountsFromCloud(force: boolean = false): Promi
                 if (Array.isArray(acc.linkedBarcodes) && acc.linkedBarcodes.some((lb) => allDeletedTombstones.has(normalizeBarcode(lb)))) {
                   continue;
                 }
-                reconciled[bCode] = acc;
+                reconciled[bCode] = {
+                  ...acc,
+                  password: acc.password || local[bCode]?.password || "",
+                };
               }
 
               saveLocalParentAccounts(reconciled);

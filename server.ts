@@ -852,22 +852,14 @@ app.post("/api/portal/login", (req, res) => {
   }
 });
 
-// Parent Accounts Sync & Save (Sanitized: Passwords Stripped)
+// Parent Accounts Sync & Save (Preserve credentials for supervisor administration)
 app.get("/api/portal/accounts-sync", (_req, res) => {
   applyZeroCacheHeaders(res);
   const rawAccounts = getAllParentAccounts();
-  const sanitizedAccounts: Record<string, any> = {};
-
-  for (const [k, acc] of Object.entries(rawAccounts)) {
-    if (acc) {
-      const { password, password_hash, ...safeAcc } = acc as any;
-      sanitizedAccounts[k] = safeAcc;
-    }
-  }
 
   return res.json({
     success: true,
-    accounts: sanitizedAccounts,
+    accounts: rawAccounts,
     deletedBarcodes: getDeletedAccountBarcodes(),
     revokedBarcodes: Array.from(revokedAccountsCache.keys()),
     timestamp: Date.now(),

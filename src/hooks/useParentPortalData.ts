@@ -193,9 +193,37 @@ export function useParentPortalData(targetBarcodeOrToken?: string): UseParentPor
             console.warn("[useParentPortalData] Fast server endpoint notice, attempting direct Supabase query:", serverErr);
           }
 
-          // Resilient Fallback: If server route did not return a student, fetch directly from Supabase Cloud
+          // Resilient Fallback & Dual-Source Enrichment:
+          // If server did not return a student OR has empty homework/grades, fetch directly from Supabase Cloud
           if (!unifiedData || !unifiedData.success || !unifiedData.student) {
             unifiedData = await fetchUnifiedStudentPortalDataFromSupabase(cleanInput);
+          } else if (!unifiedData.homeworkList?.length || !unifiedData.examGradesList?.length) {
+            try {
+              const directSbData = await fetchUnifiedStudentPortalDataFromSupabase(cleanInput);
+              if (directSbData && directSbData.success) {
+                unifiedData = {
+                  ...unifiedData,
+                  homeworkList:
+                    directSbData.homeworkList && directSbData.homeworkList.length > 0
+                      ? directSbData.homeworkList
+                      : unifiedData.homeworkList,
+                  examGradesList:
+                    directSbData.examGradesList && directSbData.examGradesList.length > 0
+                      ? directSbData.examGradesList
+                      : unifiedData.examGradesList,
+                  examScores:
+                    directSbData.examScores && directSbData.examScores.length > 0
+                      ? directSbData.examScores
+                      : unifiedData.examScores,
+                  messagesList:
+                    directSbData.messagesList && directSbData.messagesList.length > 0
+                      ? directSbData.messagesList
+                      : unifiedData.messagesList,
+                };
+              }
+            } catch (enrichErr) {
+              console.warn("[useParentPortalData] Direct enrichment notice:", enrichErr);
+            }
           }
 
           if (unifiedData && unifiedData.success) {

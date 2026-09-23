@@ -945,8 +945,11 @@ export async function saveHomeworkToSupabase(records: Array<{
     for (const r of records) {
       const sId = await getStudentIdByBarcode(r.barcode);
       if (!sId) continue;
+      const bClean = String(r.barcode).trim();
       rows.push({
         student_id: sId,
+        barcode: bClean,
+        student_barcode: bClean,
         date_key: r.dateKey,
         title: "واجب الحصة",
         status: r.status,
@@ -989,9 +992,12 @@ export async function saveExamGradeToSupabase(record: {
     const notes = record.teacherNotes || `رصد درجة امتحان: ${examTitle} (${scoreFormatted})`;
 
     // 1. Save to homework table which acts as the reliable evaluation store in Supabase
+    const cleanB = String(record.barcode).trim();
     if (studentId) {
       const hwPayload = {
         student_id: studentId,
+        barcode: cleanB,
+        student_barcode: cleanB,
         date_key: examDate,
         title: examTitle,
         status: "done",
@@ -1005,7 +1011,8 @@ export async function saveExamGradeToSupabase(record: {
     // 2. Also attempt insert to exam_grades if table exists in environment
     try {
       const payload: any = {
-        barcode: String(record.barcode).trim(),
+        barcode: cleanB,
+        student_barcode: cleanB,
         exam_title: examTitle,
         score: score,
         max_score: maxScore,
