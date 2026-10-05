@@ -72,6 +72,7 @@ import {
   getSupabaseServer,
   onPortalHydrationComplete,
   normalizeBarcode,
+  initSupabaseRealtimeServerBridge,
 } from "./server/portalStore";
 import { dispatchReliableParentPush } from "./server/fcmDispatcher";
 import { initFirestoreSync, pushServerStateToFirestore } from "./server/firestoreSync";
@@ -2708,6 +2709,32 @@ async function startServer() {
       console.warn("[Push] Background subscription sync notice:", err?.message || err);
     });
     setupAutonomousBackgroundPushListeners();
+
+    // ⚡ Start Realtime Supabase Database Listener for Instant Attendance, Payments & Push Notifications
+    initSupabaseRealtimeServerBridge(
+      async (pushEvent) => {
+        try {
+          await sendWebPushToTargets({
+            targetUserIds: pushEvent.targets,
+            title: pushEvent.title,
+            body: pushEvent.body,
+            icon: "/icon.svg",
+            badge: "/icon.svg",
+            type: pushEvent.type,
+            url: pushEvent.url,
+            eventId: pushEvent.eventId,
+          });
+        } catch (err: any) {
+          console.warn("[Push] Error delivering push notification from Supabase event:", err?.message || err);
+        }
+      },
+      () => {
+        // Debounced Firestore authoritative state sync
+        pushServerStateToFirestore(db, getSystemCache()).catch((err) => {
+          console.warn("[Push] Error syncing Supabase state to Firestore:", err?.message || err);
+        });
+      }
+    );
   });
 }
 

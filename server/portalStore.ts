@@ -358,6 +358,7 @@ export async function hydrateSystemStateFromSupabase(): Promise<boolean> {
         studentIdToBarcode.set(row.id, b);
       }
       return {
+        id: row.id,
         barcode: b,
         name: row.name || "طالب بدون اسم",
         phone: row.phone && row.phone !== "0" ? String(row.phone) : "0",
@@ -550,6 +551,601 @@ export function persistStoreDebounced(): void {
       console.warn("[PortalStore] Failed saving .system_data_store.json:", e);
     }
   }, 1000);
+}
+
+export interface SupabaseRealtimePushEvent {
+  targets: string[];
+  title: string;
+  body: string;
+  type: string;
+  url: string;
+  eventId: string;
+}
+
+let activeSupabaseChannel: any = null;
+const processedDbEventIds = new Set<string>();
+
+/**
+ * ⚡ Realtime CDC Bridge between Supabase database and Parent Portal
+ * Listens to all changes in public tables (attendance_logs, payments, students, exam_grades)
+ * Updates in-memory systemDataCache, broadcasts SSE to connected apps, triggers WebPush,
+ * and calls onStateMutated to push updated state to Firestore.
+ */
+export function initSupabaseRealtimeServerBridge(
+  onPushNotification?: (event: SupabaseRealtimePushEvent) => Promise<any> | void,
+  onStateMutated?: () => void
+): () => void {
+  if (!supabaseServer) {
+    console.warn("[Supabase Realtime Bridge] Supabase server client not initialized.");
+    return () => {};
+  }
+
+  console.log("⚡ [Supabase Realtime Bridge] Subscribing server-side listener to Supabase public tables...");
+
+  const channel = supabaseServer.channel("portal-server-global-cdc");
+
+  // 1. Attendance Logs
+  channel.on(
+    "postgres_changes",
+    { event: "*", schema: "public", table: "attendance_logs" },
+    async (payload: any) => {
+      try {
+        const eventType = payload.eventType;
+        const newRow = payload.new;
+        const oldRow = payload.old;
+        const row = newRow || oldRow;
+        if (!row) return;
+
+        const barcode = String(row.barcode || "").trim();
+        const studentId = String(row.student_id || "").trim();
+        const dateKey = String(row.date_key || getTodayKey()).trim();
+        const todayKey = getTodayKey();
+
+        // Resolve student
+        let student = systemDataCache.students.find(
+          (s) => (barcode && s.barcode === barcode) || (studentId && (s.id === studentId || s.barcode === studentId))
+        );
+        if (!student && studentId && supabaseServer) {
+          try {
+            const { data: stRow } = await supabaseServer.from("students").select("*").eq("id", studentId).maybeSingle();
+            if (stRow) {
+              student = {
+                id: stRow.id,
+                barcode: stRow.barcode,
+                name: stRow.name,
+                phone: stRow.phone,
+                parentPhone: stRow.parent_phone,
+                groupGrade: stRow.grade,
+                groupDays: stRow.group_days,
+              };
+              systemDataCache.students.push(student);
+            }
+          } catch {}
+        }
+        const resolvedBarcode = barcode || student?.barcode || "";
+
+        if (eventType === "DELETE") {
+          if (dateKey && resolvedBarcode && systemDataCache.attendanceHistory[dateKey]) {
+            delete systemDataCache.attendanceHistory[dateKey][resolvedBarcode];
+          }
+          if (dateKey === todayKey && resolvedBarcode) {
+            delete systemDataCache.attendanceToday[resolvedBarcode];
+          }
+          systemDataCache.version++;
+          systemDataCache.lastUpdated = Date.now();
+          persistStoreDebounced();
+          broadcastPortalSSE({
+            type: "ATTENDANCE_DELETED",
+            barcode: resolvedBarcode,
+            dateKey,
+            timestamp: Date.now(),
+          });
+          if (onStateMutated) onStateMutated();
+          return;
+        }
+
+        // INSERT or UPDATE
+        const rawStatus = String(row.status || "حضور").trim();
+        const status = rawStatus === "غياب" || rawStatus === "غائب" ? "غائب" : rawStatus;
+
+        if (!systemDataCache.attendanceHistory[dateKey]) {
+          systemDataCache.attendanceHistory[dateKey] = {};
+        }
+        if (resolvedBarcode) {
+          systemDataCache.attendanceHistory[dateKey][resolvedBarcode] = status;
+          if (dateKey === todayKey) {
+            systemDataCache.attendanceToday[resolvedBarcode] = status;
+            systemDataCache.scanLogTimes[resolvedBarcode] = row.time_recorded || new Date().toISOString();
+          }
+        }
+
+        systemDataCache.version++;
+        systemDataCache.lastUpdated = Date.now();
+        persistStoreDebounced();
+
+        // Broadcast SSE to all connected clients
+        broadcastPortalSSE({
+          type: "scan",
+          barcode: resolvedBarcode,
+          status,
+          dateKey,
+          timeDisplay: row.time_recorded
+            ? new Date(row.time_recorded).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })
+            : "الآن",
+          studentName: student?.name || row.student_name || "الطالب",
+          timestamp: Date.now(),
+        });
+
+        if (onStateMutated) onStateMutated();
+
+        // Trigger push notification to parents
+        const eventId = `att-${resolvedBarcode}-${dateKey}-${status}-${row.id || Date.now()}`;
+        if ((eventType === "INSERT" || eventType === "UPDATE") && !processedDbEventIds.has(eventId)) {
+          processedDbEventIds.add(eventId);
+          const studentName = student?.name || row.student_name || "الطالب";
+          const timeDisplay = row.time_recorded
+            ? new Date(row.time_recorded).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })
+            : new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
+
+          let title = `🟢 تسجيل حضور: ${studentName}`;
+          let body = `تم تسجيل حضور الطالب (${studentName}) في الحصة بنجاح (${timeDisplay}).`;
+          let nType = "attendance";
+
+          if (status === "تأخير") {
+            title = `⚠️ تنبيه تأخير: ${studentName}`;
+            body = `تم تسجيل حضور الطالب (${studentName}) متأخراً عن موعد بداية الحصة (${timeDisplay}).`;
+            nType = "late";
+          } else if (status === "غائب" || status === "غياب") {
+            title = `🔴 تنبيه غياب: ${studentName}`;
+            body = `نحيطكم علماً بأنه تم تسجيل غياب الطالب (${studentName}) عن حصة اليوم (${dateKey}).`;
+            nType = "absence";
+          }
+
+          const targets: string[] = resolvedBarcode ? [resolvedBarcode] : [];
+          if (student?.parentPhone) targets.push(String(student.parentPhone).trim());
+          if (student?.phone) targets.push(String(student.phone).trim());
+
+          if (onPushNotification && targets.length > 0) {
+            onPushNotification({
+              targets,
+              title,
+              body,
+              type: nType,
+              url: `/?tab=attendance&barcode=${resolvedBarcode}`,
+              eventId,
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("[Supabase Realtime] attendance_logs handler notice:", err);
+      }
+    }
+  );
+
+  // 2. Payments
+  channel.on(
+    "postgres_changes",
+    { event: "*", schema: "public", table: "payments" },
+    async (payload: any) => {
+      try {
+        const eventType = payload.eventType;
+        const newRow = payload.new;
+        const oldRow = payload.old;
+        const row = newRow || oldRow;
+        if (!row) return;
+
+        const barcode = String(row.barcode || "").trim();
+        const studentId = String(row.student_id || "").trim();
+        const monthKey = String(row.month_key || "").trim();
+
+        let student = systemDataCache.students.find(
+          (s) => (studentId && (s.id === studentId || s.barcode === studentId)) || (barcode && s.barcode === barcode)
+        );
+        if (!student && studentId && supabaseServer) {
+          try {
+            const { data: stRow } = await supabaseServer.from("students").select("*").eq("id", studentId).maybeSingle();
+            if (stRow) {
+              student = {
+                id: stRow.id,
+                barcode: stRow.barcode,
+                name: stRow.name,
+                phone: stRow.phone,
+                parentPhone: stRow.parent_phone,
+                groupGrade: stRow.grade,
+                groupDays: stRow.group_days,
+              };
+              systemDataCache.students.push(student);
+            }
+          } catch {}
+        }
+        const resolvedBarcode = barcode || student?.barcode || "";
+
+        if (eventType === "DELETE") {
+          if (monthKey && resolvedBarcode && systemDataCache.payments[monthKey]) {
+            delete systemDataCache.payments[monthKey][resolvedBarcode];
+          }
+          systemDataCache.version++;
+          systemDataCache.lastUpdated = Date.now();
+          persistStoreDebounced();
+          broadcastPortalSSE({
+            type: "PAYMENT_DELETED",
+            barcode: resolvedBarcode,
+            monthKey,
+            timestamp: Date.now(),
+          });
+          if (onStateMutated) onStateMutated();
+          return;
+        }
+
+        const amount = Number(row.amount_paid || row.amount || 0);
+        if (monthKey && resolvedBarcode) {
+          if (!systemDataCache.payments[monthKey]) {
+            systemDataCache.payments[monthKey] = {};
+          }
+          systemDataCache.payments[monthKey][resolvedBarcode] = {
+            monthKey,
+            barcode: resolvedBarcode,
+            amount,
+            paidAmount: amount,
+            requiredAmount: Number(row.required_amount || 0),
+            discount: Number(row.discount || 0),
+            date: row.payment_date ? String(row.payment_date).slice(0, 10) : new Date().toISOString().slice(0, 10),
+            time: row.payment_date ? String(row.payment_date).slice(11, 16) : "",
+            note: row.notes || "",
+            recordedBy: row.received_by || "الإشراف",
+            timestamp: Date.now(),
+          };
+        }
+
+        systemDataCache.version++;
+        systemDataCache.lastUpdated = Date.now();
+        persistStoreDebounced();
+
+        broadcastPortalSSE({
+          type: "LIVE_PAYMENT",
+          barcode: resolvedBarcode,
+          monthKey,
+          amount,
+          studentName: student?.name || "الطالب",
+          timestamp: Date.now(),
+        });
+
+        if (onStateMutated) onStateMutated();
+
+        const eventId = `pay-${resolvedBarcode}-${monthKey}-${row.id || Date.now()}`;
+        if ((eventType === "INSERT" || eventType === "UPDATE") && !processedDbEventIds.has(eventId)) {
+          processedDbEventIds.add(eventId);
+          const studentName = student?.name || "الطالب";
+          const title = `💳 سداد مصاريف: ${studentName}`;
+          const body = `تم بنجاح سداد اشتراك شهر (${monthKey}) للطالب (${studentName}) بمبلغ ${amount} ج.م.`;
+
+          const targets: string[] = resolvedBarcode ? [resolvedBarcode] : [];
+          if (student?.parentPhone) targets.push(String(student.parentPhone).trim());
+          if (student?.phone) targets.push(String(student.phone).trim());
+
+          if (onPushNotification && targets.length > 0) {
+            onPushNotification({
+              targets,
+              title,
+              body,
+              type: "payment",
+              url: `/?tab=financials&barcode=${resolvedBarcode}`,
+              eventId,
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("[Supabase Realtime] payments handler notice:", err);
+      }
+    }
+  );
+
+  // 3. Students Table (instant updates to demographics, fees, active status)
+  channel.on(
+    "postgres_changes",
+    { event: "*", schema: "public", table: "students" },
+    async (payload: any) => {
+      try {
+        const eventType = payload.eventType;
+        const newRow = payload.new;
+        const oldRow = payload.old;
+        const row = newRow || oldRow;
+        if (!row) return;
+
+        const barcode = String(row.barcode || "").trim();
+        const id = String(row.id || "").trim();
+
+        if (eventType === "DELETE") {
+          systemDataCache.students = systemDataCache.students.filter(
+            (s) => s.barcode !== barcode && s.id !== id
+          );
+          systemDataCache.version++;
+          systemDataCache.lastUpdated = Date.now();
+          persistStoreDebounced();
+          broadcastPortalSSE({
+            type: "STUDENT_DELETED",
+            barcode,
+            id,
+            timestamp: Date.now(),
+          });
+          if (onStateMutated) onStateMutated();
+          return;
+        }
+
+        // INSERT or UPDATE
+        const idx = systemDataCache.students.findIndex(
+          (s) => (barcode && s.barcode === barcode) || (id && s.id === id)
+        );
+        const mappedStudent: StudentRecord = {
+          id: row.id,
+          barcode: row.barcode,
+          name: row.name || "طالب بدون اسم",
+          phone: row.phone && row.phone !== "0" ? String(row.phone) : "0",
+          parentPhone: row.parent_phone && row.parent_phone !== "0" ? String(row.parent_phone) : "0",
+          groupGrade: row.grade || "الصف الرابع الابتدائي",
+          groupDays: row.group_days || "سبت - إثنين - أربعاء",
+          points: Number(row.points || 0),
+          totalAttendanceDays: Number(row.total_attendance_days || 0),
+          totalAbsentDays: Number(row.total_absent_days || 0),
+          customMonthlyFee: row.monthly_fee !== undefined ? Number(row.monthly_fee) : undefined,
+          notes: row.notes || undefined,
+          createdAt: row.created_at || undefined,
+        };
+
+        if (idx >= 0) {
+          systemDataCache.students[idx] = {
+            ...systemDataCache.students[idx],
+            ...mappedStudent,
+          };
+        } else {
+          systemDataCache.students.push(mappedStudent);
+        }
+
+        systemDataCache.version++;
+        systemDataCache.lastUpdated = Date.now();
+        persistStoreDebounced();
+
+        broadcastPortalSSE({
+          type: "STUDENT_UPDATED",
+          barcode,
+          student: mappedStudent,
+          timestamp: Date.now(),
+        });
+
+        if (onStateMutated) onStateMutated();
+      } catch (err) {
+        console.warn("[Supabase Realtime] students handler notice:", err);
+      }
+    }
+  );
+
+  // 4. Homework & Evaluations Table (Where exam grades & assessments are actually stored in Supabase)
+  channel.on(
+    "postgres_changes",
+    { event: "*", schema: "public", table: "homework" },
+    async (payload: any) => {
+      try {
+        const eventType = payload.eventType;
+        const newRow = payload.new;
+        if ((eventType !== "INSERT" && eventType !== "UPDATE") || !newRow) return;
+
+        const studentId = String(newRow.student_id || "").trim();
+        const barcode = String(newRow.barcode || newRow.student_barcode || "").trim();
+        let student = systemDataCache.students.find(
+          (s) => (studentId && (s.id === studentId || s.barcode === studentId)) || (barcode && s.barcode === barcode)
+        );
+        if (!student && studentId && supabaseServer) {
+          try {
+            const { data: stRow } = await supabaseServer.from("students").select("*").eq("id", studentId).maybeSingle();
+            if (stRow) {
+              student = {
+                id: stRow.id,
+                barcode: stRow.barcode,
+                name: stRow.name,
+                phone: stRow.phone,
+                parentPhone: stRow.parent_phone,
+                groupGrade: stRow.grade,
+                groupDays: stRow.group_days,
+              };
+              systemDataCache.students.push(student);
+            }
+          } catch {}
+        }
+
+        const resolvedBarcode = student?.barcode || barcode || "";
+        const studentName = student?.name || "الطالب";
+        const hasScore = newRow.score !== null && newRow.score !== undefined && !isNaN(Number(newRow.score));
+        if (!hasScore) return;
+
+        const score = Number(newRow.score) || 0;
+        const maxScore = Number(newRow.max_score) || 20;
+        const title = newRow.title || "التقييم الدوري";
+
+        const eventId = `hw-grade-${resolvedBarcode}-${newRow.id || Date.now()}-${score}`;
+        if (!processedDbEventIds.has(eventId)) {
+          processedDbEventIds.add(eventId);
+          const targets: string[] = resolvedBarcode ? [resolvedBarcode] : [];
+          if (student?.parentPhone) targets.push(String(student.parentPhone).trim());
+          if (student?.phone) targets.push(String(student.phone).trim());
+
+          if (onPushNotification && targets.length > 0) {
+            onPushNotification({
+              targets,
+              title: `📝 رصد درجة: ${title}`,
+              body: `تم رصد درجة الطالب (${studentName}) في ${title}: (${score} / ${maxScore}).`,
+              type: "grade",
+              url: `/?tab=exams&barcode=${resolvedBarcode}`,
+              eventId,
+            });
+          }
+        }
+
+        broadcastPortalSSE({
+          type: "GRADE_POSTED",
+          barcode: resolvedBarcode,
+          grade: {
+            id: newRow.id,
+            title,
+            score,
+            maxScore,
+            date: newRow.date_key,
+            notes: newRow.notes,
+          },
+          timestamp: Date.now(),
+        });
+
+        if (onStateMutated) onStateMutated();
+      } catch (err) {
+        console.warn("[Supabase Realtime] homework handler notice:", err);
+      }
+    }
+  );
+
+  channel.subscribe((status: string, err: any) => {
+    if (status === "SUBSCRIBED") {
+      console.log("✅ [Supabase Realtime Bridge] Successfully subscribed to public tables on server!");
+    } else if (status === "CHANNEL_ERROR") {
+      console.warn("⚠️ [Supabase Realtime Bridge] Subscription warning:", err);
+    }
+  });
+
+  activeSupabaseChannel = channel;
+
+  // 5. Fail-Safe 30-Second Reconciliation Safety Net
+  let lastAttCheck = new Date(Date.now() - 60000).toISOString();
+  let lastPayCheck = new Date(Date.now() - 60000).toISOString();
+
+  const reconcileInterval = setInterval(async () => {
+    try {
+      if (!supabaseServer) return;
+      const currentAttCheck = new Date().toISOString();
+
+      const { data: newAtts } = await supabaseServer
+        .from("attendance_logs")
+        .select("*")
+        .gt("created_at", lastAttCheck)
+        .order("created_at", { ascending: true });
+
+      if (Array.isArray(newAtts) && newAtts.length > 0) {
+        for (const row of newAtts) {
+          const barcode = String(row.barcode || "").trim();
+          const dateKey = String(row.date_key || getTodayKey()).trim();
+          const status = String(row.status || "حضور").trim();
+          const eventId = `att-${barcode}-${dateKey}-${status}-${row.id}`;
+
+          if (!processedDbEventIds.has(eventId)) {
+            processedDbEventIds.add(eventId);
+            const student = systemDataCache.students.find((s) => s.barcode === barcode);
+            const studentName = student?.name || row.student_name || "الطالب";
+            const timeDisplay = row.time_recorded
+              ? new Date(row.time_recorded).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })
+              : "الآن";
+
+            let title = `🟢 تسجيل حضور: ${studentName}`;
+            let body = `تم تسجيل حضور الطالب (${studentName}) في الحصة بنجاح (${timeDisplay}).`;
+            let nType = "attendance";
+
+            if (status === "تأخير") {
+              title = `⚠️ تنبيه تأخير: ${studentName}`;
+              body = `تم تسجيل حضور الطالب (${studentName}) متأخراً عن موعد بداية الحصة (${timeDisplay}).`;
+              nType = "late";
+            } else if (status === "غائب" || status === "غياب") {
+              title = `🔴 تنبيه غياب: ${studentName}`;
+              body = `نحيطكم علماً بأنه تم تسجيل غياب الطالب (${studentName}) عن حصة اليوم.`;
+              nType = "absence";
+            }
+
+            const targets: string[] = [barcode];
+            if (student?.parentPhone) targets.push(String(student.parentPhone).trim());
+            if (student?.phone) targets.push(String(student.phone).trim());
+
+            if (onPushNotification) {
+              onPushNotification({
+                targets,
+                title,
+                body,
+                type: nType,
+                url: `/?tab=attendance&barcode=${barcode}`,
+                eventId,
+              });
+            }
+          }
+        }
+      }
+      lastAttCheck = currentAttCheck;
+
+      const currentPayCheck = new Date().toISOString();
+      const { data: newPays } = await supabaseServer
+        .from("payments")
+        .select("*")
+        .gt("created_at", lastPayCheck)
+        .order("created_at", { ascending: true });
+
+      if (Array.isArray(newPays) && newPays.length > 0) {
+        for (const row of newPays) {
+          const studentId = String(row.student_id || "").trim();
+          let student = systemDataCache.students.find(
+            (s) => (studentId && (s.id === studentId || s.barcode === studentId)) || (row.barcode && s.barcode === row.barcode)
+          );
+          if (!student && studentId && supabaseServer) {
+            try {
+              const { data: stRow } = await supabaseServer.from("students").select("*").eq("id", studentId).maybeSingle();
+              if (stRow) {
+                student = {
+                  id: stRow.id,
+                  barcode: stRow.barcode,
+                  name: stRow.name,
+                  phone: stRow.phone,
+                  parentPhone: stRow.parent_phone,
+                  groupGrade: stRow.grade,
+                  groupDays: stRow.group_days,
+                };
+                systemDataCache.students.push(student);
+              }
+            } catch {}
+          }
+          const barcode = student?.barcode || String(row.barcode || "").trim();
+          const monthKey = String(row.month_key || "").trim();
+          const eventId = `pay-${barcode}-${monthKey}-${row.id}`;
+
+          if (!processedDbEventIds.has(eventId)) {
+            processedDbEventIds.add(eventId);
+            const studentName = student?.name || "الطالب";
+            const amount = Number(row.amount_paid || 0);
+
+            const title = `💳 سداد مصاريف: ${studentName}`;
+            const body = `تم بنجاح سداد اشتراك شهر (${monthKey}) للطالب (${studentName}) بمبلغ ${amount} ج.م.`;
+
+            const targets: string[] = barcode ? [barcode] : [];
+            if (student?.parentPhone) targets.push(String(student.parentPhone).trim());
+            if (student?.phone) targets.push(String(student.phone).trim());
+
+            if (onPushNotification && targets.length > 0) {
+              onPushNotification({
+                targets,
+                title,
+                body,
+                type: "payment",
+                url: `/?tab=financials&barcode=${barcode}`,
+                eventId,
+              });
+            }
+          }
+        }
+      }
+      lastPayCheck = currentPayCheck;
+    } catch {}
+  }, 30000);
+
+  return () => {
+    clearInterval(reconcileInterval);
+    if (activeSupabaseChannel) {
+      try {
+        supabaseServer.removeChannel(activeSupabaseChannel);
+      } catch {}
+      activeSupabaseChannel = null;
+    }
+  };
 }
 
 let saveAccountsTimeout: NodeJS.Timeout | null = null;

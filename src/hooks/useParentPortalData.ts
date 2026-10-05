@@ -68,13 +68,24 @@ export async function fetchChildTableWithDualKey(
 
     let q = supabase.from(tableName).select("*");
 
-    if (tableName === "payments") {
+    if (tableName === "payments" || tableName === "homework") {
       if (!sId) return [];
       q = q.eq("student_id", sId);
+    } else if (tableName === "exam_grades" || tableName === "evaluations") {
+      // Table does not exist in Supabase; evaluations are stored in homework
+      return [];
+    } else if (tableName === "attendance_logs") {
+      if (sId && bCode) {
+        q = q.or(`student_id.eq.${sId},barcode.eq.${bCode}`);
+      } else if (sId) {
+        q = q.eq("student_id", sId);
+      } else if (bCode) {
+        q = q.eq("barcode", bCode);
+      }
     } else if (tableName === "chat_messages" || tableName === "messages") {
       const chatFilter = bCode && sId
-        ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode},chat_id.eq.${bCode}`
-        : dualKeyFilter;
+        ? `student_id.eq.${sId},barcode.eq.${bCode},chat_id.eq.${bCode}`
+        : sId ? `student_id.eq.${sId}` : `barcode.eq.${bCode},chat_id.eq.${bCode}`;
       q = q.or(chatFilter);
     } else {
       q = q.or(dualKeyFilter);
@@ -91,12 +102,21 @@ export async function fetchChildTableWithDualKey(
     // Direct fallback without order column in case column is not indexed
     if (res.error && orderCol) {
       let retryQ = supabase.from(tableName).select("*");
-      if (tableName === "payments") {
-        if (sId) retryQ = retryQ.eq("student_id", sId);
+      if (tableName === "payments" || tableName === "homework") {
+        if (!sId) return [];
+        retryQ = retryQ.eq("student_id", sId);
+      } else if (tableName === "attendance_logs") {
+        if (sId && bCode) {
+          retryQ = retryQ.or(`student_id.eq.${sId},barcode.eq.${bCode}`);
+        } else if (sId) {
+          retryQ = retryQ.eq("student_id", sId);
+        } else if (bCode) {
+          retryQ = retryQ.eq("barcode", bCode);
+        }
       } else if (tableName === "chat_messages" || tableName === "messages") {
         const chatFilter = bCode && sId
-          ? `student_id.eq.${sId},student_barcode.eq.${bCode},barcode.eq.${bCode},chat_id.eq.${bCode}`
-          : dualKeyFilter;
+          ? `student_id.eq.${sId},barcode.eq.${bCode},chat_id.eq.${bCode}`
+          : sId ? `student_id.eq.${sId}` : `barcode.eq.${bCode},chat_id.eq.${bCode}`;
         retryQ = retryQ.or(chatFilter);
       } else {
         retryQ = retryQ.or(dualKeyFilter);

@@ -1315,46 +1315,27 @@ export async function saveFullSystemStateToSupabase(data: SystemData): Promise<b
 
   isSnapshotSaveInProgress = true;
   try {
-    const compression = await compressData(data);
-    const payload = {
-      sender_role: "admin",
-      sender_name: "system_state_snapshot",
-      message: compression.compressedString,
-      is_read: true,
-    };
-
-    const { data: inserted, error } = await supabase
-      .from("chat_messages")
-      .insert(payload)
-      .select("id");
-
-    if (error) {
-      console.warn("[Supabase Snapshot] Insert failed:", error.message);
-      return false;
+    if (Array.isArray(data.students) && data.students.length > 0) {
+      const studentBatchSize = 100;
+      for (let i = 0; i < data.students.length; i += studentBatchSize) {
+        const chunk = data.students.slice(i, i + studentBatchSize).map((s) => ({
+          barcode: String(s.barcode).trim(),
+          name: s.name || "طالب بدون اسم",
+          phone: String(s.phone || ""),
+          parent_phone: String(s.parentPhone || s.phone || "00000000000"),
+          grade: s.groupGrade || "الصف الرابع الابتدائي",
+          group_days: s.groupDays || "سبت - إثنين - أربعاء",
+          monthly_fee: Number(s.customMonthlyFee) || 0,
+          notes: s.notes || s.discountReason || "",
+          points: Number(s.points) || 0,
+        }));
+        await supabase.from("students").upsert(chunk, { onConflict: "barcode" });
+      }
     }
-
     lastSavedSnapshotTime = Date.now();
-    console.log("[Supabase Snapshot] Successfully saved state to Supabase (Zero Quota Limit).");
-
-    // Prune older snapshots asynchronously (keep latest 3)
-    setTimeout(async () => {
-      try {
-        const { data: list } = await supabase
-          .from("chat_messages")
-          .select("id, created_at")
-          .eq("sender_name", "system_state_snapshot")
-          .order("created_at", { ascending: false });
-
-        if (list && list.length > 3) {
-          const toDelete = list.slice(3).map((r) => r.id);
-          await supabase.from("chat_messages").delete().in("id", toDelete);
-        }
-      } catch {}
-    }, 2000);
-
     return true;
   } catch (err) {
-    console.warn("[Supabase Snapshot] Save error:", err);
+    console.warn("[Supabase State Save] error:", err);
     return false;
   } finally {
     isSnapshotSaveInProgress = false;
@@ -1362,27 +1343,21 @@ export async function saveFullSystemStateToSupabase(data: SystemData): Promise<b
 }
 
 /**
- * Pull full system state from Supabase (Snapshot + Live DB Records)
- * Fast sub-500ms latency, 100% resilient across GitHub deployments, Vercel, and new devices.
+ * Pull full system state directly from authentic Supabase tables (students, payments, attendance, homework, exam_grades)
+ * Fast sub-500ms latency, 100% resilient, zero dependency on stale chat_messages snapshots.
  */
 export async function pullFullStateFromSupabase(): Promise<Partial<SystemData> | null> {
   if (!isSupabaseConfigured()) return null;
 
   try {
-    // 1. Fetch live tables in parallel
-    const [snapshotRes, studentsRes, paymentsRes] = await executeFastQuery(
+    // 1. Fetch live tables in parallel directly from source of truth
+    const [studentsRes, paymentsRes] = await executeFastQuery(
       () =>
         Promise.allSettled([
-          supabase
-            .from("chat_messages")
-            .select("message, created_at")
-            .eq("sender_name", "system_state_snapshot")
-            .order("created_at", { ascending: false })
-            .limit(1),
           supabase.from("students").select("*"),
           supabase.from("payments").select("*"),
         ]),
-      5000,
+      6000,
       "استعلام الطلاب والمدفوعات من Supabase"
     );
 
@@ -1405,81 +1380,69 @@ export async function pullFullStateFromSupabase(): Promise<Partial<SystemData> |
       }
     }
 
-    // 3. Fetch homework / exams with pagination
+    // 3. Fast fetch for scored evaluations & exams (sub-300ms, avoids pulling 33k rows in a loop)
     const allHomework: any[] = [];
-    let hwPage = 0;
-    while (true) {
-      try {
-        const { data, error } = await supabase
-          .from("homework")
-          .select("*")
-          .range(hwPage * pageSize, (hwPage + 1) * pageSize - 1);
-        if (error || !data || data.length === 0) break;
+    try {
+      const { data, error } = await supabase
+        .from("homework")
+        .select("*")
+        .not("score", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(2500);
+      if (!error && Array.isArray(data)) {
         allHomework.push(...data);
-        if (data.length < pageSize) break;
-        hwPage++;
-      } catch {
-        break;
       }
+    } catch (e) {
+      console.warn("[pullFullStateFromSupabase] Homework fetch warning:", e);
     }
 
-    let baseState: Partial<SystemData> = {};
+    // 4. Dedicated exam_grades (if exists)
+    let allExamGrades: any[] = [];
 
-    if (
-      snapshotRes.status === "fulfilled" &&
-      snapshotRes.value.data &&
-      snapshotRes.value.data.length > 0 &&
-      snapshotRes.value.data[0].message
-    ) {
-      try {
-        const decompressed = await decompressData<SystemData>(snapshotRes.value.data[0].message);
-        if (decompressed && typeof decompressed === "object" && Array.isArray(decompressed.students)) {
-          baseState = decompressed;
-          console.log(`[Supabase Pull] Restored snapshot with ${decompressed.students.length} students.`);
-        }
-      } catch (decompErr) {
-        console.warn("[Supabase Pull] Snapshot decompression notice:", decompErr);
-      }
-    }
+    const baseState: Partial<SystemData> = {
+      students: [],
+      payments: {},
+      attendanceHistory: {},
+      attendanceToday: {},
+    };
 
     // Build student id to barcode map
     const studentIdToBarcode = new Map<string, string>();
 
-    // Merge students table
-    if (studentsRes.status === "fulfilled" && studentsRes.value.data && studentsRes.value.data.length > 0) {
+    // Authoritative students table
+    if (studentsRes.status === "fulfilled" && Array.isArray(studentsRes.value.data) && studentsRes.value.data.length > 0) {
       const studentMap = new Map<string, any>();
-      (baseState.students || []).forEach((s) => {
-        if (s && s.barcode) studentMap.set(String(s.barcode).trim(), s);
-      });
 
       studentsRes.value.data.forEach((row: any) => {
-        const b = String(row.barcode).trim();
+        const b = String(row.barcode || "").trim();
         if (row.id && b) {
           studentIdToBarcode.set(row.id, b);
         }
-        const existing = studentMap.get(b) || {};
         studentMap.set(b, {
-          ...existing,
           id: row.id,
           barcode: b,
-          name: row.name || existing.name || "طالب بدون اسم",
-          phone: row.phone && row.phone !== "0" ? row.phone : existing.phone || "0",
-          parentPhone: row.parent_phone && row.parent_phone !== "0" ? row.parent_phone : existing.parentPhone || "0",
-          groupGrade: row.grade || existing.groupGrade || "الصف الرابع الابتدائي",
-          groupDays: row.group_days || existing.groupDays || "سبت - إثنين - أربعاء",
-          groupTime: row.group_time || existing.groupTime || "04:00 م",
-          customMonthlyFee: row.monthly_fee !== undefined && row.monthly_fee !== null ? Number(row.monthly_fee) : existing.customMonthlyFee,
-          discountReason: row.notes || existing.discountReason,
-          notes: row.notes || existing.notes,
+          name: row.name || "طالب بدون اسم",
+          phone: row.phone && row.phone !== "0" ? String(row.phone) : "0",
+          parentPhone: row.parent_phone && row.parent_phone !== "0" ? String(row.parent_phone) : "0",
+          groupGrade: row.grade || "الصف الرابع الابتدائي",
+          groupDays: row.group_days || "سبت - إثنين - أربعاء",
+          groupTime: row.group_time || "04:00 م",
+          customMonthlyFee: row.monthly_fee !== undefined && row.monthly_fee !== null ? Number(row.monthly_fee) : undefined,
+          discountReason: row.notes || undefined,
+          notes: row.notes || undefined,
+          points: Number(row.points || 0),
+          totalAttendanceDays: Number(row.total_attendance_days || 0),
+          totalAbsentDays: Number(row.total_absent_days || 0),
+          createdAt: row.created_at || undefined,
         });
       });
 
       baseState.students = Array.from(studentMap.values());
     }
 
-    // Merge payments table (using student_id to barcode mapping)
-    if (paymentsRes.status === "fulfilled" && paymentsRes.value.data && paymentsRes.value.data.length > 0) {
-      const paymentsMap: Record<string, Record<string, any>> = baseState.payments ? { ...baseState.payments } : {};
+    // Authoritative payments table (using student_id to barcode mapping)
+    if (paymentsRes.status === "fulfilled" && Array.isArray(paymentsRes.value.data) && paymentsRes.value.data.length > 0) {
+      const paymentsMap: Record<string, Record<string, any>> = {};
       paymentsRes.value.data.forEach((p: any) => {
         const mKey = p.month_key;
         const b = p.barcode ? String(p.barcode).trim() : (p.student_id ? studentIdToBarcode.get(p.student_id) : null);
@@ -1487,6 +1450,7 @@ export async function pullFullStateFromSupabase(): Promise<Partial<SystemData> |
         if (!paymentsMap[mKey]) paymentsMap[mKey] = {};
         paymentsMap[mKey][b] = {
           monthKey: mKey,
+          barcode: b,
           amount: Number(p.amount_paid || 0),
           paidAmount: Number(p.amount_paid || 0),
           requiredAmount: Number(p.required_amount || 0),
@@ -1502,31 +1466,42 @@ export async function pullFullStateFromSupabase(): Promise<Partial<SystemData> |
       baseState.payments = paymentsMap;
     }
 
-    // Merge attendance records from paginated results
-    const history: Record<string, Record<string, string>> = baseState.attendanceHistory ? { ...baseState.attendanceHistory } : {};
+    // Authoritative attendance records from paginated results
+    const history: Record<string, Record<string, string>> = {};
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const todayAtt: Record<string, string> = {};
+
     if (allAttendanceLogs.length > 0) {
       allAttendanceLogs.forEach((att: any) => {
         const dKey = att.date_key;
         const b = att.barcode ? String(att.barcode).trim() : (att.student_id ? studentIdToBarcode.get(att.student_id) : null);
         if (!dKey || !b) return;
         if (!history[dKey]) history[dKey] = {};
-        history[dKey][b] = att.status || "حضور";
+        const rawStatus = String(att.status || "حضور").trim();
+        const status = rawStatus === "غياب" || rawStatus === "غائب" ? "غائب" : rawStatus;
+        history[dKey][b] = status;
+        if (dKey === todayKey) {
+          todayAtt[b] = status;
+        }
       });
       baseState.attendanceHistory = history;
+      baseState.attendanceToday = todayAtt;
     }
 
-    // Merge homework and exam records from paginated results
-    if (allHomework.length > 0) {
+    // Authoritative homework and exam records
+    const combinedExams = [...allExamGrades, ...allHomework];
+    if (combinedExams.length > 0) {
       const studentExamsMap = new Map<string, any[]>();
-      allHomework.forEach((hw: any) => {
-        const b = hw.barcode ? String(hw.barcode).trim() : (hw.student_id ? studentIdToBarcode.get(hw.student_id) : null);
+      combinedExams.forEach((hw: any) => {
+        const b = hw.barcode || hw.student_barcode ? String(hw.barcode || hw.student_barcode).trim() : (hw.student_id ? studentIdToBarcode.get(hw.student_id) : null);
         if (!b) return;
         const rawGrade = hw.grade !== undefined ? hw.grade : (hw.score !== undefined ? hw.score : hw.degree);
         const hasScore = rawGrade !== null && rawGrade !== undefined && rawGrade !== "";
         const isExam =
           hasScore ||
           (typeof hw.notes === "string" && (hw.notes.includes("امتحان") || hw.notes.includes("اختبار") || hw.notes.includes("تقييم") || hw.notes.includes("درجة") || hw.notes.includes("رصد"))) ||
-          (typeof hw.title === "string" && (hw.title.includes("امتحان") || hw.title.includes("اختبار") || hw.title.includes("تقييم")));
+          (typeof hw.title === "string" && (hw.title.includes("امتحان") || hw.title.includes("اختبار") || hw.title.includes("تقييم"))) ||
+          (typeof hw.exam_title === "string");
 
         if (isExam) {
           if (!studentExamsMap.has(b)) studentExamsMap.set(b, []);
@@ -1535,28 +1510,8 @@ export async function pullFullStateFromSupabase(): Promise<Partial<SystemData> |
       });
 
       if (baseState.students) {
-        // Calculate true attendance and absence from attendance logs
-        const clientAttCounts = new Map<string, { present: number; absent: number }>();
-        if (history) {
-          for (const dKey of Object.keys(history)) {
-            const dayMap = history[dKey];
-            if (dayMap && typeof dayMap === "object") {
-              for (const [bCode, st] of Object.entries(dayMap)) {
-                if (!clientAttCounts.has(bCode)) clientAttCounts.set(bCode, { present: 0, absent: 0 });
-                const counts = clientAttCounts.get(bCode)!;
-                if (st === "حضور" || st === "present") counts.present++;
-                else if (st === "غياب" || st === "absent") counts.absent++;
-              }
-            }
-          }
-        }
-
         baseState.students = baseState.students.map((s: any) => {
           const b = String(s.barcode || "").trim();
-          const counts = clientAttCounts.get(b);
-          const attDays = counts ? counts.present : (s.totalAttendanceDays || 0);
-          const absDays = counts ? counts.absent : (s.totalAbsentDays || 0);
-
           const exams = studentExamsMap.get(b);
           if (exams && exams.length > 0) {
             const newest = exams[0];
@@ -1572,18 +1527,12 @@ export async function pullFullStateFromSupabase(): Promise<Partial<SystemData> |
 
             return {
               ...s,
-              totalAttendanceDays: attDays,
-              totalAbsentDays: absDays,
-              lastExamTitle: s.lastExamTitle || newest.title || "التقييم الدوري",
-              lastExamScore: s.lastExamScore || scoreFormatted,
-              totalExamScores: (s.totalExamScores && s.totalExamScores.length > 0) ? s.totalExamScores : allPcts,
+              lastExamTitle: newest.exam_title || newest.title || newest.subject || "التقييم الدوري",
+              lastExamScore: scoreFormatted,
+              totalExamScores: allPcts,
             };
           }
-          return {
-            ...s,
-            totalAttendanceDays: attDays,
-            totalAbsentDays: absDays,
-          };
+          return s;
         });
       }
     }
@@ -1603,12 +1552,16 @@ export function subscribeToDatabaseChanges(onStateChange: () => void): () => voi
     .channel("supabase-db-sync-channel")
     .on(
       "postgres_changes",
-      { event: "*", schema: "public", table: "chat_messages" },
-      (payload) => {
-        const record = payload.new as any;
-        if (record && record.sender_name === "system_state_snapshot") {
-          onStateChange();
-        }
+      { event: "*", schema: "public", table: "attendance_logs" },
+      () => {
+        onStateChange();
+      }
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "payments" },
+      () => {
+        onStateChange();
       }
     )
     .on(
@@ -1620,7 +1573,14 @@ export function subscribeToDatabaseChanges(onStateChange: () => void): () => voi
     )
     .on(
       "postgres_changes",
-      { event: "*", schema: "public", table: "payments" },
+      { event: "*", schema: "public", table: "exam_grades" },
+      () => {
+        onStateChange();
+      }
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "homework" },
       () => {
         onStateChange();
       }
@@ -2223,10 +2183,15 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
             } else if (bCode) {
               q = q.eq("barcode", bCode);
             }
-          } else {
-            // For homework, payments, chat_messages: student_id is the foreign key
+          } else if (tableName === "payments" || tableName === "homework") {
             if (!sId) return [];
             q = q.eq("student_id", sId);
+          } else if (tableName === "exam_grades" || tableName === "evaluations") {
+            return [];
+          } else {
+            if (!sId && !bCode) return [];
+            if (sId) q = q.eq("student_id", sId);
+            else if (bCode) q = q.eq("barcode", bCode);
           }
 
           if (orderCol) {
@@ -2250,9 +2215,15 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
               if (sId && bCode) retryQ = retryQ.or(`student_id.eq.${sId},barcode.eq.${bCode}`);
               else if (sId) retryQ = retryQ.eq("student_id", sId);
               else if (bCode) retryQ = retryQ.eq("barcode", bCode);
-            } else {
+            } else if (tableName === "payments" || tableName === "homework") {
               if (!sId) return [];
               retryQ = retryQ.eq("student_id", sId);
+            } else if (tableName === "exam_grades" || tableName === "evaluations") {
+              return [];
+            } else {
+              if (!sId && !bCode) return [];
+              if (sId) retryQ = retryQ.eq("student_id", sId);
+              else if (bCode) retryQ = retryQ.eq("barcode", bCode);
             }
             const retryRes = await Promise.race([retryQ, timeoutPromise]);
             if (retryRes && !retryRes.error && Array.isArray(retryRes.data)) {
@@ -2267,10 +2238,11 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
       };
 
       // Parallel direct queries to all sub-tables for authentic sub-second responses
-      const [attendance, homework, payments, chatMessages] = await Promise.all([
+      const [attendance, homework, payments, examGrades, chatMessages] = await Promise.all([
         querySubTableDirect("attendance_logs", "date_key", false),
         querySubTableDirect("homework", "date_key", false),
         querySubTableDirect("payments", "month_key", false),
+        querySubTableDirect("exam_grades", "created_at", false),
         querySubTableDirect("chat_messages", "created_at", true),
       ]);
 
@@ -2279,7 +2251,7 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
         attendance_logs: attendance,
         homework,
         payments,
-        exam_grades: [],
+        exam_grades: examGrades,
         chat_messages: chatMessages,
       };
     };
@@ -2486,7 +2458,7 @@ export async function fetchUnifiedStudentPortalDataFromSupabase(
         const pct = maxScore > 0 ? Math.min(100, Math.round((score / maxScore) * 100)) : 100;
         examGradesMap.set(key, {
           id: h.id || `eval-${idx}`,
-          studentId: sId,
+          studentId: h.student_id || studentRow.id,
           barcode: bCode,
           examTitle: rawTitle || "تقييم دوري",
           title: rawTitle || "تقييم دوري",

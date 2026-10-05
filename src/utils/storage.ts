@@ -1514,42 +1514,28 @@ export async function pullLatestCloudDataImmediately(force = false): Promise<boo
 
   pullInFlightPromise = (async () => {
     try {
-      // 1. Direct Firestore Cloud Pull FIRST (Authoritative Primary Database of the Main Platform)
-      if (!isQuotaExceeded || Date.now() >= quotaExceededUntil) {
-        try {
-          await ensureFirebaseAuth();
-        } catch {}
+      // 1. Direct Supabase Cloud Pull FIRST (Authoritative Primary Database of the Main Platform)
+      try {
+        const supabaseData = await pullFullStateFromSupabase();
+        if (supabaseData && Array.isArray(supabaseData.students) && supabaseData.students.length > 0) {
+          const currentLocal = loadLocalData();
+          const merged = mergeCloudDataWithLocal(currentLocal, supabaseData);
 
-        try {
-          const systemDocRef = doc(db, "system_state", "main_center_data");
-          const snapshot = await withTimeout(getDoc(systemDocRef), 8000, "Timeout pulling Firestore main data");
-
-          if (snapshot && snapshot.exists()) {
-            const val = snapshot.data();
-            if (val) {
-              const cloudObj: Partial<SystemData> = await resolvePayloadFromSnapshot(val);
-              if (cloudObj && Array.isArray(cloudObj.students) && cloudObj.students.length > 0) {
-                const currentLocal = loadLocalData();
-                const merged = mergeCloudDataWithLocal(currentLocal, cloudObj);
-
-                lastSyncedDataHash = JSON.stringify(merged);
-                localStorage.setItem(PENDING_SYNC_KEY, "false");
-                saveToLocalStorage(merged, false);
-                notifySyncStatusChange();
-                notifyCloudDataListeners(merged);
-                if (typeof window !== "undefined") {
-                  window.dispatchEvent(new CustomEvent("center-data-updated", { detail: merged }));
-                }
-
-                lastSnapshotReceivedAt = Date.now();
-                lastSuccessfulPullTime = Date.now();
-                return true;
-              }
-            }
+          lastSyncedDataHash = JSON.stringify(merged);
+          localStorage.setItem(PENDING_SYNC_KEY, "false");
+          saveToLocalStorage(merged, false);
+          notifySyncStatusChange();
+          notifyCloudDataListeners(merged);
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("center-data-updated", { detail: merged }));
           }
-        } catch (fsErr) {
-          console.warn("[Storage] Firestore direct pull notice:", fsErr);
+
+          lastSnapshotReceivedAt = Date.now();
+          lastSuccessfulPullTime = Date.now();
+          return true;
         }
+      } catch (sbErr) {
+        console.warn("[Storage] Supabase authoritative pull notice:", sbErr);
       }
 
       // 2. HTTP ETag sync from local Express server cache (<5ms)
@@ -1590,25 +1576,42 @@ export async function pullLatestCloudDataImmediately(force = false): Promise<boo
         // Fall through
       }
 
-      // 3. Fallback: only if local storage has 0 students and cloud/server were unreachable
-      const localCheck = loadLocalData();
-      if (!Array.isArray(localCheck.students) || localCheck.students.length === 0) {
+      // 3. Fallback to Firestore if Supabase was unreachable
+      if (!isQuotaExceeded || Date.now() >= quotaExceededUntil) {
         try {
-          const supabaseData = await pullFullStateFromSupabase();
-          if (supabaseData && Array.isArray(supabaseData.students) && supabaseData.students.length > 0) {
-            const merged = mergeCloudDataWithLocal(localCheck, supabaseData);
-            lastSyncedDataHash = JSON.stringify(merged);
-            localStorage.setItem(PENDING_SYNC_KEY, "false");
-            saveToLocalStorage(merged, false);
-            notifySyncStatusChange();
-            notifyCloudDataListeners(merged);
-            if (typeof window !== "undefined") {
-              window.dispatchEvent(new CustomEvent("center-data-updated", { detail: merged }));
-            }
-            lastSuccessfulPullTime = Date.now();
-            return true;
-          }
+          await ensureFirebaseAuth();
         } catch {}
+
+        try {
+          const systemDocRef = doc(db, "system_state", "main_center_data");
+          const snapshot = await withTimeout(getDoc(systemDocRef), 6000, "Timeout pulling Firestore main data");
+
+          if (snapshot && snapshot.exists()) {
+            const val = snapshot.data();
+            if (val) {
+              const cloudObj: Partial<SystemData> = await resolvePayloadFromSnapshot(val);
+              if (cloudObj && Array.isArray(cloudObj.students) && cloudObj.students.length > 0) {
+                const currentLocal = loadLocalData();
+                const merged = mergeCloudDataWithLocal(currentLocal, cloudObj);
+
+                lastSyncedDataHash = JSON.stringify(merged);
+                localStorage.setItem(PENDING_SYNC_KEY, "false");
+                saveToLocalStorage(merged, false);
+                notifySyncStatusChange();
+                notifyCloudDataListeners(merged);
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new CustomEvent("center-data-updated", { detail: merged }));
+                }
+
+                lastSnapshotReceivedAt = Date.now();
+                lastSuccessfulPullTime = Date.now();
+                return true;
+              }
+            }
+          }
+        } catch (fsErr) {
+          console.warn("[Storage] Firestore fallback pull notice:", fsErr);
+        }
       }
     } catch (err) {
       console.warn("Notice: Fast cloud pull on wake-up completed with fallback:", err);
@@ -1658,6 +1661,13 @@ function ensureActiveSnapshotListener() {
 
               const cloudObj: Partial<SystemData> = await resolvePayloadFromSnapshot(val);
               const currentLocal = loadLocalData();
+
+              // Safeguard: Protect fresh local / Supabase data from stale Firestore snapshots
+              const cloudTime = parseTimestamp(cloudObj.updatedAt || (val as any).updatedAt);
+              const localTime = parseTimestamp(currentLocal.updatedAt);
+              if (cloudTime && localTime && cloudTime < localTime - 5000) {
+                return;
+              }
 
               // Perform intelligent multi-device 3-way merge
               const merged = mergeCloudDataWithLocal(currentLocal, cloudObj);
