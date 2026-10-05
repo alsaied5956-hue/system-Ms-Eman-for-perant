@@ -44,7 +44,7 @@ import {
   getGeminiClient,
   executeWithRetry,
   cleanAndParseJSON,
-} from "./server/geminiService";
+} from "./server/geminiService.ts";
 import {
   getSystemCache,
   recordLiveScan,
@@ -73,9 +73,9 @@ import {
   onPortalHydrationComplete,
   normalizeBarcode,
   initSupabaseRealtimeServerBridge,
-} from "./server/portalStore";
-import { dispatchReliableParentPush } from "./server/fcmDispatcher";
-import { initFirestoreSync, pushServerStateToFirestore } from "./server/firestoreSync";
+} from "./server/portalStore.ts";
+import { dispatchReliableParentPush } from "./server/fcmDispatcher.ts";
+import { initFirestoreSync, pushServerStateToFirestore } from "./server/firestoreSync.ts";
 
 const fbApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 const db = getFirestore(fbApp, (firebaseConfig as any).firestoreDatabaseId || undefined);
@@ -432,17 +432,32 @@ app.post("/api/portal/live-scan", async (req, res) => {
         ? "⚠️ تنبيه تأخير عن الحصة"
         : "🔴 تنبيه غياب عن الحصة";
 
-    sendWebPushToTargets({
-      targetUserIds: targets,
-      title: statusTitle,
-      body: `تم تسجيل ${status} للطالب (${finalName}) في مركز الرياضيات (${finalTime}).`,
-      type: "attendance",
-      icon: "/icon.svg",
-      badge: "/icon.svg",
-      tag: `att-${barcode}-${Date.now()}`,
-      eventId: `att-${barcode}-${status}-${Date.now()}`,
-      url: "/?tab=attendance",
-    }).catch((e) => console.info("[LiveScan] Push notice:", e?.message || e));
+    // Send instant push via integrated FCM & WebPush engine
+    dispatchReliableParentPush(
+      {
+        targetUserIds: targets,
+        role: "parent",
+        title: statusTitle,
+        body: `تم تسجيل ${status} للطالب (${finalName}) في مركز الرياضيات (${finalTime}).`,
+        type: "attendance",
+        url: "/?tab=attendance",
+        eventId: `att-${barcode}-${status}-${Date.now()}`,
+      },
+      async (targetIds, payload) => {
+        const wpRes = await sendWebPushToTargets({
+          targetUserIds: targetIds,
+          title: statusTitle,
+          body: `تم تسجيل ${status} للطالب (${finalName}) في مركز الرياضيات (${finalTime}).`,
+          type: "attendance",
+          icon: "/icon.svg",
+          badge: "/icon.svg",
+          tag: `att-${barcode}-${Date.now()}`,
+          eventId: `att-${barcode}-${status}-${Date.now()}`,
+          url: "/?tab=attendance",
+        });
+        return { sent: wpRes.sent, failed: wpRes.failed };
+      }
+    ).catch((e) => console.info("[LiveScan] Push notice:", e?.message || e));
 
     return res.json({ success: true, scanInfo: result.scanInfo });
   } catch (err: any) {
@@ -2714,16 +2729,30 @@ async function startServer() {
     initSupabaseRealtimeServerBridge(
       async (pushEvent) => {
         try {
-          await sendWebPushToTargets({
-            targetUserIds: pushEvent.targets,
-            title: pushEvent.title,
-            body: pushEvent.body,
-            icon: "/icon.svg",
-            badge: "/icon.svg",
-            type: pushEvent.type,
-            url: pushEvent.url,
-            eventId: pushEvent.eventId,
-          });
+          await dispatchReliableParentPush(
+            {
+              targetUserIds: pushEvent.targets,
+              role: "parent",
+              title: pushEvent.title,
+              body: pushEvent.body,
+              type: pushEvent.type,
+              url: pushEvent.url,
+              eventId: pushEvent.eventId,
+            },
+            async (targets, payload) => {
+              const wpRes = await sendWebPushToTargets({
+                targetUserIds: targets,
+                title: pushEvent.title,
+                body: pushEvent.body,
+                icon: "/icon.svg",
+                badge: "/icon.svg",
+                type: pushEvent.type,
+                url: pushEvent.url,
+                eventId: pushEvent.eventId,
+              });
+              return { sent: wpRes.sent, failed: wpRes.failed };
+            }
+          );
         } catch (err: any) {
           console.warn("[Push] Error delivering push notification from Supabase event:", err?.message || err);
         }

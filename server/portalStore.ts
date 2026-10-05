@@ -175,28 +175,62 @@ export function getTodayKey(): string {
   return `${year}-${month}-${day}`;
 }
 
-// Load baseline on module load: 100% Cloud-Authoritative from Firestore
+export function resolveNotificationTarget(barcode?: string, parentPhone?: string): string[] {
+  const cleanB = normalizeBarcode(barcode);
+  if (cleanB && cleanB !== "0") return [cleanB];
+  const cleanP = normalizePhone(parentPhone);
+  if (cleanP && cleanP.length >= 8 && cleanP !== "0") return [cleanP];
+  return [];
+}
+
+// Load baseline on module load: 100% Persistent & Cloud-Authoritative
 export function initPortalStore(): void {
   try {
-    // Delete any legacy disk store file to avoid local disk corruption
+    // 1. Instantly load authoritative local persistent disk store if available (726 real students)
     if (fs.existsSync(STORE_PATH)) {
       try {
-        fs.unlinkSync(STORE_PATH);
-      } catch {}
+        const diskRaw = fs.readFileSync(STORE_PATH, "utf8");
+        const parsed = JSON.parse(diskRaw);
+        if (parsed && typeof parsed === "object") {
+          if (Array.isArray(parsed.students) && parsed.students.length > 0) {
+            systemDataCache.students = parsed.students;
+          }
+          if (parsed.attendanceHistory && typeof parsed.attendanceHistory === "object") {
+            systemDataCache.attendanceHistory = parsed.attendanceHistory;
+          }
+          if (parsed.attendanceToday && typeof parsed.attendanceToday === "object") {
+            systemDataCache.attendanceToday = parsed.attendanceToday;
+          }
+          if (parsed.scanLogTimes && typeof parsed.scanLogTimes === "object") {
+            systemDataCache.scanLogTimes = parsed.scanLogTimes;
+          }
+          if (Array.isArray(parsed.scanLogOrder)) {
+            systemDataCache.scanLogOrder = parsed.scanLogOrder;
+          }
+          if (parsed.payments && typeof parsed.payments === "object") {
+            systemDataCache.payments = parsed.payments;
+          }
+          if (parsed.groupPrices && typeof parsed.groupPrices === "object") {
+            systemDataCache.groupPrices = parsed.groupPrices;
+          }
+          if (Array.isArray(parsed.usersList) && parsed.usersList.length > 0) {
+            systemDataCache.usersList = parsed.usersList;
+          }
+          if (Array.isArray(parsed.platformMessages)) {
+            systemDataCache.platformMessages = parsed.platformMessages;
+          }
+          if (parsed.gradeWhatsAppLinks && typeof parsed.gradeWhatsAppLinks === "object") {
+            systemDataCache.gradeWhatsAppLinks = parsed.gradeWhatsAppLinks;
+          }
+          if (parsed.activeSessionSlotId) {
+            systemDataCache.activeSessionSlotId = parsed.activeSessionSlotId;
+          }
+          console.log(`[PortalStore] Loaded ${systemDataCache.students.length} real students and full history from persistent store.`);
+        }
+      } catch (diskErr) {
+        console.warn("[PortalStore] Persistent store parse notice:", diskErr);
+      }
     }
-
-    systemDataCache.students = [];
-    systemDataCache.attendanceHistory = {};
-    systemDataCache.attendanceToday = {};
-    systemDataCache.scanLogTimes = {};
-    systemDataCache.scanLogOrder = [];
-    systemDataCache.payments = {};
-    systemDataCache.groupPrices = {};
-    systemDataCache.usersList = [];
-    systemDataCache.platformMessages = [];
-    systemDataCache.gradeWhatsAppLinks = {};
-    systemDataCache.activeSessionSlotId = "";
-    console.log("[PortalStore] Initialized clean: ready for 100% cloud hydration from Firestore.");
     // 3. Load Parent Accounts
     if (fs.existsSync(ACCOUNTS_PATH)) {
       try {
@@ -661,6 +695,7 @@ export function initSupabaseRealtimeServerBridge(
 
         systemDataCache.version++;
         systemDataCache.lastUpdated = Date.now();
+        invalidateStudentPortalMicroCache(resolvedBarcode);
         persistStoreDebounced();
 
         // Broadcast SSE to all connected clients
@@ -701,9 +736,7 @@ export function initSupabaseRealtimeServerBridge(
             nType = "absence";
           }
 
-          const targets: string[] = resolvedBarcode ? [resolvedBarcode] : [];
-          if (student?.parentPhone) targets.push(String(student.parentPhone).trim());
-          if (student?.phone) targets.push(String(student.phone).trim());
+          const targets: string[] = resolveNotificationTarget(resolvedBarcode, student?.parentPhone);
 
           if (onPushNotification && targets.length > 0) {
             onPushNotification({
@@ -799,6 +832,7 @@ export function initSupabaseRealtimeServerBridge(
 
         systemDataCache.version++;
         systemDataCache.lastUpdated = Date.now();
+        invalidateStudentPortalMicroCache(resolvedBarcode);
         persistStoreDebounced();
 
         broadcastPortalSSE({
@@ -819,9 +853,7 @@ export function initSupabaseRealtimeServerBridge(
           const title = `💳 سداد مصاريف: ${studentName}`;
           const body = `تم بنجاح سداد اشتراك شهر (${monthKey}) للطالب (${studentName}) بمبلغ ${amount} ج.م.`;
 
-          const targets: string[] = resolvedBarcode ? [resolvedBarcode] : [];
-          if (student?.parentPhone) targets.push(String(student.parentPhone).trim());
-          if (student?.phone) targets.push(String(student.phone).trim());
+          const targets: string[] = resolveNotificationTarget(resolvedBarcode, student?.parentPhone);
 
           if (onPushNotification && targets.length > 0) {
             onPushNotification({
@@ -903,6 +935,7 @@ export function initSupabaseRealtimeServerBridge(
 
         systemDataCache.version++;
         systemDataCache.lastUpdated = Date.now();
+        invalidateStudentPortalMicroCache(barcode);
         persistStoreDebounced();
 
         broadcastPortalSSE({
@@ -964,9 +997,7 @@ export function initSupabaseRealtimeServerBridge(
         const eventId = `hw-grade-${resolvedBarcode}-${newRow.id || Date.now()}-${score}`;
         if (!processedDbEventIds.has(eventId)) {
           processedDbEventIds.add(eventId);
-          const targets: string[] = resolvedBarcode ? [resolvedBarcode] : [];
-          if (student?.parentPhone) targets.push(String(student.parentPhone).trim());
-          if (student?.phone) targets.push(String(student.phone).trim());
+          const targets: string[] = resolveNotificationTarget(resolvedBarcode, student?.parentPhone);
 
           if (onPushNotification && targets.length > 0) {
             onPushNotification({
@@ -980,6 +1011,7 @@ export function initSupabaseRealtimeServerBridge(
           }
         }
 
+        invalidateStudentPortalMicroCache(resolvedBarcode);
         broadcastPortalSSE({
           type: "GRADE_POSTED",
           barcode: resolvedBarcode,
@@ -1055,9 +1087,7 @@ export function initSupabaseRealtimeServerBridge(
               nType = "absence";
             }
 
-            const targets: string[] = [barcode];
-            if (student?.parentPhone) targets.push(String(student.parentPhone).trim());
-            if (student?.phone) targets.push(String(student.phone).trim());
+            const targets: string[] = resolveNotificationTarget(barcode, student?.parentPhone);
 
             if (onPushNotification) {
               onPushNotification({
@@ -1116,9 +1146,7 @@ export function initSupabaseRealtimeServerBridge(
             const title = `💳 سداد مصاريف: ${studentName}`;
             const body = `تم بنجاح سداد اشتراك شهر (${monthKey}) للطالب (${studentName}) بمبلغ ${amount} ج.م.`;
 
-            const targets: string[] = barcode ? [barcode] : [];
-            if (student?.parentPhone) targets.push(String(student.parentPhone).trim());
-            if (student?.phone) targets.push(String(student.phone).trim());
+            const targets: string[] = resolveNotificationTarget(barcode, student?.parentPhone);
 
             if (onPushNotification && targets.length > 0) {
               onPushNotification({

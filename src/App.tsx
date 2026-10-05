@@ -207,17 +207,17 @@ export default function App() {
 
   // Pure Cloud-Only Architecture: Strict Single-Source-of-Truth
   // Initial state initializers evaluate strictly to empty arrays/objects until live Supabase fetch completes
-  const [students, setStudents] = useState<Student[]>([]);
-  const [attendanceToday, setAttendanceToday] = useState<Record<string, string>>({});
-  const [attendanceHistory, setAttendanceHistory] = useState<Record<string, Record<string, string>>>({});
-  const [scanLogOrder, setScanLogOrder] = useState<string[]>([]);
-  const [scanLogTimes, setScanLogTimes] = useState<Record<string, string>>({});
-  const [payments, setPayments] = useState<Record<string, Record<string, PaymentRecord>>>({});
-  const [groupPrices, setGroupPrices] = useState<Record<GradeName, number>>({} as Record<GradeName, number>);
-  const [usersList, setUsersList] = useState<UserAccount[]>([]);
-  const [platformMessages, setPlatformMessages] = useState<PlatformMessage[]>([]);
-  const [pendingWhatsAppMessages, setPendingWhatsAppMessages] = useState<PendingWhatsAppMessage[]>([]);
-  const [gradeWhatsAppLinks, setGradeWhatsAppLinks] = useState<Record<string, string>>({});
+  const [students, setStudents] = useState<Student[]>(() => loadInitialData().students || []);
+  const [attendanceToday, setAttendanceToday] = useState<Record<string, string>>(() => loadInitialData().attendanceToday || {});
+  const [attendanceHistory, setAttendanceHistory] = useState<Record<string, Record<string, string>>>(() => loadInitialData().attendanceHistory || {});
+  const [scanLogOrder, setScanLogOrder] = useState<string[]>(() => loadInitialData().scanLogOrder || []);
+  const [scanLogTimes, setScanLogTimes] = useState<Record<string, string>>(() => loadInitialData().scanLogTimes || {});
+  const [payments, setPayments] = useState<Record<string, Record<string, PaymentRecord>>>(() => loadInitialData().payments || {});
+  const [groupPrices, setGroupPrices] = useState<Record<GradeName, number>>(() => loadInitialData().groupPrices || ({} as Record<GradeName, number>));
+  const [usersList, setUsersList] = useState<UserAccount[]>(() => loadInitialData().usersList || []);
+  const [platformMessages, setPlatformMessages] = useState<PlatformMessage[]>(() => loadInitialData().platformMessages || []);
+  const [pendingWhatsAppMessages, setPendingWhatsAppMessages] = useState<PendingWhatsAppMessage[]>(() => loadInitialData().pendingWhatsAppMessages || []);
+  const [gradeWhatsAppLinks, setGradeWhatsAppLinks] = useState<Record<string, string>>(() => loadInitialData().gradeWhatsAppLinks || {});
   const [isWhatsAppOutboxOpen, setIsWhatsAppOutboxOpen] = useState<boolean>(false);
   const [isCloudHydrating, setIsCloudHydrating] = useState<boolean>(true);
   const [isCloudHydrated, setIsCloudHydrated] = useState<boolean>(false);

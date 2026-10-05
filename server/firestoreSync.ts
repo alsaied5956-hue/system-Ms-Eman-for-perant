@@ -5,7 +5,7 @@ import {
   setSystemDataFromCloud,
   getSystemCache,
   broadcastPortalSSE,
-} from "./portalStore";
+} from "./portalStore.ts";
 
 const STATUS_TO_CODE: Record<string, number> = { "حضور": 1, "غائب": 2, "تأخير": 3, "إذن": 4 };
 const CODE_TO_STATUS: Record<number, string> = { 1: "حضور", 2: "غائب", 3: "تأخير", 4: "إذن" };

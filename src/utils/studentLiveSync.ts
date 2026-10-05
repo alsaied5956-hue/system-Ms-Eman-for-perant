@@ -202,7 +202,82 @@ export function subscribeToStudentLiveBarcode(
     };
   } catch {}
 
-  // 3. Scoped Firestore Realtime Listener: Strictly `/students_live/{barcode}`
+  // 3. Direct Ultra-Low-Latency SSE Stream (<15ms instant connection to main system server)
+  let sseSource: EventSource | null = null;
+  try {
+    if (typeof window !== "undefined" && "EventSource" in window) {
+      sseSource = new EventSource(`/api/portal/live-stream?barcode=${encodeURIComponent(cleanBarcode)}&role=parent`);
+      sseSource.onmessage = (event) => {
+        if (isCancelled || !event?.data) return;
+        try {
+          const data = JSON.parse(event.data);
+          if (!data || typeof data !== "object") return;
+
+          let studentEvent: StudentLiveEvent | null = null;
+          if (data.type === "scan" || data.type === "attendance") {
+            studentEvent = {
+              barcode: cleanBarcode,
+              action: "attendance_change",
+              dateKey: data.dateKey,
+              attendanceStatus: data.status,
+              reason: data.reason,
+              updatedAt: data.timestamp || Date.now(),
+              version: Date.now(),
+            };
+          } else if (data.type === "LIVE_PAYMENT" || data.type === "payment") {
+            studentEvent = {
+              barcode: cleanBarcode,
+              action: "payment_change",
+              paymentMonthKey: data.monthKey,
+              paymentRecord: data.paymentRecord || {
+                barcode: cleanBarcode,
+                monthKey: data.monthKey,
+                amount: data.amount,
+                paidAmount: data.amount,
+                date: new Date().toISOString().slice(0, 10),
+                month: data.monthKey,
+              },
+              updatedAt: data.timestamp || Date.now(),
+              version: Date.now(),
+            };
+          } else if (data.type === "GRADE_POSTED" || data.type === "exam" || data.type === "grade") {
+            studentEvent = {
+              barcode: cleanBarcode,
+              action: "exam_change",
+              examScore: data.grade?.score ?? data.score,
+              examTitle: data.grade?.title ?? data.title,
+              updatedAt: data.timestamp || Date.now(),
+              version: Date.now(),
+            };
+          } else if (data.type === "STUDENT_LIVE_EVENT" && data.event) {
+            studentEvent = data.event;
+          } else if (data.type === "STUDENT_UPDATED" && data.student) {
+            studentEvent = {
+              barcode: cleanBarcode,
+              action: "update",
+              studentData: data.student,
+              updatedAt: data.timestamp || Date.now(),
+              version: Date.now(),
+            };
+          } else if (data.type === "ACCOUNT_DELETED" || data.type === "ACCOUNT_REVOKED") {
+            studentEvent = {
+              barcode: cleanBarcode,
+              action: "account_revoked",
+              reason: data.reason || "تم فصل الجلسة وإلغاء تنشيط الحساب.",
+              updatedAt: data.timestamp || Date.now(),
+              version: Date.now(),
+            };
+          }
+
+          if (studentEvent) {
+            handleIncoming(studentEvent);
+          }
+        } catch {}
+      };
+    }
+  } catch {}
+
+  // 4. Scoped Firestore Realtime Listener: Strictly `/students_live/{barcode}`
   // Add slight random jitter (50ms - 250ms) to protect quota during multi-parent traffic spikes
   let firestoreUnsub: Unsubscribe | null = null;
   const jitterMs = Math.floor(Math.random() * 200) + 50;
@@ -251,6 +326,10 @@ export function subscribeToStudentLiveBarcode(
     if (channel) {
       channel.close();
       channel = null;
+    }
+    if (sseSource) {
+      sseSource.close();
+      sseSource = null;
     }
     if (firestoreUnsub) {
       firestoreUnsub();

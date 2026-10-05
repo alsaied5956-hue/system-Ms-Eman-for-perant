@@ -977,9 +977,55 @@ function normalizeAttendanceStatus(raw: any): "حضور" | "تأخير" | "غا�
 
       // 2. Instant Invalidation / Notification of record updates
       if (ev.action === "attendance_change") {
-        playPortalAudioChime("attendance");
+        const status = ev.attendanceStatus || "حضور";
+        const isAbsence = status === "غياب" || status === "غائب";
+        const isLate = status === "تأخير";
+        const chimeType = isAbsence ? "absence" : isLate ? "delay" : "attendance";
+        playPortalAudioChime(chimeType);
+
+        const title = isAbsence
+          ? "🔴 تنبيه غياب"
+          : isLate
+          ? "⚠️ تنبيه تأخير"
+          : "🟢 تسجيل حضور";
+        const body = `تم تسجيل (${status}) للطالب (${activeStudent.name}) في الحصة.`;
+        sendPortalNotification(title, body, chimeType, { eventId: `att-${ev.dateKey}-${status}-${Date.now()}` }).catch(() => {});
+
+        if (ev.dateKey) {
+          setSupabasePortalData((prev) => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              attendanceHistory: {
+                ...(prev.attendanceHistory || {}),
+                [ev.dateKey!]: status,
+              },
+            };
+          });
+        }
+        fetchPortalData(activeStudent.barcode, true).catch(() => {});
       } else if (ev.action === "payment_change") {
         playPortalAudioChime("fee");
+        sendPortalNotification(
+          "💳 سداد مصاريف",
+          `تم تسجيل سداد مصاريف للطالب (${activeStudent.name}) بنجاح.`,
+          "payment",
+          { eventId: `pay-${ev.paymentMonthKey}-${Date.now()}` }
+        ).catch(() => {});
+        fetchPortalData(activeStudent.barcode, true).catch(() => {});
+      } else if (ev.action === "exam_change") {
+        playPortalAudioChime("grade");
+        const examTitle = ev.examTitle || "الاختبار";
+        const scoreStr = ev.examScore !== undefined && ev.examScore !== null ? `بدرجة ${ev.examScore}` : "";
+        sendPortalNotification(
+          "📝 رصد تقييم جديد",
+          `تم رصد نتيجة ${examTitle} للطالب (${activeStudent.name}) ${scoreStr}.`,
+          "grade",
+          { eventId: `exam-${Date.now()}` }
+        ).catch(() => {});
+        fetchPortalData(activeStudent.barcode, true).catch(() => {});
+      } else if (ev.action === "update") {
+        fetchPortalData(activeStudent.barcode, true).catch(() => {});
       }
     });
 

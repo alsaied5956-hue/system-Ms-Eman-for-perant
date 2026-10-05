@@ -404,6 +404,23 @@ export function normalizeAndMigratePayments(rawPayments: any): Record<string, Re
  */
 export function loadLocalData(): SystemData {
   if (memoryCachedData) return memoryCachedData;
+  if (typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object" && Array.isArray(parsed.students)) {
+          memoryCachedData = {
+            ...INITIAL_SYSTEM_DATA,
+            ...parsed,
+            students: parsed.students,
+            payments: normalizeAndMigratePayments(parsed.payments || {}),
+          };
+          return memoryCachedData;
+        }
+      }
+    } catch {}
+  }
   return INITIAL_SYSTEM_DATA;
 }
 
@@ -1514,7 +1531,42 @@ export async function pullLatestCloudDataImmediately(force = false): Promise<boo
 
   pullInFlightPromise = (async () => {
     try {
-      // 1. Direct Supabase Cloud Pull FIRST (Authoritative Primary Database of the Main Platform)
+      // 1. Fast-Path: HTTP ETag sync from local Express server cache (<5ms, holds full 726 students)
+      try {
+        const syncResp = await fetch("/api/portal/system-sync", {
+          headers: lastSystemSyncETag ? { "If-None-Match": lastSystemSyncETag } : {},
+        });
+
+        if (syncResp.status === 304) {
+          lastSnapshotReceivedAt = Date.now();
+          lastSuccessfulPullTime = Date.now();
+          localStorage.setItem(PENDING_SYNC_KEY, "false");
+        } else if (syncResp.status === 200) {
+          const etag = syncResp.headers.get("ETag");
+          if (etag) lastSystemSyncETag = etag;
+          const serverData = await syncResp.json();
+          if (serverData && typeof serverData === "object" && Array.isArray(serverData.students) && serverData.students.length > 0) {
+            const currentLocal = loadLocalData();
+            const merged = mergeCloudDataWithLocal(currentLocal, serverData);
+
+            lastSyncedDataHash = JSON.stringify(merged);
+            localStorage.setItem(PENDING_SYNC_KEY, "false");
+            saveToLocalStorage(merged, false);
+            notifySyncStatusChange();
+            notifyCloudDataListeners(merged);
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("center-data-updated", { detail: merged }));
+            }
+
+            lastSnapshotReceivedAt = Date.now();
+            lastSuccessfulPullTime = Date.now();
+          }
+        }
+      } catch (srvErr) {
+        console.warn("[Storage] Server sync fast-path notice:", srvErr);
+      }
+
+      // 2. Direct Supabase Cloud Pull (Authoritative Primary Database of the Main Platform)
       try {
         const supabaseData = await pullFullStateFromSupabase();
         if (supabaseData && Array.isArray(supabaseData.students) && supabaseData.students.length > 0) {
@@ -1536,44 +1588,6 @@ export async function pullLatestCloudDataImmediately(force = false): Promise<boo
         }
       } catch (sbErr) {
         console.warn("[Storage] Supabase authoritative pull notice:", sbErr);
-      }
-
-      // 2. HTTP ETag sync from local Express server cache (<5ms)
-      try {
-        const syncResp = await fetch("/api/portal/system-sync", {
-          headers: lastSystemSyncETag ? { "If-None-Match": lastSystemSyncETag } : {},
-        });
-
-        if (syncResp.status === 304) {
-          // 304 Not Modified: server has exact same state, zero data transfer required
-          lastSnapshotReceivedAt = Date.now();
-          lastSuccessfulPullTime = Date.now();
-          localStorage.setItem(PENDING_SYNC_KEY, "false");
-          return true;
-        } else if (syncResp.status === 200) {
-          const etag = syncResp.headers.get("ETag");
-          if (etag) lastSystemSyncETag = etag;
-          const serverData = await syncResp.json();
-          if (serverData && typeof serverData === "object" && Array.isArray(serverData.students) && serverData.students.length > 0) {
-            const currentLocal = loadLocalData();
-            const merged = mergeCloudDataWithLocal(currentLocal, serverData);
-
-            lastSyncedDataHash = JSON.stringify(merged);
-            localStorage.setItem(PENDING_SYNC_KEY, "false");
-            saveToLocalStorage(merged, false);
-            notifySyncStatusChange();
-            notifyCloudDataListeners(merged);
-            if (typeof window !== "undefined") {
-              window.dispatchEvent(new CustomEvent("center-data-updated", { detail: merged }));
-            }
-
-            lastSnapshotReceivedAt = Date.now();
-            lastSuccessfulPullTime = Date.now();
-            return true;
-          }
-        }
-      } catch {
-        // Fall through
       }
 
       // 3. Fallback to Firestore if Supabase was unreachable

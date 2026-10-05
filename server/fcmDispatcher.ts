@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { barcodeToUUID, normalizeBarcode, normalizePhone, getAllParentAccounts, getSystemCache } from "./portalStore";
+import { barcodeToUUID, normalizeBarcode, normalizePhone, getAllParentAccounts, getSystemCache } from "./portalStore.ts";
 
 const SUPABASE_URL =
   process.env.VITE_SUPABASE_URL ||
@@ -84,16 +84,32 @@ export async function queryParentAccountFCMTokens(
   let dbRows: any[] = [];
   if (supabaseServer) {
     try {
-      const uuids = cleanTargets.map((t) => barcodeToUUID(normalizeBarcode(t) || t));
-      const allSearchIds = Array.from(new Set([...cleanTargets, ...uuids]));
+      const uuids = cleanTargets
+        .map((t) => barcodeToUUID(normalizeBarcode(t) || t))
+        .filter((u) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(u));
+      const explicitUuids = cleanTargets.filter((t) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t)
+      );
+      const validUuids = Array.from(new Set([...uuids, ...explicitUuids]));
+      const validPhones = cleanTargets
+        .map(normalizePhone)
+        .filter((p) => p && p.length >= 8 && p !== "0");
+      const validBarcodes = cleanTargets
+        .map(normalizeBarcode)
+        .filter((b) => b && b !== "0");
+
+      const orClauses: string[] = [];
+      validUuids.forEach((uid) => orClauses.push(`id.eq.${uid}`));
+      validPhones.forEach((ph) => orClauses.push(`parent_phone.eq.${ph}`));
+      validBarcodes.forEach((b) => orClauses.push(`linked_student_barcodes.cs.{"${b}"}`));
 
       // Targeted query for parent_accounts by id, linked_student_barcodes, or parent_phone
       let query = supabaseServer
         .from("parent_accounts")
         .select("id, parent_phone, linked_student_barcodes, fcm_token, status");
 
-      if (allSearchIds.length > 0 && allSearchIds.length <= 50) {
-        query = query.or(allSearchIds.map((id) => `id.eq.${id},parent_phone.eq.${id}`).join(","));
+      if (orClauses.length > 0 && orClauses.length <= 50) {
+        query = query.or(orClauses.join(","));
       }
 
       const { data, error } = await query;
@@ -366,11 +382,19 @@ export async function dispatchReliableParentPush(
     rawTargets = Object.keys(all);
   }
 
-  const targetList = Array.isArray(rawTargets)
+  const rawArray = Array.isArray(rawTargets)
     ? rawTargets.map(String)
     : rawTargets
     ? [String(rawTargets)]
     : [];
+
+  const targetList = Array.from(
+    new Set(
+      rawArray
+        .map((t) => t.trim())
+        .filter((t) => t && t !== "0" && t !== "undefined" && t !== "null" && t.length > 1)
+    )
+  );
 
   const totalTargets = targetList.length;
 
@@ -506,13 +530,13 @@ export async function dispatchReliableParentPush(
     }
   }
 
-  // 4. Log summary
+  // 4. Log summary safely
   console.info(
-    `[FCM Parent Dispatcher Summary] Targets: ${totalTargets} | Tokens: ${tokensFound} | FCM Sent: ${fcmDispatched} | FCM Failed: ${fcmFailed} | WebPush: ${webPushDispatched} | Missing: ${missingTokens.length}`
+    `[FCM Parent Dispatcher] Dispatched notifications for ${totalTargets} target(s): ${fcmDispatched} via FCM, ${webPushDispatched} via WebPush (Tokens registered: ${tokensFound})`
   );
 
   return {
-    success: fcmDispatched > 0 || webPushDispatched > 0 || missingTokens.length === 0,
+    success: fcmFailed === 0,
     totalTargets,
     tokensFound,
     fcmDispatched,
