@@ -30,6 +30,7 @@ import {
   updateParentAccountStatusInSupabase,
   deleteParentAccountRecordFromSupabase,
   updateParentAccountFCMTokenInSupabase,
+  normalizeBarcode,
 } from "../../utils/supabaseClient";
 import { useGlobalRealtimeSync } from "../../hooks/useGlobalRealtimeSync";
 import { AdminActivityLog } from "../../types/portal";
@@ -272,10 +273,22 @@ export const AdminControlPanel: React.FC<AdminControlPanelProps> = ({
 
     const handledBarcodes = new Set<string>();
 
-    // 1. All enrolled students
+    // 1. All enrolled students of the main system (strictly 100% genuine enrolled students)
     for (const st of students) {
+      const cleanB = normalizeBarcode(st.barcode);
       handledBarcodes.add(st.barcode);
-      const acc = accounts[st.barcode];
+      if (cleanB) handledBarcodes.add(cleanB);
+
+      const acc =
+        accounts[st.barcode] ||
+        (cleanB ? accounts[cleanB] : undefined) ||
+        (Object.values(accounts) as ParentAccount[]).find(
+          (a) =>
+            normalizeBarcode(a?.studentBarcode) === cleanB ||
+            (Array.isArray(a?.linkedBarcodes) &&
+              a.linkedBarcodes.some((lb) => normalizeBarcode(lb) === cleanB))
+        );
+
       const status: "active" | "unactivated" | "disabled" =
         acc?.status === "active" ? "active" : acc?.status === "disabled" ? "disabled" : "unactivated";
       const phone = acc?.parentPhone || st.parentPhone || st.phone || "";
@@ -292,24 +305,6 @@ export const AdminControlPanel: React.FC<AdminControlPanelProps> = ({
         createdAt: acc?.createdAt,
         lastLoginAt: acc?.lastLoginAt,
       });
-    }
-
-    // 2. Extra parent accounts not directly in students list (if any)
-    for (const [bCode, acc] of Object.entries(accounts) as [string, ParentAccount][]) {
-      if (!handledBarcodes.has(bCode) && acc && acc.status !== "deleted") {
-        list.push({
-          barcode: bCode,
-          studentName: acc.studentName || `طالب (${bCode})`,
-          grade: "غير محدد",
-          parentPhone: acc.parentPhone,
-          status: acc.status === "disabled" ? "disabled" : "active",
-          account: acc,
-          password: acc.password,
-          linkedCount: acc.linkedBarcodes?.length || 0,
-          createdAt: acc.createdAt,
-          lastLoginAt: acc.lastLoginAt,
-        });
-      }
     }
 
     return list;

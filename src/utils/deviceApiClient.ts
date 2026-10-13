@@ -332,19 +332,25 @@ export function connectDeviceLiveStream(options: {
         } catch {}
       };
 
+      let deviceErrorCount = 0;
       eventSource.onerror = (err) => {
+        deviceErrorCount++;
         if (options.onError) options.onError(err);
         try {
           eventSource?.close();
         } catch {}
-        // إعادة المحاولة بعد 4 ثوانٍ بأمان دون تجميد المتصفح
         if (!isClosed) {
-          retryTimeout = setTimeout(connect, 4000);
+          // If 2 failures happen (e.g. static hosting on Vercel without local device server), back off quietly
+          if (deviceErrorCount >= 2) {
+            retryTimeout = setTimeout(connect, 5 * 60 * 1000);
+          } else {
+            retryTimeout = setTimeout(connect, 6000);
+          }
         }
       };
     } catch (e) {
       if (!isClosed) {
-        retryTimeout = setTimeout(connect, 4000);
+        retryTimeout = setTimeout(connect, 10000);
       }
     }
   }

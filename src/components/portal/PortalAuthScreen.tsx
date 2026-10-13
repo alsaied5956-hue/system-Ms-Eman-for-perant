@@ -106,9 +106,9 @@ export const PortalAuthScreen: React.FC<PortalAuthScreenProps> = ({
     try {
       const res = await authenticatePortalLogin(loginBarcode, loginPassword, students);
       if (res.success && res.role) {
-        setSuccessMsg(res.message);
+        setSuccessMsg("✅ " + (res.message || "تم تسجيل الدخول بنجاح! جاري فتح المنظومة..."));
         forceUpdateServiceWorker().catch(() => {});
-        // Instant instantaneous transition
+        await new Promise((r) => setTimeout(r, 350));
         onLoginSuccess(res.role, res.account, loginBarcode.trim());
       } else {
         setErrorMsg(res.message);
@@ -150,8 +150,9 @@ export const PortalAuthScreen: React.FC<PortalAuthScreenProps> = ({
         (cleanPin === "2468" || cleanPin === "admin");
 
       if (isSupervisor) {
-        setSuccessMsg("تم تسجيل دخول المشرف العام بنجاح!");
+        setSuccessMsg("✅ مرحباً بكِ! تم تسجيل دخول المشرف العام بنجاح...");
         forceUpdateServiceWorker().catch(() => {});
+        await new Promise((r) => setTimeout(r, 350));
         onLoginSuccess("admin", undefined, cleanId);
         return;
       }
@@ -159,8 +160,9 @@ export const PortalAuthScreen: React.FC<PortalAuthScreenProps> = ({
       // 2. Delegate to authentication service
       const res = await authenticatePortalLogin(cleanId, cleanPin, students);
       if (res.success && res.role === "admin") {
-        setSuccessMsg(res.message);
+        setSuccessMsg("✅ " + (res.message || "تم تسجيل دخول المشرف بنجاح!"));
         forceUpdateServiceWorker().catch(() => {});
+        await new Promise((r) => setTimeout(r, 350));
         onLoginSuccess("admin", res.account, cleanId);
       } else {
         setErrorMsg("بيانات دخول المشرف غير صحيحة. يرجى التأكد من رقم الهاتف والرمز السري (PIN).");

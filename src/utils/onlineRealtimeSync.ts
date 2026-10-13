@@ -160,7 +160,14 @@ export function initOnlineRealtimeSync(): () => void {
 
   isInitialized = true;
 
+  let consecutiveFailures = 0;
+  let sseCircuitBreakerActive = false;
+
   const connect = () => {
+    if (sseCircuitBreakerActive) {
+      return;
+    }
+
     if (eventSource) {
       try {
         eventSource.close();
@@ -188,7 +195,9 @@ export function initOnlineRealtimeSync(): () => void {
       eventSource = new EventSource(streamUrl);
 
       eventSource.onopen = () => {
-        // Connected successfully
+        // Reset failure counter on clean connection
+        consecutiveFailures = 0;
+        sseCircuitBreakerActive = false;
       };
 
       eventSource.onmessage = (event) => {
@@ -200,19 +209,38 @@ export function initOnlineRealtimeSync(): () => void {
       };
 
       eventSource.onerror = () => {
+        consecutiveFailures++;
         if (eventSource) {
           try {
             eventSource.close();
           } catch {}
           eventSource = null;
         }
-        // Auto-reconnect with 3s backoff
+
+        // Circuit breaker: If 2 consecutive failures occur (e.g. running on Vercel without local Express server)
+        // do not loop every 3 seconds. Fallback cleanly to Supabase Realtime WebSocket without exhausting Vercel quota.
+        if (consecutiveFailures >= 2) {
+          sseCircuitBreakerActive = true;
+          // Silent backoff: try once after 5 minutes or on visibility change
+          clearTimeout(reconnectTimer);
+          reconnectTimer = setTimeout(() => {
+            sseCircuitBreakerActive = false;
+            connect();
+          }, 5 * 60 * 1000);
+          return;
+        }
+
         clearTimeout(reconnectTimer);
-        reconnectTimer = setTimeout(connect, 3000);
+        reconnectTimer = setTimeout(connect, 6000);
       };
     } catch {
+      consecutiveFailures++;
+      if (consecutiveFailures >= 2) {
+        sseCircuitBreakerActive = true;
+        return;
+      }
       clearTimeout(reconnectTimer);
-      reconnectTimer = setTimeout(connect, 5000);
+      reconnectTimer = setTimeout(connect, 10000);
     }
   };
 

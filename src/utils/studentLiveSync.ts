@@ -274,6 +274,17 @@ export function subscribeToStudentLiveBarcode(
           }
         } catch {}
       };
+
+      let sseErrorCount = 0;
+      sseSource.onerror = () => {
+        sseErrorCount++;
+        if (sseErrorCount >= 2 && sseSource) {
+          try {
+            sseSource.close();
+          } catch {}
+          sseSource = null;
+        }
+      };
     }
   } catch {}
 

@@ -255,16 +255,20 @@ export async function saveAdminPortalSettings(settings: AdminPortalSettings): Pr
 const LS_DELETED_TOMBSTONES = "eman_deleted_accounts_tombstones";
 
 export function getDeletedTombstones(): Set<string> {
+  const set = new Set<string>(["101065", "101140"]);
   try {
     const raw = localStorage.getItem(LS_DELETED_TOMBSTONES);
     if (raw) {
       const arr = JSON.parse(raw);
       if (Array.isArray(arr)) {
-        return new Set(arr.map((x) => normalizeBarcode(String(x))).filter(Boolean));
+        arr.forEach((x) => {
+          const b = normalizeBarcode(String(x));
+          if (b) set.add(b);
+        });
       }
     }
   } catch {}
-  return new Set();
+  return set;
 }
 
 export function addDeletedTombstones(barcodes: string | string[]): void {
@@ -357,6 +361,8 @@ export function saveLocalParentAccounts(accounts: Record<string, ParentAccount>)
 let syncAccountsInFlight: Promise<Record<string, ParentAccount>> | null = null;
 let lastAccountsSyncTime = 0;
 
+let isLocalServerApiActive = true;
+
 export async function syncParentAccountsFromCloud(force: boolean = false): Promise<Record<string, ParentAccount>> {
   const local = getLocalParentAccounts();
   const tombstones = getDeletedTombstones();
@@ -372,54 +378,61 @@ export async function syncParentAccountsFromCloud(force: boolean = false): Promi
       const allDeletedTombstones = new Set<string>(tombstones);
 
       // 1. Authoritative Express Server Cache Sync (<5ms)
-      // Retrieves active accounts and tombstones of deleted accounts
-      try {
-        const resp = await fetch("/api/portal/accounts-sync");
-        if (resp.ok) {
-          const json = await resp.json();
-          if (json?.success) {
-            if (Array.isArray(json.deletedBarcodes)) {
-              json.deletedBarcodes.forEach((b: string) => allDeletedTombstones.add(normalizeBarcode(b)));
-            }
-            if (Array.isArray(json.revokedBarcodes)) {
-              json.revokedBarcodes.forEach((b: string) => allDeletedTombstones.add(normalizeBarcode(b)));
-            }
-            addDeletedTombstones(Array.from(allDeletedTombstones));
-
-            if (json.accounts && typeof json.accounts === "object") {
-              const serverAccounts = json.accounts as Record<string, ParentAccount>;
-              const reconciled: Record<string, ParentAccount> = {};
-
-              for (const [b, acc] of Object.entries(serverAccounts)) {
-                const bCode = normalizeBarcode(b);
-                const stBarcode = normalizeBarcode(acc?.studentBarcode);
-                if (!bCode || allDeletedTombstones.has(bCode) || allDeletedTombstones.has(stBarcode) || acc.status === "deleted") {
-                  continue;
-                }
-                if (Array.isArray(acc.linkedBarcodes) && acc.linkedBarcodes.some((lb) => allDeletedTombstones.has(normalizeBarcode(lb)))) {
-                  continue;
-                }
-                reconciled[bCode] = {
-                  ...acc,
-                  password: acc.password || local[bCode]?.password || "",
-                };
+      // Retrieves active accounts and tombstones of deleted accounts (skipped if on static hosting / Vercel)
+      if (isLocalServerApiActive) {
+        try {
+          const resp = await fetch("/api/portal/accounts-sync");
+          const cType = resp.headers.get("content-type") || "";
+          if (resp.ok && cType.includes("application/json")) {
+            const json = await resp.json();
+            if (json?.success) {
+              if (Array.isArray(json.deletedBarcodes)) {
+                json.deletedBarcodes.forEach((b: string) => allDeletedTombstones.add(normalizeBarcode(b)));
               }
-
-              saveLocalParentAccounts(reconciled);
-              lastAccountsSyncTime = Date.now();
-              if (typeof window !== "undefined") {
-                window.dispatchEvent(
-                  new CustomEvent("eman_account_activated", {
-                    detail: { accounts: reconciled },
-                  })
-                );
+              if (Array.isArray(json.revokedBarcodes)) {
+                json.revokedBarcodes.forEach((b: string) => allDeletedTombstones.add(normalizeBarcode(b)));
               }
-              return reconciled;
+              addDeletedTombstones(Array.from(allDeletedTombstones));
+
+              if (json.accounts && typeof json.accounts === "object") {
+                const serverAccounts = json.accounts as Record<string, ParentAccount>;
+                const reconciled: Record<string, ParentAccount> = {};
+
+                for (const [b, acc] of Object.entries(serverAccounts)) {
+                  const bCode = normalizeBarcode(b);
+                  const stBarcode = normalizeBarcode(acc?.studentBarcode);
+                  if (!bCode || allDeletedTombstones.has(bCode) || allDeletedTombstones.has(stBarcode) || acc.status === "deleted") {
+                    continue;
+                  }
+                  if (Array.isArray(acc.linkedBarcodes) && acc.linkedBarcodes.some((lb) => allDeletedTombstones.has(normalizeBarcode(lb)))) {
+                    continue;
+                  }
+                  reconciled[bCode] = {
+                    ...acc,
+                    password: acc.password || local[bCode]?.password || "",
+                  };
+                }
+
+                saveLocalParentAccounts(reconciled);
+                lastAccountsSyncTime = Date.now();
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(
+                    new CustomEvent("eman_account_activated", {
+                      detail: { accounts: reconciled },
+                    })
+                  );
+                }
+                return reconciled;
+              }
             }
+          } else {
+            // Not JSON (e.g. Vercel rewrite to index.html), disable server-side endpoint calls
+            isLocalServerApiActive = false;
           }
+        } catch (srvErr) {
+          isLocalServerApiActive = false;
+          console.warn("[syncParentAccounts] Server sync notice:", srvErr);
         }
-      } catch (srvErr) {
-        console.warn("[syncParentAccounts] Server sync notice:", srvErr);
       }
 
       // 2. Direct Firestore parent_accounts collection sync
@@ -932,12 +945,22 @@ export function subscribeToAllParentAccounts(
           }
         } catch {}
       };
+      let supervisorSseErrors = 0;
+      sseSource.onerror = () => {
+        supervisorSseErrors++;
+        if (supervisorSseErrors >= 2 && sseSource) {
+          try {
+            sseSource.close();
+          } catch {}
+          sseSource = null;
+        }
+      };
     } catch (err) {
       console.warn("Supervisor SSE subscription notice:", err);
     }
   }
 
-  // 6. Real-time background delta-sync interval every 8s while tab is active (failsafe against network blips)
+  // 6. Real-time background delta-sync interval every 25s while tab is active (Supabase Realtime handles instant events)
   const syncInterval = setInterval(() => {
     if (isCancelled) return;
     if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
@@ -948,7 +971,7 @@ export function subscribeToAllParentAccounts(
         }
       })
       .catch(() => {});
-  }, 8000);
+  }, 25000);
 
   // 7. Firestore Live Realtime Listeners (Phone to PC / PC to Phone)
   let unsubCollection: (() => void) | null = null;
@@ -1173,8 +1196,15 @@ export function subscribeToParentAccountLiveStatus(
           }
         } catch {}
       };
+      let revSseErrors = 0;
       eventSource.onerror = () => {
-        // SSE auto-reconnects
+        revSseErrors++;
+        if (revSseErrors >= 2 && eventSource) {
+          try {
+            eventSource.close();
+          } catch {}
+          eventSource = null;
+        }
       };
     } catch {}
   }
@@ -1891,43 +1921,50 @@ export async function authenticatePortalLogin(
   }
 
   // 0. High-Security Server Login Attempt (Validates securely without leaking other accounts)
-  try {
-    const loginRes = await fetch("/api/portal/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ barcode: rawTrimmed, password: passTrimmed }),
-    });
-    if (loginRes.ok) {
-      const loginData = await loginRes.json();
-      if (loginData.success) {
-        if (loginData.role === "admin") {
-          return {
-            success: true,
-            role: "admin",
-            message: loginData.message || "مرحباً بكِ في لوحة تحكم المشرف العام!",
-          };
+  if (isLocalServerApiActive) {
+    try {
+      const loginRes = await fetch("/api/portal/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ barcode: rawTrimmed, password: passTrimmed }),
+      });
+      const cType = loginRes.headers.get("content-type") || "";
+      if (loginRes.ok && cType.includes("application/json")) {
+        const loginData = await loginRes.json();
+        if (loginData.success) {
+          if (loginData.role === "admin") {
+            return {
+              success: true,
+              role: "admin",
+              message: loginData.message || "مرحباً بكِ في لوحة تحكم المشرف العام!",
+            };
+          }
+          if (loginData.account) {
+            const acc = loginData.account as ParentAccount;
+            const currentAccs = getLocalParentAccounts();
+            currentAccs[acc.studentBarcode] = acc;
+            saveLocalParentAccounts(currentAccs);
+            return {
+              success: true,
+              role: "parent",
+              account: acc,
+              message: "تم تسجيل الدخول بنجاح!",
+            };
+          }
+        } else if (loginData.message) {
+          return { success: false, message: loginData.message };
         }
-        if (loginData.account) {
-          const acc = loginData.account as ParentAccount;
-          const currentAccs = getLocalParentAccounts();
-          currentAccs[acc.studentBarcode] = acc;
-          saveLocalParentAccounts(currentAccs);
-          return {
-            success: true,
-            role: "parent",
-            account: acc,
-            message: "تم تسجيل الدخول بنجاح!",
-          };
-        }
-      } else if (loginData.message) {
-        return { success: false, message: loginData.message };
+      } else if (!cType.includes("application/json")) {
+        // Not a JSON endpoint (running on static host / Vercel), mark inactive and continue to Supabase
+        isLocalServerApiActive = false;
+      } else if (loginRes.status === 401 || loginRes.status === 403 || loginRes.status === 404) {
+        const errJson = await loginRes.json().catch(() => ({}));
+        return { success: false, message: errJson.message || "بيانات الدخول غير صحيحة" };
       }
-    } else if (loginRes.status === 401 || loginRes.status === 403 || loginRes.status === 404) {
-      const errJson = await loginRes.json().catch(() => ({}));
-      return { success: false, message: errJson.message || "بيانات الدخول غير صحيحة" };
+    } catch {
+      isLocalServerApiActive = false;
+      // Network unavailable or offline: seamlessly proceed to local offline verification below
     }
-  } catch {
-    // Network unavailable or offline: seamlessly proceed to local offline verification below
   }
 
   // 1. Dedicated & Bypassed Supervisor / Admin Authentication (Instant zero-delay clearance)
@@ -2299,6 +2336,20 @@ export async function sendParentChatMessage(
     } catch (err) {
       console.warn("Failed to persist chat to Firebase:", err);
     }
+
+    // Persist to Supabase chat_messages table for instant multi-device CDC sync
+    try {
+      const studentUuid = barcodeToUUID(chatId);
+      await supabase
+        .from("chat_messages")
+        .insert({
+          student_id: studentUuid,
+          sender_role: sender === "admin" ? "supervisor" : "parent",
+          sender_name: senderName,
+          message: text.trim(),
+          is_read: false,
+        });
+    } catch {}
   })();
 
   // Background Web Push to recipient phone/device (delivers even if app is completely closed)
