@@ -1777,17 +1777,24 @@ function normalizeAttendanceStatus(raw: any): "حضور" | "تأخير" | "غا�
     }[] = [];
     if (!activeStudent) return list;
 
-    // 1. If supabasePortalData has rich examGradesList, prioritize it
+    // 1. If supabasePortalData has rich examGradesList, prioritize it (deduplicated by title)
     const rawExamItems = (supabasePortalData?.examGradesList && supabasePortalData.examGradesList.length > 0)
       ? supabasePortalData.examGradesList
       : [];
+
+    const seenTitles = new Set<string>();
 
     if (rawExamItems.length > 0) {
       rawExamItems.forEach((g: any, idx: number) => {
         const rawGrade = g.grade !== undefined ? g.grade : g.score !== undefined ? g.score : g.degree;
         const numScore = Number(rawGrade) || 0;
         const maxScore = Number(g.maxScore || g.max_score || 10);
-        const examTitle = g.examTitle || g.title || g.subject || g.name || "اختبار دوري";
+        const examTitle = String(g.examTitle || g.title || g.subject || g.name || "اختبار دوري").trim();
+        
+        // Prevent duplicate exam cards of the same evaluation title
+        if (seenTitles.has(examTitle)) return;
+        seenTitles.add(examTitle);
+
         const examDate = g.created_at || g.date || g.timestamp || g.examDate || g.dateKey || g.date_key || "";
         const cleanExamDate = typeof examDate === "string" ? (examDate.length >= 10 ? examDate.slice(0, 10) : examDate) : undefined;
         const pct = g.percentage !== undefined ? g.percentage : Math.min(100, Math.round((numScore / maxScore) * 100));
@@ -1802,7 +1809,7 @@ function normalizeAttendanceStatus(raw: any): "حضور" | "تأخير" | "غا�
           degree: g.degree,
           scoreStr: g.scoreFormatted || `${rawGrade !== undefined ? rawGrade : numScore} / ${maxScore} (${pct}%)`,
           pct,
-          isLatest: idx === 0,
+          isLatest: list.length === 0,
           date: cleanExamDate,
           created_at: g.created_at || cleanExamDate,
           timestamp: g.timestamp,
@@ -1812,35 +1819,55 @@ function normalizeAttendanceStatus(raw: any): "حضور" | "تأخير" | "غا�
       return list;
     }
 
-    // 2. Fallback to activeStudent fields
+    // 2. Authoritative student records: display ONLY the real evaluations (e.g. التقييم الأول، الثاني، الثالث...)
     if (activeStudent.lastExamTitle && activeStudent.lastExamScore) {
-      // Parse percentage if possible
+      const trimmedLastTitle = activeStudent.lastExamTitle.trim();
       const match = activeStudent.lastExamScore.match(/\((\d+)%\)/);
       const pct = match ? parseInt(match[1], 10) : 100;
+
+      seenTitles.add(trimmedLastTitle);
       list.push({
-        title: activeStudent.lastExamTitle,
-        subject: activeStudent.lastExamTitle,
-        name: activeStudent.lastExamTitle,
+        title: trimmedLastTitle,
+        subject: trimmedLastTitle,
+        name: trimmedLastTitle,
         scoreStr: activeStudent.lastExamScore,
         pct,
         isLatest: true,
       });
-    }
 
-    if (activeStudent.totalExamScores && activeStudent.totalExamScores.length > 0) {
-      activeStudent.totalExamScores.forEach((pct, idx) => {
-        // Only add historical if not identical latest
-        if (list.length === 0 || idx < (activeStudent.totalExamScores?.length || 0) - 1) {
-          list.push({
-            title: `تقييم دوري #${idx + 1}`,
-            subject: `تقييم دوري #${idx + 1}`,
-            name: `تقييم دوري #${idx + 1}`,
-            scoreStr: `${pct}%`,
-            pct,
-            isLatest: false,
-          });
+      // Include previous sequential evaluations if student completed multiple evaluations
+      const standardSequence = [
+        "التقييم الأول",
+        "التقييم الثاني",
+        "التقييم الثالث",
+        "التقييم الرابع",
+        "التقييم الخامس",
+        "التقييم السادس",
+        "التقييم السابع",
+        "التقييم الثامن",
+        "التقييم التاسع",
+        "التقييم العاشر",
+      ];
+
+      const currentIdx = standardSequence.indexOf(trimmedLastTitle);
+      if (currentIdx > 0) {
+        // Add previous completed evaluations in descending order
+        for (let i = currentIdx - 1; i >= 0; i--) {
+          const prevTitle = standardSequence[i];
+          if (!seenTitles.has(prevTitle)) {
+            seenTitles.add(prevTitle);
+            const prevScorePct = activeStudent.totalExamScores?.[i] || pct;
+            list.push({
+              title: prevTitle,
+              subject: prevTitle,
+              name: prevTitle,
+              scoreStr: `${prevScorePct}%`,
+              pct: prevScorePct,
+              isLatest: false,
+            });
+          }
         }
-      });
+      }
     }
 
     return list;
