@@ -1584,13 +1584,31 @@ export default function App() {
 
     const updated = students.map((s) => {
       if (s.barcode === barcode) {
-        const scores = s.totalExamScores ? [...s.totalExamScores, pct] : [pct];
+        const prevRecorded = Array.isArray(s.recordedExamTitles)
+          ? [...s.recordedExamTitles]
+          : s.lastExamTitle
+          ? [s.lastExamTitle]
+          : [];
+        const isDuplicateTitle = prevRecorded.includes(examTitle);
+        const recordedTitles = isDuplicateTitle
+          ? prevRecorded
+          : [...prevRecorded, examTitle];
+
+        let scores: number[];
+        if (isDuplicateTitle && s.totalExamScores && s.totalExamScores.length > 0) {
+          scores = [...s.totalExamScores];
+          scores[scores.length - 1] = pct;
+        } else {
+          scores = s.totalExamScores ? [...s.totalExamScores, pct] : [pct];
+        }
+
         const pointsBonus = pct === 100 ? 20 : pct >= 90 ? 10 : pct >= 75 ? 5 : 0;
 
         return {
           ...s,
           lastExamTitle: examTitle,
           lastExamScore: scoreFormatted,
+          recordedExamTitles: recordedTitles,
           totalExamScores: scores,
           points: (s.points || 0) + pointsBonus,
           updatedAt: Date.now(),
@@ -1662,10 +1680,20 @@ export default function App() {
   ) => {
     const updated = students.map((s) => {
       if (s.barcode === barcode) {
+        const prevRecorded = Array.isArray(s.recordedExamTitles)
+          ? [...s.recordedExamTitles]
+          : s.lastExamTitle
+          ? [s.lastExamTitle]
+          : [];
+        const recordedTitles = prevRecorded.includes(lastTitle)
+          ? prevRecorded
+          : [...prevRecorded, lastTitle];
+
         return {
           ...s,
           lastExamTitle: lastTitle,
           lastExamScore: lastScore,
+          recordedExamTitles: recordedTitles,
           points: newPoints,
           totalExamScores: updatedScores,
           updatedAt: Date.now(),

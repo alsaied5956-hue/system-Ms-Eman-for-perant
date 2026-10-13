@@ -47,6 +47,7 @@ export interface Student {
   totalExamScores: number[]; // مصفوفة النسب المئوية للاختبارات
   lastExamTitle?: string;
   lastExamScore?: string;
+  recordedExamTitles?: string[]; // قائمة عناوين التقييمات المسجلة لمنع تكرار الامتحان لنفس الطالب
   notes?: string;
   createdAt?: string;
   updatedAt?: number;

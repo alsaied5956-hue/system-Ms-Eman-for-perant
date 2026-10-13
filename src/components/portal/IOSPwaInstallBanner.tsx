@@ -1,201 +1,75 @@
 import React, { useState, useEffect } from "react";
-import { Share, PlusSquare, X, BellRing, Smartphone, Check } from "lucide-react";
+import { usePWAInstall } from "../../hooks/usePWAInstall";
+import { Share, PlusSquare, X, Smartphone } from "lucide-react";
 
-interface IOSPwaInstallBannerProps {
-  onDismiss?: () => void;
-}
-
-export const IOSPwaInstallBanner: React.FC<IOSPwaInstallBannerProps> = ({ onDismiss }) => {
-  const [showBanner, setShowBanner] = useState<boolean>(false);
-  const [isDismissed, setIsDismissed] = useState<boolean>(false);
+export const IOSPwaInstallBanner: React.FC = () => {
+  const { isIOS, isInstalled } = usePWAInstall();
+  const [dismissed, setDismissed] = useState(true);
 
   useEffect(() => {
-    if (typeof window === "undefined" || typeof navigator === "undefined") return;
-
-    // 1. Explicitly check if the app is already running in standalone mode (Installed PWA)
-    const isStandalone =
-      (window.navigator as any).standalone ||
-      (typeof window.matchMedia === "function" &&
-        window.matchMedia("(display-mode: standalone)").matches);
-
-    // Automatically suppress and hide the banner if isStandalone is true so installed PWA users never see the prompt
-    if (isStandalone) {
-      setShowBanner(false);
-      return;
-    }
-
-    // 2. Check if device is iOS (iPhone, iPad, iPod)
-    const ua = navigator.userAgent || "";
-    const isIOSDevice =
-      /iphone|ipad|ipod/i.test(ua) ||
-      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-
-    if (!isIOSDevice) {
-      setShowBanner(false);
-      return;
-    }
-
-    // 3. Check if user already dismissed the prompt recently (e.g. within 5 days)
-    try {
-      const dismissedAt = localStorage.getItem("eman_ios_pwa_banner_dismissed_at");
-      if (dismissedAt) {
-        const diffMs = Date.now() - parseInt(dismissedAt, 10);
-        if (diffMs < 5 * 24 * 60 * 60 * 1000) {
-          return;
-        }
-      }
-    } catch {}
-
-    // Show banner after a gentle 1.5s delay to avoid layout shift during page load
-    const timer = setTimeout(() => {
-      // Re-verify standalone state before showing to prevent race conditions
-      const currentIsStandalone =
-        (window.navigator as any).standalone ||
-        (typeof window.matchMedia === "function" &&
-          window.matchMedia("(display-mode: standalone)").matches);
-
-      if (!currentIsStandalone) {
-        setShowBanner(true);
-      }
-    }, 1500);
-
-    // Listen to display-mode changes (e.g., if launched into standalone mode)
-    let mql: MediaQueryList | null = null;
-    let handleMqlChange: ((e: MediaQueryListEvent) => void) | null = null;
-    if (typeof window.matchMedia === "function") {
-      mql = window.matchMedia("(display-mode: standalone)");
-      handleMqlChange = (e: MediaQueryListEvent) => {
-        if (e.matches) {
-          setShowBanner(false);
-        }
-      };
-      if (mql.addEventListener) {
-        mql.addEventListener("change", handleMqlChange);
-      } else if ((mql as any).addListener) {
-        (mql as any).addListener(handleMqlChange);
+    if (typeof window !== "undefined") {
+      const isDismissed = localStorage.getItem("eman_ios_pwa_banner_dismissed");
+      if (!isDismissed && isIOS && !isInstalled) {
+        setDismissed(false);
       }
     }
+  }, [isIOS, isInstalled]);
 
-    return () => {
-      clearTimeout(timer);
-      if (mql && handleMqlChange) {
-        if (mql.removeEventListener) {
-          mql.removeEventListener("change", handleMqlChange);
-        } else if ((mql as any).removeListener) {
-          (mql as any).removeListener(handleMqlChange);
-        }
-      }
-    };
-  }, []);
+  if (dismissed || !isIOS || isInstalled) {
+    return null;
+  }
 
   const handleDismiss = () => {
-    setIsDismissed(true);
-    setShowBanner(false);
+    setDismissed(true);
     try {
-      localStorage.setItem("eman_ios_pwa_banner_dismissed_at", Date.now().toString());
+      localStorage.setItem("eman_ios_pwa_banner_dismissed", "true");
     } catch {}
-    onDismiss?.();
   };
 
-  if (!showBanner || isDismissed) return null;
-
   return (
-    <aside
+    <div
       id="ios-pwa-install-banner"
-      aria-label="تعليمات تثبيت المنظومة على أجهزة آيفون"
       dir="rtl"
-      className="fixed bottom-4 inset-x-3 sm:inset-x-auto sm:right-6 sm:max-w-md z-[999999] animate-fadeIn"
+      className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md rounded-2xl border border-amber-500/40 bg-slate-900/95 p-4 text-slate-100 shadow-2xl backdrop-blur-md animate-fadeIn"
     >
-      <div className="relative overflow-hidden rounded-3xl bg-slate-900/95 backdrop-blur-xl border-2 border-emerald-500/40 p-5 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.85)] text-white">
-        {/* Glow Accent */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none -mr-10 -mt-10" />
-
-        {/* Close Button */}
-        <button
-          id="btn-close-ios-pwa-banner"
-          type="button"
-          onClick={handleDismiss}
-          className="absolute top-3.5 left-3.5 p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition"
-          title="إغلاق التنبيه"
-        >
-          <X className="w-4 h-4" />
-        </button>
-
-        {/* Header */}
-        <div className="flex items-start gap-3 mb-3 pl-6">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0 text-emerald-400">
-            <BellRing className="w-5 h-5 animate-pulse" />
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-400">
+            <Smartphone className="h-5 w-5" />
           </div>
           <div>
-            <h4 className="font-bold text-sm text-emerald-300">
-              تفعيل إشعارات الحضور والواجبات على الآيفون
+            <h4 className="text-sm font-bold text-white font-fancy">
+              تثبيت المنظومة على آيفون / آيباد
             </h4>
-            <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
-              تتطلب حماية Apple إضافة المنظومة للشاشة الرئيسية لتصلك رنات التنبيه الفورية في الخلفية.
+            <p className="text-xs text-amber-300 font-tajawal">
+              للحصول على تجربة التطبيق الأصلي السريع
             </p>
           </div>
         </div>
+        <button
+          type="button"
+          onClick={handleDismiss}
+          className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition cursor-pointer"
+          aria-label="إغلاق"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
 
-        {/* Step-by-Step iOS Guide */}
-        <div className="bg-slate-800/80 rounded-2xl p-3 border border-slate-700/60 space-y-2 mb-3.5 text-xs text-slate-200">
-          <div className="flex items-center gap-2.5">
-            <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-[11px] shrink-0">
-              1
-            </span>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span>اضغط على زر المشاركة</span>
-              <span className="inline-flex items-center gap-1 bg-slate-700/80 px-2 py-0.5 rounded-lg border border-slate-600 text-emerald-300 font-semibold text-[11px]">
-                <Share className="w-3.5 h-3.5" />
-                <span>Share</span>
-              </span>
-              <span>في شريط Safari السفلي.</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-[11px] shrink-0">
-              2
-            </span>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span>مرر للأسفل واختر</span>
-              <span className="inline-flex items-center gap-1 bg-slate-700/80 px-2 py-0.5 rounded-lg border border-slate-600 text-emerald-300 font-semibold text-[11px]">
-                <PlusSquare className="w-3.5 h-3.5" />
-                <span>إضافة إلى الصفحة الرئيسية</span>
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-[11px] shrink-0">
-              3
-            </span>
-            <div className="flex items-center gap-1 text-slate-300">
-              <span>افتح المنظومة من الشاشة الرئيسية واستمتع بالإشعارات كأي تطبيق أصلي.</span>
-            </div>
-          </div>
+      <div className="mt-3 space-y-2 text-xs text-slate-300 font-tajawal">
+        <div className="flex items-center gap-2 rounded-xl bg-slate-800/70 p-2 border border-slate-700/50">
+          <Share className="h-4 w-4 text-sky-400 shrink-0" />
+          <span>
+            1. اضغط على زر <strong>المشاركة (Share)</strong> أسفل متصفح Safari.
+          </span>
         </div>
-
-        {/* Buttons */}
-        <div className="flex items-center justify-between gap-2 pt-1">
-          <button
-            id="btn-confirm-ios-pwa-banner"
-            type="button"
-            onClick={handleDismiss}
-            className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
-          >
-            <Check className="w-3.5 h-3.5" />
-            <span>حسناً، فهمت الخطوات</span>
-          </button>
-          <button
-            id="btn-later-ios-pwa-banner"
-            type="button"
-            onClick={handleDismiss}
-            className="py-2 px-3 rounded-xl text-slate-400 hover:text-slate-200 text-xs transition cursor-pointer"
-          >
-            لاحقاً
-          </button>
+        <div className="flex items-center gap-2 rounded-xl bg-slate-800/70 p-2 border border-slate-700/50">
+          <PlusSquare className="h-4 w-4 text-amber-400 shrink-0" />
+          <span>
+            2. اختر <strong>إضافة إلى الصفحة الرئيسية (Add to Home Screen)</strong>.
+          </span>
         </div>
       </div>
-    </aside>
+    </div>
   );
 };

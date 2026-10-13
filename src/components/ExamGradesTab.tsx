@@ -1,11 +1,28 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Student } from "../types";
-import { openWhatsApp, SCHOOL_WHATSAPP_PHONE, sortStudentsByGradeAndName } from "../utils/helpers";
+import {
+  openWhatsApp,
+  SCHOOL_WHATSAPP_PHONE,
+  sortStudentsByGradeAndName,
+  STANDARD_EVALUATIONS,
+  getStudentRecordedExams,
+  getNextSuggestedEvaluation,
+} from "../utils/helpers";
 import { enqueuePlatformMessage } from "../utils/storage";
 import { playBeep } from "../utils/audio";
 import { dispatchPushNotification } from "../services/pushNotificationService";
 import { StudentSearchBox } from "./StudentSearchBox";
-import { FileCheck2, Send, Sparkles, UserCheck, MessageSquare, Clock, CheckCircle2, Loader2, Trash2 } from "lucide-react";
+import {
+  FileCheck2,
+  Send,
+  Sparkles,
+  CheckCircle2,
+  Loader2,
+  Trash2,
+  AlertTriangle,
+  ChevronDown,
+  RotateCcw,
+} from "lucide-react";
 
 interface ExamGradesTabProps {
   students: Student[];
@@ -20,7 +37,7 @@ export const ExamGradesTab: React.FC<ExamGradesTabProps> = ({
 }) => {
   // Retain the exam title and maximum score across submissions and browser refreshes
   const [examTitle, setExamTitle] = useState<string>(() => {
-    return localStorage.getItem("eman_last_exam_title") || "التقييم الأول";
+    return localStorage.getItem("eman_last_exam_title") || STANDARD_EVALUATIONS[0];
   });
   const [maxScore, setMaxScore] = useState<number>(() => {
     const saved = localStorage.getItem("eman_last_max_score");
@@ -36,10 +53,12 @@ export const ExamGradesTab: React.FC<ExamGradesTabProps> = ({
     studentName: string;
     barcode: string;
     grade: string;
+    phone?: string;
     score: number;
     maxScore: number;
     percentage: number;
     examTitle: string;
+    message?: string;
   } | null>(null);
 
   // Sync to local storage whenever title or max score changes
@@ -61,10 +80,39 @@ export const ExamGradesTab: React.FC<ExamGradesTabProps> = ({
     }
   };
 
+  // Evaluate which exams the currently selected student already completed
+  const recordedExamsForSelected = useMemo(() => {
+    if (!selectedStudent) return [];
+    return getStudentRecordedExams(selectedStudent);
+  }, [selectedStudent]);
+
+  // Is current exam title already taken by selected student?
+  const isCurrentExamDuplicate = useMemo(() => {
+    if (!selectedStudent || !examTitle.trim()) return false;
+    return recordedExamsForSelected.includes(examTitle.trim());
+  }, [selectedStudent, examTitle, recordedExamsForSelected]);
+
+  // Next sequential evaluation for selected student
+  const nextSuggestedForSelected = useMemo(() => {
+    if (!selectedStudent) return STANDARD_EVALUATIONS[0];
+    return getNextSuggestedEvaluation(selectedStudent);
+  }, [selectedStudent]);
+
+  // Select student and automatically ensure examTitle is not a duplicate for them
   const handleSelectStudent = (student: Student) => {
     setSelectedStudent(student);
     setSearchInput(student.name);
     playBeep("success");
+
+    // If current title is already recorded for this student, auto-advance to their next unrecorded evaluation!
+    const studentRecorded = getStudentRecordedExams(student);
+    if (studentRecorded.includes(examTitle.trim())) {
+      const nextEval = getNextSuggestedEvaluation(student);
+      setExamTitle(nextEval);
+      try {
+        localStorage.setItem("eman_last_exam_title", nextEval);
+      } catch {}
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -73,6 +121,18 @@ export const ExamGradesTab: React.FC<ExamGradesTabProps> = ({
 
     if (!selectedStudent) {
       setFeedback({ type: "error", message: "⚠️ يرجى اختيار أو مسح باركود طالب مسجل أولاً!" });
+      return;
+    }
+
+    const currentTitle = examTitle.trim() || STANDARD_EVALUATIONS[0];
+
+    // STRICT ANTI-DUPLICATION RULE: An exam title can NEVER be repeated for the same student!
+    if (isCurrentExamDuplicate) {
+      setFeedback({
+        type: "error",
+        message: `⚠️ غير مسموح بتكرار الامتحان! (${currentTitle}) مسجل بالفعل للطالب (${selectedStudent.name}). التقييم يُرصد مرة واحدة فقط ولا يتكرر! التقييم التالي المقترح: (${nextSuggestedForSelected}).`,
+      });
+      playBeep("error");
       return;
     }
 
@@ -96,8 +156,6 @@ export const ExamGradesTab: React.FC<ExamGradesTabProps> = ({
 
     setIsSubmitting(true);
 
-    const currentTitle = examTitle.trim() || "التقييم الأول";
-
     // 1. Record grade in system
     onRecordGrade(selectedStudent.barcode, currentTitle, scoreNum, maxNum);
     playBeep("success");
@@ -111,8 +169,6 @@ export const ExamGradesTab: React.FC<ExamGradesTabProps> = ({
     }
 
     const msg = `نتيجة اختبار الرياضيات 📐\nالامتحان: (${currentTitle})\nاسم الطالب: ${selectedStudent.name}\nالصف: ${selectedStudent.groupGrade}\nالدرجة: ${scoreNum} من ${maxNum} (${percentage}%)\nالتقييم: ${evaluation}\nمع تحيات ميس إيمان الدمشيتي ✨`;
-
-    const isOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
 
     // Direct Platform Notification sent to Firebase platform_messages & notifications collections
     enqueuePlatformMessage({
@@ -140,7 +196,7 @@ export const ExamGradesTab: React.FC<ExamGradesTabProps> = ({
 
     setFeedback({
       type: "success",
-      message: `✅ تم رصد درجة (${selectedStudent.name}): ${scoreNum}/${maxNum} (${percentage}%) وبث إشعار المنصة الفوري بنجاح!`,
+      message: `✅ تم رصد درجة (${selectedStudent.name}) بنجاح: ${currentTitle} [${scoreNum}/${maxNum} - ${percentage}%] ولم يتكرر أي تقييم!`,
     });
 
     // Save info for visual confirmation card
@@ -156,7 +212,7 @@ export const ExamGradesTab: React.FC<ExamGradesTabProps> = ({
       message: msg,
     });
 
-    // Reset student selection & score, BUT strictly KEEP examTitle and maxScore intact!
+    // Reset student selection & score for next student
     setSearchInput("");
     setSelectedStudent(null);
     setStudentScore("");
@@ -186,6 +242,9 @@ export const ExamGradesTab: React.FC<ExamGradesTabProps> = ({
     openWhatsApp(SCHOOL_WHATSAPP_PHONE, msg);
   };
 
+  // Quick chips: Top standard evaluations
+  const quickChips = STANDARD_EVALUATIONS.slice(0, 8);
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="glass-panel p-6 md:p-8 rounded-3xl shadow-2xl space-y-6">
@@ -196,10 +255,10 @@ export const ExamGradesTab: React.FC<ExamGradesTabProps> = ({
             </div>
             <div>
               <h2 className="text-xl font-bold font-fancy text-amber-300">
-                رصد وإضافة درجات الاختبارات الفورية
+                رصد درجات الاختبارات المتسلسلة
               </h2>
               <p className="text-xs text-slate-400 font-tajawal mt-0.5">
-                بحث ذكي بالاسم أو الباركود وحساب النسب المئوية آلياً مع إشعار ولي الأمر
+                التقييم الأول، الثاني، الثالث، الرابع... مع قفل فوري يمنع تكرار أي تقييم لنفس الطالب
               </p>
             </div>
           </div>
@@ -226,23 +285,92 @@ export const ExamGradesTab: React.FC<ExamGradesTabProps> = ({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs font-bold font-tajawal">
-          <div className="space-y-1.5">
+          {/* Sequential Exam Title Selector */}
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-slate-300">عنوان أو موضوع الامتحان *</label>
-              <span className="text-[11px] text-amber-400/80 font-normal">
-                (يظل ثابتاً تلقائياً لسرعة رصد باقي الطلاب)
+              <label className="text-slate-300">
+                عنوان التقييم المطلوب رصده *
+              </label>
+              <span className="text-[11px] text-amber-400 font-normal">
+                (التقييم يكتب مرة واحدة فقط ولا يتكرر لنفس الطالب)
               </span>
             </div>
-            <input
-              type="text"
-              required
-              value={examTitle}
-              onChange={(e) => handleExamTitleChange(e.target.value)}
-              placeholder="مثال: التقييم الأول، التقييم الثاني، اختبار الجبر..."
-              className="w-full bg-[#080d1e] border border-indigo-500/30 focus:border-amber-400 text-slate-100 px-4 py-3 rounded-2xl outline-none text-sm font-medium transition-all"
-            />
+
+            {/* Quick Sequential Buttons (التقييم الأول، الثاني، الثالث...) */}
+            <div className="flex flex-wrap gap-1.5 pt-0.5">
+              {quickChips.map((title) => {
+                const isSelected = examTitle === title;
+                const isTaken = recordedExamsForSelected.includes(title);
+                const isSuggested = selectedStudent && nextSuggestedForSelected === title;
+
+                return (
+                  <button
+                    key={title}
+                    type="button"
+                    onClick={() => handleExamTitleChange(title)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 border ${
+                      isSelected
+                        ? "bg-amber-400 text-slate-950 border-amber-300 shadow-md shadow-amber-500/20"
+                        : isTaken
+                        ? "bg-slate-900/60 text-slate-500 border-slate-800 line-through opacity-70"
+                        : isSuggested
+                        ? "bg-indigo-950/70 text-indigo-300 border-indigo-500/60 ring-1 ring-indigo-400"
+                        : "bg-[#080d1e] text-slate-300 border-indigo-500/30 hover:border-amber-400/60"
+                    }`}
+                    title={isTaken ? `مسجل مسبقاً لهذا الطالب (غير قابل للتكرار)` : title}
+                  >
+                    <span>{title}</span>
+                    {isTaken && <span className="text-[10px] no-underline">✓</span>}
+                    {isSuggested && !isSelected && (
+                      <span className="text-[10px] text-amber-400">✨</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Dropdown Selector for all 30 evaluations + custom text fallback */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <div className="relative">
+                <select
+                  value={STANDARD_EVALUATIONS.includes(examTitle) ? examTitle : "custom"}
+                  onChange={(e) => {
+                    if (e.target.value !== "custom") {
+                      handleExamTitleChange(e.target.value);
+                    }
+                  }}
+                  className="w-full bg-[#080d1e] border border-indigo-500/30 focus:border-amber-400 text-slate-100 px-3.5 py-2.5 rounded-2xl outline-none text-xs font-medium appearance-none cursor-pointer"
+                >
+                  <option value="" disabled>
+                    اختر التقييم من القائمة المتسلسلة...
+                  </option>
+                  {STANDARD_EVALUATIONS.map((ev) => {
+                    const taken = recordedExamsForSelected.includes(ev);
+                    return (
+                      <option key={ev} value={ev} className="bg-slate-900 text-white">
+                        {ev} {taken ? "(مسجل مسبقاً ✓)" : ""}
+                      </option>
+                    );
+                  })}
+                  <option value="custom" className="bg-slate-900 text-amber-300">
+                    -- كتابة اسم تقييم مخصص --
+                  </option>
+                </select>
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+              </div>
+
+              <input
+                type="text"
+                required
+                value={examTitle}
+                onChange={(e) => handleExamTitleChange(e.target.value)}
+                placeholder="اسم التقييم..."
+                className="w-full bg-[#080d1e] border border-indigo-500/30 focus:border-amber-400 text-slate-100 px-3.5 py-2.5 rounded-2xl outline-none text-xs font-medium transition-all"
+              />
+            </div>
           </div>
 
+          {/* Student Search */}
           <div className="space-y-1.5">
             <label className="text-slate-300 flex items-center justify-between">
               <span>ابحث باسم الطالب أو باركود الكارت:</span>
@@ -263,17 +391,53 @@ export const ExamGradesTab: React.FC<ExamGradesTabProps> = ({
             />
           </div>
 
+          {/* Selected Student Card & Anti-Duplication Status */}
           {selectedStudent && (
-            <div className="glass-card border-emerald-500/40 p-4 rounded-2xl flex items-center justify-between animate-in fade-in">
-              <div>
-                <h4 className="text-sm font-bold text-emerald-300 font-fancy">{selectedStudent.name}</h4>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  {selectedStudent.groupGrade} • {selectedStudent.groupDays} • باركود #{selectedStudent.barcode}
-                </p>
+            <div className="space-y-2">
+              <div className="glass-card border-emerald-500/40 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
+                <div>
+                  <h4 className="text-sm font-bold text-emerald-300 font-fancy">
+                    {selectedStudent.name}
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {selectedStudent.groupGrade} • {selectedStudent.groupDays} • باركود #{selectedStudent.barcode}
+                  </p>
+                </div>
+                <div className="text-left font-mono text-xs text-amber-300">
+                  ⭐ النقاط: {selectedStudent.points || 0}
+                </div>
               </div>
-              <div className="text-left font-mono text-xs text-amber-300">
-                ⭐ النقاط: {selectedStudent.points || 0}
-              </div>
+
+              {/* Duplicate Prevention Alert */}
+              {isCurrentExamDuplicate ? (
+                <div className="p-3.5 rounded-2xl bg-rose-950/80 border border-rose-500/50 text-rose-200 flex flex-wrap items-center justify-between gap-2 animate-in fade-in">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span className="text-xs font-bold">
+                      ⚠️ تنبيه: تم رصد ({examTitle}) لهذا الطالب مسبقاً، ولا يمكن تكراره ثانية!
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleExamTitleChange(nextSuggestedForSelected)}
+                    className="px-3 py-1.5 rounded-xl bg-amber-400 text-slate-950 text-xs font-black hover:bg-amber-300 transition cursor-pointer flex items-center gap-1 shadow-sm"
+                  >
+                    <RotateCcw className="w-3 h-3 text-slate-950" />
+                    <span>الانتقال إلى ({nextSuggestedForSelected}) ⚡</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-[11px] flex items-center justify-between">
+                  <span>
+                    التقييم المستحق للطالب: <strong className="text-white font-fancy">{examTitle}</strong> (غير مسجل مسبقاً ✓)
+                  </span>
+                  {recordedExamsForSelected.length > 0 && (
+                    <span className="text-slate-400">
+                      مسجل له سابقاً: {recordedExamsForSelected.length} تقييم
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -317,9 +481,9 @@ export const ExamGradesTab: React.FC<ExamGradesTabProps> = ({
 
           <button
             type="submit"
-            disabled={!selectedStudent || isSubmitting}
+            disabled={!selectedStudent || isSubmitting || isCurrentExamDuplicate}
             className={`w-full py-3.5 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-xl ${
-              selectedStudent && !isSubmitting
+              selectedStudent && !isSubmitting && !isCurrentExamDuplicate
                 ? "bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-200 hover:from-amber-300 hover:to-yellow-100 text-slate-950 shadow-amber-500/25 cursor-pointer active:scale-[0.99]"
                 : "bg-slate-800 text-slate-500 cursor-not-allowed opacity-50"
             }`}
@@ -328,6 +492,11 @@ export const ExamGradesTab: React.FC<ExamGradesTabProps> = ({
               <>
                 <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
                 <span>جارٍ رصد النتيجة...</span>
+              </>
+            ) : isCurrentExamDuplicate ? (
+              <>
+                <AlertTriangle className="w-4 h-4 text-rose-400" />
+                <span>الامتحان مسجل مسبقاً لهذا الطالب (غير مسموح بالتكرار)</span>
               </>
             ) : (
               <>

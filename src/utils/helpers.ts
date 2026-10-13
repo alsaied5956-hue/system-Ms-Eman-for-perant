@@ -576,3 +576,82 @@ export function getLatestActiveMonthKey(
   return getCurrentMonthKey();
 }
 
+/**
+ * Standard sequential evaluations in Arabic ("التقييم الأول", "التقييم الثاني", ...)
+ */
+export const STANDARD_EVALUATIONS: string[] = [
+  "التقييم الأول",
+  "التقييم الثاني",
+  "التقييم الثالث",
+  "التقييم الرابع",
+  "التقييم الخامس",
+  "التقييم السادس",
+  "التقييم السابع",
+  "التقييم الثامن",
+  "التقييم التاسع",
+  "التقييم العاشر",
+  "التقييم الحادي عشر",
+  "التقييم الثاني عشر",
+  "التقييم الثالث عشر",
+  "التقييم الرابع عشر",
+  "التقييم الخامس عشر",
+  "التقييم السادس عشر",
+  "التقييم السابع عشر",
+  "التقييم الثامن عشر",
+  "التقييم التاسع عشر",
+  "التقييم العشرون",
+  "التقييم الحادي والعشرون",
+  "التقييم الثاني والعشرون",
+  "التقييم الثالث والعشرون",
+  "التقييم الرابع والعشرون",
+  "التقييم الخامس والعشرون",
+  "التقييم السادس والعشرون",
+  "التقييم السابع والعشرون",
+  "التقييم الثامن والعشرون",
+  "التقييم التاسع والعشرون",
+  "التقييم الثلاثون",
+];
+
+/**
+ * Returns all recorded exam titles for a student to ensure no evaluation is duplicated.
+ */
+export function getStudentRecordedExams(student?: Student | null): string[] {
+  if (!student) return [];
+  const set = new Set<string>();
+
+  if (Array.isArray(student.recordedExamTitles)) {
+    student.recordedExamTitles.forEach((t) => {
+      if (t && typeof t === "string") set.add(t.trim());
+    });
+  }
+
+  if (student.lastExamTitle && typeof student.lastExamTitle === "string") {
+    const trimmed = student.lastExamTitle.trim();
+    set.add(trimmed);
+
+    // If student has a sequential title (e.g. "التقييم الثاني"), infer previous ones
+    const idx = STANDARD_EVALUATIONS.indexOf(trimmed);
+    if (idx > 0) {
+      for (let i = 0; i <= idx; i++) {
+        set.add(STANDARD_EVALUATIONS[i]);
+      }
+    }
+  }
+
+  return Array.from(set);
+}
+
+/**
+ * Returns the next sequential evaluation for a student that has not yet been taken.
+ */
+export function getNextSuggestedEvaluation(student?: Student | null): string {
+  if (!student) return STANDARD_EVALUATIONS[0];
+  const recorded = getStudentRecordedExams(student);
+  for (const evalTitle of STANDARD_EVALUATIONS) {
+    if (!recorded.includes(evalTitle)) {
+      return evalTitle;
+    }
+  }
+  return `التقييم رقم ${recorded.length + 1}`;
+}
+
